@@ -19,6 +19,8 @@ export interface Group {
   emoji: string;
   invite_code: string;
   created_by: string;
+  banner_gradient: string;
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -29,6 +31,9 @@ export interface GroupMember {
   user_id: string | null;
   name: string;
   is_placeholder: boolean;
+  status: string;
+  role: string;
+  left_at: string | null;
   joined_at: string;
 }
 
@@ -100,10 +105,14 @@ export interface AppContextValue extends AppState {
   setCurrentGroup: (group: Group | null) => void;
   fetchGroups: () => Promise<void>;
   createGroup: (name: string, emoji: string) => Promise<Group | null>;
+  updateGroup: (groupId: string, updates: Partial<Pick<Group, 'name' | 'banner_gradient'>>) => Promise<void>;
+  deleteGroup: (groupId: string) => Promise<void>;
 
   // Member actions
   fetchMembers: (groupId: string) => Promise<void>;
   addPlaceholderMember: (groupId: string, name: string) => Promise<GroupMember | null>;
+  removeMember: (memberId: string) => Promise<void>;
+  leaveGroup: (groupId: string) => Promise<void>;
 
   // Expense actions
   fetchExpenses: (groupId: string) => Promise<void>;

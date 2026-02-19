@@ -172,6 +172,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           user_id: user.id,
           name: profile?.display_name ?? user.email?.split("@")[0] ?? "You",
           is_placeholder: false,
+          role: "admin",
         });
 
       if (memberError) throw memberError;
@@ -310,8 +311,71 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   // =====================================================
-  // BALANCE CALCULATION
+  // GROUP MANAGEMENT
   // =====================================================
+  const updateGroup = useCallback(async (groupId: string, updates: Partial<Pick<Group, 'name' | 'banner_gradient'>>) => {
+    try {
+      const { error: updateError } = await supabase
+        .from("groups")
+        .update(updates)
+        .eq("id", groupId);
+      if (updateError) throw updateError;
+      setUserGroups((prev) => prev.map((g) => g.id === groupId ? { ...g, ...updates } : g));
+      if (currentGroup?.id === groupId) {
+        setCurrentGroupState((prev) => prev ? { ...prev, ...updates } : prev);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update group");
+    }
+  }, [currentGroup]);
+
+  const deleteGroup = useCallback(async (groupId: string) => {
+    try {
+      const { error: delError } = await supabase
+        .from("groups")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", groupId);
+      if (delError) throw delError;
+      setUserGroups((prev) => prev.filter((g) => g.id !== groupId));
+      if (currentGroup?.id === groupId) {
+        setCurrentGroupState(null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete group");
+    }
+  }, [currentGroup]);
+
+  const removeMember = useCallback(async (memberId: string) => {
+    try {
+      const { error: updateError } = await supabase
+        .from("group_members")
+        .update({ status: "left", left_at: new Date().toISOString() })
+        .eq("id", memberId);
+      if (updateError) throw updateError;
+      setGroupMembers((prev) => prev.map((m) => m.id === memberId ? { ...m, status: "left", left_at: new Date().toISOString() } : m));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove member");
+    }
+  }, []);
+
+  const leaveGroup = useCallback(async (groupId: string) => {
+    if (!user) return;
+    try {
+      const member = groupMembers.find((m) => m.user_id === user.id && m.group_id === groupId);
+      if (!member) return;
+      const { error: updateError } = await supabase
+        .from("group_members")
+        .update({ status: "left", left_at: new Date().toISOString() })
+        .eq("id", member.id);
+      if (updateError) throw updateError;
+      setUserGroups((prev) => prev.filter((g) => g.id !== groupId));
+      if (currentGroup?.id === groupId) {
+        setCurrentGroupState(null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to leave group");
+    }
+  }, [user, groupMembers, currentGroup]);
   const calculateBalances = useCallback((): BalanceSummary[] => {
     return calcBalances(expenses);
   }, [expenses]);
@@ -387,8 +451,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCurrentGroup,
     fetchGroups,
     createGroup,
+    updateGroup,
+    deleteGroup,
     fetchMembers,
     addPlaceholderMember,
+    removeMember,
+    leaveGroup,
     fetchExpenses,
     addExpense,
     fetchExpenseSplits,
