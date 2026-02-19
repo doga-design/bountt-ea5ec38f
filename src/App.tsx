@@ -16,6 +16,7 @@ import Invite from "./pages/onboarding/Invite";
 import Join from "./pages/Join";
 import Dashboard from "./pages/Dashboard";
 import ComingSoon from "./pages/ComingSoon";
+import GroupSettings from "./pages/GroupSettings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,7 +49,7 @@ const App = () => (
               {/* Protected — Phase 2 stubs */}
               <Route path="/groups" element={<AuthGuard><ComingSoon title="All Groups — Phase 2" /></AuthGuard>} />
               <Route path="/groups/:groupId/members" element={<AuthGuard><ComingSoon title="Members — Phase 2" /></AuthGuard>} />
-              <Route path="/groups/:groupId/settings" element={<AuthGuard><ComingSoon title="Settings — Phase 2" /></AuthGuard>} />
+              <Route path="/groups/:groupId/settings" element={<AuthGuard><GroupSettings /></AuthGuard>} />
 
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />

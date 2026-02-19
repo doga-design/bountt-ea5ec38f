@@ -1,4 +1,5 @@
 import { Settings, Plus, User } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import BalancePill from "./BalancePill";
 
@@ -9,7 +10,7 @@ interface DashboardHeaderProps {
 
 export default function DashboardHeader({ onAddMember, showBalance = false }: DashboardHeaderProps) {
   const { currentGroup, groupMembers, user } = useApp();
-
+  const navigate = useNavigate();
   if (!currentGroup) return null;
 
   return (
@@ -19,6 +20,7 @@ export default function DashboardHeader({ onAddMember, showBalance = false }: Da
         <button
           className="w-11 h-11 flex items-center justify-center rounded-full bg-primary-foreground/10"
           aria-label="Group settings"
+          onClick={() => navigate(`/groups/${currentGroup.id}/settings`)}
         >
           <Settings className="w-5 h-5 text-primary-foreground" />
         </button>
