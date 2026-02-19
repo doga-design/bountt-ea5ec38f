@@ -3,7 +3,7 @@ import { useApp } from "@/contexts/AppContext";
 import { formatCurrency } from "@/lib/bountt-utils";
 
 export default function BalancePill() {
-  const { expenses, groupMembers, user, expenseSplits } = useApp();
+  const { expenses, user, expenseSplits } = useApp();
 
   // Calculate net balance for current user
   let totalPaid = 0;
@@ -17,7 +17,6 @@ export default function BalancePill() {
   }
 
   for (const split of expenseSplits) {
-    // Find if the expense is unsettled
     const expense = expenses.find((e) => e.id === split.expense_id);
     if (!expense || expense.is_settled) continue;
     if (split.user_id === user?.id) {
@@ -32,9 +31,9 @@ export default function BalancePill() {
   const label = net > 0 ? `${formatCurrency(net)} owed` : `${formatCurrency(Math.abs(net))} owing`;
 
   return (
-    <div className="flex items-center gap-1.5 bg-primary-foreground/20 rounded-full px-3 py-1">
-      <Layers className="w-3.5 h-3.5 text-primary-foreground" />
-      <span className="text-xs font-medium text-primary-foreground">{label}</span>
+    <div className="flex items-center gap-1.5 bg-primary-foreground/20 rounded-xl px-3 py-1.5">
+      <Layers className="w-4 h-4 text-primary-foreground" />
+      <span className="text-sm font-semibold text-primary-foreground">{label}</span>
     </div>
   );
 }

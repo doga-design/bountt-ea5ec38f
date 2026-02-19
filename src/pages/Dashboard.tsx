@@ -6,8 +6,11 @@ import EmptyState from "@/components/dashboard/EmptyState";
 import AddExpensePrompt from "@/components/dashboard/AddExpensePrompt";
 import ExpenseSheet from "@/components/dashboard/ExpenseSheet";
 import ExpenseCard from "@/components/dashboard/ExpenseCard";
+import MemberCardScroll from "@/components/dashboard/MemberCardScroll";
 import BottomNav from "@/components/BottomNav";
 import { formatRelativeDate } from "@/lib/bountt-utils";
+import { GroupMember } from "@/types";
+import MemberDetailSheet from "@/components/group-settings/MemberDetailSheet";
 
 export default function Dashboard() {
   const { groupId } = useParams<{ groupId: string }>();
@@ -21,9 +24,11 @@ export default function Dashboard() {
     user,
     membersLoading,
     expensesLoading,
+    removeMember,
   } = useApp();
 
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<GroupMember | null>(null);
 
   useEffect(() => {
     if (groupId) {
@@ -32,15 +37,14 @@ export default function Dashboard() {
     }
   }, [groupId, userGroups]);
 
-  // Determine onboarding state
   const otherMembers = groupMembers.filter((m) => m.user_id !== user?.id);
   const hasOtherMembers = otherMembers.length > 0;
   const hasExpenses = expenses.length > 0;
   const latestMemberName = otherMembers[otherMembers.length - 1]?.name ?? "";
 
   const isLoading = membersLoading || expensesLoading;
+  const isAdmin = currentGroup?.created_by === user?.id;
 
-  // Group expenses by date label
   const groupedExpenses = useMemo(() => {
     const groups: { label: string; items: typeof expenses }[] = [];
     let currentLabel = "";
@@ -63,7 +67,6 @@ export default function Dashboard() {
     );
   }
 
-  // State machine: Step 1, Step 2, or Normal
   const mode = !hasOtherMembers ? "empty" : !hasExpenses ? "prompt" : "normal";
 
   return (
@@ -91,6 +94,17 @@ export default function Dashboard() {
 
       {mode === "normal" && (
         <>
+          {/* Member cards horizontal scroll */}
+          <div className="mt-8">
+            <MemberCardScroll
+              members={groupMembers}
+              expenses={expenses}
+              splits={expenseSplits}
+              currentUserId={user?.id ?? ""}
+              onCardClick={setSelectedMember}
+            />
+          </div>
+
           <div className="flex-1 px-4 py-4 space-y-4 pb-24">
             {groupedExpenses.map((group) => (
               <div key={group.label}>
@@ -114,6 +128,22 @@ export default function Dashboard() {
           <ExpenseSheet
             open={sheetOpen}
             onOpenChange={setSheetOpen}
+          />
+
+          <MemberDetailSheet
+            open={!!selectedMember}
+            onOpenChange={(o) => !o && setSelectedMember(null)}
+            member={selectedMember}
+            expenses={expenses}
+            splits={expenseSplits}
+            currentUserId={user?.id ?? ""}
+            isAdmin={isAdmin}
+            onRemove={async () => {
+              if (selectedMember) {
+                await removeMember(selectedMember.id);
+                setSelectedMember(null);
+              }
+            }}
           />
         </>
       )}
