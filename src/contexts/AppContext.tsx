@@ -1,0 +1,350 @@
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+} from "react";
+import { User, Session, RealtimeChannel } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
+import { Group, GroupMember, Expense, Profile, AppContextValue, BalanceSummary } from "@/types";
+import { generateInviteCode, calculateBalances as calcBalances } from "@/lib/bountt-utils";
+
+const AppContext = createContext<AppContextValue | undefined>(undefined);
+
+export function AppProvider({ children }: { children: React.ReactNode }) {
+  // Auth state
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // Groups state
+  const [currentGroup, setCurrentGroupState] = useState<Group | null>(null);
+  const [userGroups, setUserGroups] = useState<Group[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+
+  // Members state
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+
+  // Expenses state
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expensesLoading, setExpensesLoading] = useState(false);
+
+  const [error, setError] = useState<string | null>(null);
+
+  // Realtime subscription refs
+  const expensesChannelRef = useRef<RealtimeChannel | null>(null);
+  const membersChannelRef = useRef<RealtimeChannel | null>(null);
+
+  // =====================================================
+  // AUTH
+  // =====================================================
+  useEffect(() => {
+    // Set up auth state listener BEFORE getSession
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, newSession) => {
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+        setAuthLoading(false);
+
+        if (newSession?.user) {
+          // Fetch profile after auth (defer to avoid deadlock)
+          setTimeout(() => fetchProfile(newSession.user.id), 0);
+        } else {
+          setProfile(null);
+          setUserGroups([]);
+          setCurrentGroupState(null);
+          setExpenses([]);
+          setGroupMembers([]);
+        }
+      }
+    );
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      setSession(initialSession);
+      setUser(initialSession?.user ?? null);
+      setAuthLoading(false);
+      if (initialSession?.user) {
+        fetchProfile(initialSession.user.id);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchProfile = async (userId: string) => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (!error && data) {
+      setProfile(data as Profile);
+    }
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  // =====================================================
+  // GROUPS
+  // =====================================================
+  const fetchGroups = useCallback(async () => {
+    if (!user) return;
+    setGroupsLoading(true);
+    setError(null);
+
+    try {
+      const { data, error: fetchError } = await supabase
+        .from("groups")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (fetchError) throw fetchError;
+      setUserGroups((data as Group[]) ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch groups");
+    } finally {
+      setGroupsLoading(false);
+    }
+  }, [user]);
+
+  const createGroup = useCallback(async (name: string, emoji: string): Promise<Group | null> => {
+    if (!user) return null;
+    setError(null);
+
+    try {
+      const inviteCode = generateInviteCode();
+
+      const { data: groupData, error: groupError } = await supabase
+        .from("groups")
+        .insert({ name, emoji, invite_code: inviteCode, created_by: user.id })
+        .select()
+        .single();
+
+      if (groupError) throw groupError;
+
+      const group = groupData as Group;
+
+      // Auto-add creator as member
+      const { error: memberError } = await supabase
+        .from("group_members")
+        .insert({
+          group_id: group.id,
+          user_id: user.id,
+          name: profile?.display_name ?? user.email?.split("@")[0] ?? "You",
+          is_placeholder: false,
+        });
+
+      if (memberError) throw memberError;
+
+      setUserGroups((prev) => [group, ...prev]);
+      setCurrentGroupState(group);
+      return group;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create group");
+      return null;
+    }
+  }, [user, profile]);
+
+  const setCurrentGroup = useCallback((group: Group | null) => {
+    setCurrentGroupState(group);
+    if (group) {
+      fetchMembers(group.id);
+      fetchExpenses(group.id);
+    } else {
+      setGroupMembers([]);
+      setExpenses([]);
+    }
+  }, []);
+
+  // =====================================================
+  // MEMBERS
+  // =====================================================
+  const fetchMembers = useCallback(async (groupId: string) => {
+    setMembersLoading(true);
+    try {
+      const { data, error: fetchError } = await supabase
+        .from("group_members")
+        .select("*")
+        .eq("group_id", groupId)
+        .order("joined_at", { ascending: true });
+
+      if (fetchError) throw fetchError;
+      setGroupMembers((data as GroupMember[]) ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch members");
+    } finally {
+      setMembersLoading(false);
+    }
+  }, []);
+
+  const addPlaceholderMember = useCallback(async (
+    groupId: string,
+    name: string
+  ): Promise<GroupMember | null> => {
+    if (!user) return null;
+    try {
+      const { data, error: insertError } = await supabase
+        .from("group_members")
+        .insert({ group_id: groupId, user_id: null, name, is_placeholder: true })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+      const member = data as GroupMember;
+      setGroupMembers((prev) => [...prev, member]);
+      return member;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add member");
+      return null;
+    }
+  }, [user]);
+
+  // =====================================================
+  // EXPENSES
+  // =====================================================
+  const fetchExpenses = useCallback(async (groupId: string) => {
+    setExpensesLoading(true);
+    try {
+      const { data, error: fetchError } = await supabase
+        .from("expenses")
+        .select("*")
+        .eq("group_id", groupId)
+        .order("date", { ascending: false });
+
+      if (fetchError) throw fetchError;
+      setExpenses((data as Expense[]) ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch expenses");
+    } finally {
+      setExpensesLoading(false);
+    }
+  }, []);
+
+  const addExpense = useCallback(async (
+    expense: Omit<Expense, "id" | "created_at" | "updated_at">
+  ): Promise<Expense | null> => {
+    if (!user) return null;
+    try {
+      const { data, error: insertError } = await supabase
+        .from("expenses")
+        .insert(expense)
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+      const newExpense = data as Expense;
+      setExpenses((prev) => [newExpense, ...prev]);
+      return newExpense;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add expense");
+      return null;
+    }
+  }, [user]);
+
+  // =====================================================
+  // BALANCE CALCULATION
+  // =====================================================
+  const calculateBalances = useCallback((): BalanceSummary[] => {
+    return calcBalances(expenses);
+  }, [expenses]);
+
+  // =====================================================
+  // REALTIME SUBSCRIPTIONS (dormant in Phase 1)
+  // =====================================================
+  useEffect(() => {
+    if (!currentGroup) {
+      expensesChannelRef.current?.unsubscribe();
+      membersChannelRef.current?.unsubscribe();
+      return;
+    }
+
+    // Subscribe to expenses changes for current group
+    expensesChannelRef.current = supabase
+      .channel(`expenses:${currentGroup.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "expenses", filter: `group_id=eq.${currentGroup.id}` },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            setExpenses((prev) => [payload.new as Expense, ...prev]);
+          } else if (payload.eventType === "UPDATE") {
+            setExpenses((prev) =>
+              prev.map((e) => (e.id === (payload.new as Expense).id ? (payload.new as Expense) : e))
+            );
+          } else if (payload.eventType === "DELETE") {
+            setExpenses((prev) => prev.filter((e) => e.id !== (payload.old as Expense).id));
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to group_members changes
+    membersChannelRef.current = supabase
+      .channel(`members:${currentGroup.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "group_members", filter: `group_id=eq.${currentGroup.id}` },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            setGroupMembers((prev) => [...prev, payload.new as GroupMember]);
+          } else if (payload.eventType === "UPDATE") {
+            setGroupMembers((prev) =>
+              prev.map((m) => (m.id === (payload.new as GroupMember).id ? (payload.new as GroupMember) : m))
+            );
+          } else if (payload.eventType === "DELETE") {
+            setGroupMembers((prev) => prev.filter((m) => m.id !== (payload.old as GroupMember).id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      expensesChannelRef.current?.unsubscribe();
+      membersChannelRef.current?.unsubscribe();
+    };
+  }, [currentGroup?.id]);
+
+  const value: AppContextValue = {
+    user,
+    session,
+    profile,
+    authLoading,
+    currentGroup,
+    userGroups,
+    groupsLoading,
+    groupMembers,
+    membersLoading,
+    expenses,
+    expensesLoading,
+    error,
+    setCurrentGroup,
+    fetchGroups,
+    createGroup,
+    fetchMembers,
+    addPlaceholderMember,
+    fetchExpenses,
+    addExpense,
+    calculateBalances,
+    signOut,
+  };
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+}
+
+export function useApp() {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error("useApp must be used within an AppProvider");
+  }
+  return context;
+}
+
+export default AppContext;
