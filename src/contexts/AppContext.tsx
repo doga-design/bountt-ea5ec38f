@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import { User, Session, RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { Group, GroupMember, Expense, Profile, AppContextValue, BalanceSummary } from "@/types";
+import { Group, GroupMember, Expense, ExpenseSplit, Profile, AppContextValue, BalanceSummary } from "@/types";
 import { generateInviteCode, calculateBalances as calcBalances } from "@/lib/bountt-utils";
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -32,6 +32,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Expenses state
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [expensesLoading, setExpensesLoading] = useState(false);
+
+  // Expense splits state
+  const [expenseSplits, setExpenseSplits] = useState<ExpenseSplit[]>([]);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -187,9 +190,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (group) {
       fetchMembers(group.id);
       fetchExpenses(group.id);
+      fetchExpenseSplits(group.id);
     } else {
       setGroupMembers([]);
       setExpenses([]);
+      setExpenseSplits([]);
     }
   }, []);
 
@@ -254,6 +259,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setError(err instanceof Error ? err.message : "Failed to fetch expenses");
     } finally {
       setExpensesLoading(false);
+    }
+  }, []);
+
+  const fetchExpenseSplits = useCallback(async (groupId: string) => {
+    try {
+      // Get expense IDs for this group first
+      const { data: expenseRows } = await supabase
+        .from("expenses")
+        .select("id")
+        .eq("group_id", groupId);
+
+      if (!expenseRows || expenseRows.length === 0) {
+        setExpenseSplits([]);
+        return;
+      }
+
+      const expenseIds = expenseRows.map((e) => e.id);
+      const { data, error: fetchError } = await supabase
+        .from("expense_splits")
+        .select("*")
+        .in("expense_id", expenseIds);
+
+      if (fetchError) throw fetchError;
+      setExpenseSplits((data as ExpenseSplit[]) ?? []);
+    } catch (err) {
+      console.error("Failed to fetch expense splits", err);
     }
   }, []);
 
@@ -351,6 +382,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     membersLoading,
     expenses,
     expensesLoading,
+    expenseSplits,
     error,
     setCurrentGroup,
     fetchGroups,
@@ -359,6 +391,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     addPlaceholderMember,
     fetchExpenses,
     addExpense,
+    fetchExpenseSplits,
     calculateBalances,
     signOut,
   };
