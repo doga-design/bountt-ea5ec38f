@@ -397,7 +397,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         { event: "*", schema: "public", table: "expenses", filter: `group_id=eq.${currentGroup.id}` },
         (payload) => {
           if (payload.eventType === "INSERT") {
-            setExpenses((prev) => [payload.new as Expense, ...prev]);
+            setExpenses((prev) => {
+              const newExpense = payload.new as Expense;
+              if (prev.some((e) => e.id === newExpense.id)) return prev;
+              return [newExpense, ...prev];
+            });
           } else if (payload.eventType === "UPDATE") {
             setExpenses((prev) =>
               prev.map((e) => (e.id === (payload.new as Expense).id ? (payload.new as Expense) : e))
@@ -416,7 +420,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         { event: "*", schema: "public", table: "group_members", filter: `group_id=eq.${currentGroup.id}` },
         (payload) => {
           if (payload.eventType === "INSERT") {
-            setGroupMembers((prev) => [...prev, payload.new as GroupMember]);
+            setGroupMembers((prev) => {
+              const newMember = payload.new as GroupMember;
+              if (prev.some((m) => m.id === newMember.id)) return prev;
+              return [...prev, newMember];
+            });
           } else if (payload.eventType === "UPDATE") {
             setGroupMembers((prev) =>
               prev.map((m) => (m.id === (payload.new as GroupMember).id ? (payload.new as GroupMember) : m))
