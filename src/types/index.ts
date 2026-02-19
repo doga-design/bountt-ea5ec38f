@@ -88,6 +88,9 @@ export interface AppState {
   expenses: Expense[];
   expensesLoading: boolean;
 
+  // Expense Splits
+  expenseSplits: ExpenseSplit[];
+
   // General
   error: string | null;
 }
@@ -105,6 +108,7 @@ export interface AppContextValue extends AppState {
   // Expense actions
   fetchExpenses: (groupId: string) => Promise<void>;
   addExpense: (expense: Omit<Expense, "id" | "created_at" | "updated_at">) => Promise<Expense | null>;
+  fetchExpenseSplits: (groupId: string) => Promise<void>;
 
   // Balance utilities
   calculateBalances: () => BalanceSummary[];
