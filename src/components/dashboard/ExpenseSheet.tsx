@@ -73,7 +73,7 @@ export default function ExpenseSheet({
           amount: numAmount,
           description: description.trim() || "Quick Expense",
           paid_by_user_id: payer.user_id,
-          paid_by_name: isPayerSelf ? "You" : payer.name,
+          paid_by_name: payer.name,
           created_by: user.id,
           is_settled: false,
         })

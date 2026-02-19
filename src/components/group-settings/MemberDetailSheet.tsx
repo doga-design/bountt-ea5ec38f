@@ -143,7 +143,7 @@ export default function MemberDetailSheet({
                       <div>
                         <p className="text-sm font-medium text-foreground">{exp.description}</p>
                         <p className="text-xs text-muted-foreground">
-                          {exp.paid_by_name} paid {formatCurrency(exp.amount)}
+                          {exp.paid_by_user_id === currentUserId ? "You" : exp.paid_by_name} paid {formatCurrency(exp.amount)}
                         </p>
                       </div>
                       <p className="text-sm font-medium text-foreground">
