@@ -39,11 +39,53 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const expensesChannelRef = useRef<RealtimeChannel | null>(null);
   const membersChannelRef = useRef<RealtimeChannel | null>(null);
 
+  // Track if we already fetched groups for a given user to avoid double-fetch
+  const groupsFetchedForRef = useRef<string | null>(null);
+
+  // =====================================================
+  // GROUPS (defined before AUTH so it can be called there)
+  // =====================================================
+  const fetchGroups = useCallback(async (userId?: string) => {
+    const uid = userId ?? user?.id;
+    if (!uid) return;
+    setGroupsLoading(true);
+    setError(null);
+
+    try {
+      // Get groups where user is a member
+      const { data: memberRows, error: memberErr } = await supabase
+        .from("group_members")
+        .select("group_id")
+        .eq("user_id", uid);
+
+      if (memberErr) throw memberErr;
+
+      const groupIds = memberRows?.map((r) => r.group_id) ?? [];
+
+      if (groupIds.length === 0) {
+        setUserGroups([]);
+        return;
+      }
+
+      const { data, error: fetchError } = await supabase
+        .from("groups")
+        .select("*")
+        .in("id", groupIds)
+        .order("created_at", { ascending: false });
+
+      if (fetchError) throw fetchError;
+      setUserGroups((data as Group[]) ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch groups");
+    } finally {
+      setGroupsLoading(false);
+    }
+  }, [user]);
+
   // =====================================================
   // AUTH
   // =====================================================
   useEffect(() => {
-    // Set up auth state listener BEFORE getSession
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         setSession(newSession);
@@ -51,25 +93,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setAuthLoading(false);
 
         if (newSession?.user) {
-          // Fetch profile after auth (defer to avoid deadlock)
           setTimeout(() => fetchProfile(newSession.user.id), 0);
+          // Auto-fetch groups on sign-in
+          if (groupsFetchedForRef.current !== newSession.user.id) {
+            groupsFetchedForRef.current = newSession.user.id;
+            setTimeout(() => fetchGroups(newSession.user.id), 0);
+          }
         } else {
           setProfile(null);
           setUserGroups([]);
           setCurrentGroupState(null);
           setExpenses([]);
           setGroupMembers([]);
+          groupsFetchedForRef.current = null;
         }
       }
     );
 
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
       setAuthLoading(false);
       if (initialSession?.user) {
         fetchProfile(initialSession.user.id);
+        if (groupsFetchedForRef.current !== initialSession.user.id) {
+          groupsFetchedForRef.current = initialSession.user.id;
+          fetchGroups(initialSession.user.id);
+        }
       }
     });
 
@@ -93,28 +143,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // =====================================================
-  // GROUPS
+  // MORE GROUPS
   // =====================================================
-  const fetchGroups = useCallback(async () => {
-    if (!user) return;
-    setGroupsLoading(true);
-    setError(null);
-
-    try {
-      const { data, error: fetchError } = await supabase
-        .from("groups")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (fetchError) throw fetchError;
-      setUserGroups((data as Group[]) ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch groups");
-    } finally {
-      setGroupsLoading(false);
-    }
-  }, [user]);
-
   const createGroup = useCallback(async (name: string, emoji: string): Promise<Group | null> => {
     if (!user) return null;
     setError(null);
@@ -132,7 +162,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const group = groupData as Group;
 
-      // Auto-add creator as member
       const { error: memberError } = await supabase
         .from("group_members")
         .insert({
@@ -257,7 +286,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [expenses]);
 
   // =====================================================
-  // REALTIME SUBSCRIPTIONS (dormant in Phase 1)
+  // REALTIME SUBSCRIPTIONS
   // =====================================================
   useEffect(() => {
     if (!currentGroup) {
@@ -266,7 +295,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Subscribe to expenses changes for current group
     expensesChannelRef.current = supabase
       .channel(`expenses:${currentGroup.id}`)
       .on(
@@ -286,7 +314,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       )
       .subscribe();
 
-    // Subscribe to group_members changes
     membersChannelRef.current = supabase
       .channel(`members:${currentGroup.id}`)
       .on(
