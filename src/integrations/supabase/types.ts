@@ -105,7 +105,10 @@ export type Database = {
           id: string
           is_placeholder: boolean
           joined_at: string
+          left_at: string | null
           name: string
+          role: string
+          status: string
           user_id: string | null
         }
         Insert: {
@@ -113,7 +116,10 @@ export type Database = {
           id?: string
           is_placeholder?: boolean
           joined_at?: string
+          left_at?: string | null
           name: string
+          role?: string
+          status?: string
           user_id?: string | null
         }
         Update: {
@@ -121,7 +127,10 @@ export type Database = {
           id?: string
           is_placeholder?: boolean
           joined_at?: string
+          left_at?: string | null
           name?: string
+          role?: string
+          status?: string
           user_id?: string | null
         }
         Relationships: [
@@ -136,8 +145,10 @@ export type Database = {
       }
       groups: {
         Row: {
+          banner_gradient: string
           created_at: string
           created_by: string
+          deleted_at: string | null
           emoji: string
           id: string
           invite_code: string
@@ -145,8 +156,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          banner_gradient?: string
           created_at?: string
           created_by: string
+          deleted_at?: string | null
           emoji?: string
           id?: string
           invite_code: string
@@ -154,8 +167,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          banner_gradient?: string
           created_at?: string
           created_by?: string
+          deleted_at?: string | null
           emoji?: string
           id?: string
           invite_code?: string

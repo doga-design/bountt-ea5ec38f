@@ -20,7 +20,7 @@ export default function BalancePill() {
     // Find if the expense is unsettled
     const expense = expenses.find((e) => e.id === split.expense_id);
     if (!expense || expense.is_settled) continue;
-    if (split.user_id === user?.id || (!split.user_id && groupMembers.find((m) => m.user_id === user?.id && m.name === split.member_name))) {
+    if (split.user_id === user?.id) {
       totalOwed += Number(split.share_amount);
     }
   }
