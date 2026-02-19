@@ -84,7 +84,6 @@ export default function Dashboard() {
           <ExpenseSheet
             open={sheetOpen}
             onOpenChange={setSheetOpen}
-            memberName={latestMemberName}
             isFirstExpense
           />
         </>
@@ -115,7 +114,6 @@ export default function Dashboard() {
           <ExpenseSheet
             open={sheetOpen}
             onOpenChange={setSheetOpen}
-            memberName={otherMembers.map((m) => m.name).join(", ")}
           />
         </>
       )}

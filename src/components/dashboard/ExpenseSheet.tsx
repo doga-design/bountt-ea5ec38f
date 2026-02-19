@@ -4,12 +4,12 @@ import { ArrowRight, Delete } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { distributeCents } from "@/lib/bountt-utils";
 import confetti from "canvas-confetti";
 
 interface ExpenseSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  memberName: string;
   isFirstExpense?: boolean;
 }
 
@@ -23,13 +23,20 @@ const NUMPAD_KEYS = [
 export default function ExpenseSheet({
   open,
   onOpenChange,
-  memberName,
   isFirstExpense = false,
 }: ExpenseSheetProps) {
   const [amount, setAmount] = useState("0");
   const [loading, setLoading] = useState(false);
+  const [selectedPayerIdx, setSelectedPayerIdx] = useState(0); // index into groupMembers; 0 = current user (self)
   const { currentGroup, user, groupMembers, addExpense, fetchExpenseSplits } = useApp();
   const { toast } = useToast();
+
+  // Sort members so current user is first
+  const sortedMembers = [...groupMembers].sort((a, b) => {
+    if (a.user_id === user?.id) return -1;
+    if (b.user_id === user?.id) return 1;
+    return 0;
+  });
 
   const handleKey = (key: string) => {
     if (key === "del") {
@@ -43,7 +50,7 @@ export default function ExpenseSheet({
     if (amount === "0" && key !== ".") {
       setAmount(key);
     } else {
-      if (amount.length >= 9) return; // max length
+      if (amount.length >= 9) return;
       setAmount((prev) => prev + key);
     }
   };
@@ -54,6 +61,9 @@ export default function ExpenseSheet({
     setLoading(true);
 
     try {
+      const payer = sortedMembers[selectedPayerIdx] ?? sortedMembers[0];
+      const isPayerSelf = payer.user_id === user.id;
+
       // Insert expense
       const { data: expenseData, error: expenseError } = await supabase
         .from("expenses")
@@ -61,8 +71,8 @@ export default function ExpenseSheet({
           group_id: currentGroup.id,
           amount: numAmount,
           description: "Quick Expense",
-          paid_by_user_id: user.id,
-          paid_by_name: "You",
+          paid_by_user_id: payer.user_id,
+          paid_by_name: isPayerSelf ? "You" : payer.name,
           created_by: user.id,
           is_settled: false,
         })
@@ -71,16 +81,22 @@ export default function ExpenseSheet({
 
       if (expenseError) throw expenseError;
 
-      // Insert equal splits for all members
-      const memberCount = groupMembers.length;
-      const shareAmount = Math.round((numAmount / memberCount) * 100) / 100;
+      // Cent-distribution algorithm for perfect splits
+      const shares = distributeCents(numAmount, sortedMembers.length);
 
-      const splits = groupMembers.map((m) => ({
+      const splits = sortedMembers.map((m, i) => ({
         expense_id: expenseData.id,
         user_id: m.user_id,
         member_name: m.name,
-        share_amount: shareAmount,
+        share_amount: shares[i],
       }));
+
+      // Validate: splits must sum to exact total
+      const splitsSum = splits.reduce((s, sp) => s + Math.round(sp.share_amount * 100), 0);
+      const totalCents = Math.round(numAmount * 100);
+      if (Math.abs(splitsSum - totalCents) > 0) {
+        console.error("Split validation failed:", { splitsSum, totalCents, shares });
+      }
 
       const { error: splitsError } = await supabase
         .from("expense_splits")
@@ -88,7 +104,6 @@ export default function ExpenseSheet({
 
       if (splitsError) throw splitsError;
 
-      // Refresh splits in context
       await fetchExpenseSplits(currentGroup.id);
 
       if (isFirstExpense) {
@@ -104,6 +119,7 @@ export default function ExpenseSheet({
       }
 
       setAmount("0");
+      setSelectedPayerIdx(0);
       onOpenChange(false);
     } catch (err) {
       toast({
@@ -120,6 +136,10 @@ export default function ExpenseSheet({
   const numAmount = parseFloat(amount);
   const canSubmit = numAmount > 0 && !loading;
 
+  const otherNames = sortedMembers
+    .filter((_, i) => i !== selectedPayerIdx)
+    .map((m) => m.user_id === user?.id ? "you" : m.name.toLowerCase());
+
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="max-w-[430px] mx-auto">
@@ -128,9 +148,34 @@ export default function ExpenseSheet({
           <h3 className="text-lg font-bold text-foreground text-center mb-1">
             What did you pay for?
           </h3>
-          <p className="text-sm text-muted-foreground text-center mb-6">
-            Splitting equally with <span className="text-primary font-medium">{memberName.toLowerCase()}</span>
+          <p className="text-sm text-muted-foreground text-center mb-4">
+            Split equally among{" "}
+            <span className="text-primary font-medium">{sortedMembers.length} people</span>
           </p>
+
+          {/* Who paid? selector */}
+          <div className="mb-6">
+            <p className="text-xs text-muted-foreground text-center mb-2">Who paid?</p>
+            <div className="flex gap-2 overflow-x-auto justify-center">
+              {sortedMembers.map((m, i) => {
+                const isSelf = m.user_id === user?.id;
+                const selected = i === selectedPayerIdx;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => setSelectedPayerIdx(i)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                      selected
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {isSelf ? "You" : m.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Amount display */}
           <div className="flex items-baseline justify-center mb-8">

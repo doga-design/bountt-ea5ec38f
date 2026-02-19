@@ -12,13 +12,28 @@ export default function ExpenseCard({ expense, splits }: ExpenseCardProps) {
   const { user } = useApp();
   const isPayer = expense.paid_by_user_id === user?.id;
 
-  // Find the other person's share to display
-  const otherSplit = splits.find((s) =>
-    isPayer ? s.user_id !== user?.id : s.user_id === user?.id
-  );
-  const shareLabel = otherSplit
-    ? `${isPayer ? otherSplit.member_name : "Your"}'s share is ${formatCurrency(otherSplit.share_amount)}`
-    : "";
+  // Find the current user's split
+  const mySplit = splits.find((s) => s.user_id === user?.id);
+  const myShare = mySplit ? Number(mySplit.share_amount) : 0;
+
+  let shareLabel = "";
+  if (splits.length === 2) {
+    // 2-person split: show the other person's share
+    const otherSplit = splits.find((s) => s.user_id !== user?.id);
+    if (otherSplit) {
+      shareLabel = isPayer
+        ? `${otherSplit.member_name}'s share is ${formatCurrency(Number(otherSplit.share_amount))}`
+        : `Your share is ${formatCurrency(myShare)}`;
+    }
+  } else if (splits.length > 2) {
+    // 3+ person: show net position
+    if (isPayer) {
+      const othersOwe = Number(expense.amount) - myShare;
+      shareLabel = `Others owe you ${formatCurrency(othersOwe)}`;
+    } else {
+      shareLabel = `Your share is ${formatCurrency(myShare)}`;
+    }
+  }
 
   return (
     <div className="bg-card rounded-2xl p-4 flex items-start justify-between">
@@ -35,7 +50,7 @@ export default function ExpenseCard({ expense, splits }: ExpenseCardProps) {
       </div>
       <div className="text-right">
         <span className="inline-block bg-muted text-foreground text-sm font-semibold px-3 py-1 rounded-full">
-          {formatCurrency(expense.amount)}
+          {formatCurrency(Number(expense.amount))}
         </span>
         {shareLabel && (
           <p className="text-xs text-muted-foreground mt-1">{shareLabel}</p>
