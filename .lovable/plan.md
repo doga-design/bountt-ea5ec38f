@@ -1,219 +1,109 @@
 
 
-# Visual Member System + Group Settings Overhaul
+# Bug Fixes and Improvements -- Implementation Plan
 
-## Overview
+## Phase 1: Critical Fixes
 
-This is a major UI overhaul touching the dashboard header, member card system, and group settings page. The work breaks down into 5 implementation phases executed in sequence.
+### BUG 6: Persistent Authentication
+**Status:** Already working correctly.
+The auth setup in `AppContext.tsx` (lines 91-130) already calls `onAuthStateChange` first, then `getSession()`. Supabase handles session persistence via localStorage automatically. However, the Splash page (`Splash.tsx`) has a 2200ms delay timer that may cause issues if auth resolves slowly. No code changes needed here -- this should already work. Will verify during testing.
 
----
+### BUG 3: Join via Invite Code Not Working
+**Status:** Already working.
+The `/join` route exists in `App.tsx`, and the `Join.tsx` page has a form with a code input and validation. The Auth page links to `/join` with the text "I have a group invite code". The join page handles both URL params and manual code entry. However, the join page requires authentication (`AuthGuard` wraps it). If a user is not logged in and clicks the link on the auth page, they'll be redirected to `/auth` by the guard -- but they're already on `/auth`. This creates a loop for unauthenticated users.
 
-## Phase 1: Foundation -- Avatar Colors + Utility Functions
+**Fix:** Move the `/join` route outside of `AuthGuard` OR handle the auth-first flow inside Join.tsx (redirect to auth, then back to join after login). The simplest fix: keep the guard but store the invite code. The current code already has `state={{ from: location.pathname }}` in AuthGuard, so after login the user should be redirected back. However, `Auth.tsx` doesn't read `location.state.from`. Need to fix the post-login redirect in Auth.tsx to check for a `from` state.
 
-### New file: `src/lib/avatar-utils.ts`
-- Deterministic color assignment from 6-color palette (#3B82F6, #EC4899, #10B981, #F97316, #8B5CF6, #14B8A6) based on member ID hash
-- `getAvatarColor(memberId: string): string` -- hashes the ID and picks a color index
-- `getMemberBalance(memberId: string, expenses: Expense[], splits: ExpenseSplit[], currentUserId: string): { amount: number; direction: 'you_pay' | 'they_pay' | 'settled' }` -- calculates the net financial relationship between the current user and a specific member
+**Files:** `src/pages/Auth.tsx` -- after successful sign-in, check `location.state?.from` and navigate there instead of the default dashboard redirect.
 
-### Balance calculation per member
-For each member, compute:
-- Sum of all unsettled expenses where YOU paid and THEY have a split = what they owe you
-- Sum of all unsettled expenses where THEY paid and YOU have a split = what you owe them
-- Net = (what they owe you) - (what you owe them)
-- Positive net = "They pay you $X", Negative net = "You pay $X", Zero = "All settled"
+### BUG 5: Member Count Doesn't Update After User Leaves
+**Root cause:** `fetchGroups` filters by `user_id` in `group_members` but doesn't filter by `status='active'`. Also, `fetchMembers` fetches ALL members regardless of status. The member count in `GroupSettings.tsx` line 48 already filters by `status === "active"` -- that's correct. But `DashboardHeader.tsx` line 17 also filters by `status === "active"`. The issue is likely that after `leaveGroup` is called, the `groupMembers` state doesn't update because the member's status is changed in the DB but the local state may not reflect it if the realtime subscription doesn't fire or the user navigates away.
 
----
+**Fix:** In `leaveGroup` (AppContext line 361-378), after updating the member status, also update `groupMembers` state to reflect the change (set the member's status to "left"). Currently it only removes the group from `userGroups` and clears `currentGroup`, but doesn't update `groupMembers`. Also, `fetchGroups` should filter out groups where the user's membership status is "left".
 
-## Phase 2: Redesign Dashboard Header
+**Files:** `src/contexts/AppContext.tsx` -- update `fetchGroups` to join with `group_members` and filter `status = 'active'`, and update `leaveGroup` to also update local `groupMembers` state.
 
-### Rewrite: `src/components/dashboard/DashboardHeader.tsx`
+### BUG 4: Expense Description Not Editable
+**Root cause:** `ExpenseSheet.tsx` line 73 hardcodes `description: "Quick Expense"`.
 
-Match `hero-banner-style.png` exactly:
+**Fix:** Add a text input state for description. Place it between the amount display and the numpad. Default to empty, auto-fill "Quick Expense" on submit if empty.
 
-**Layout changes:**
-- Remove `rounded-b-3xl` (straight edges)
-- Height ~200px total
-- Add black strip at absolute bottom (4px height, full width)
-
-**Element positioning (top to bottom, left to right):**
-
-Top row:
-- Left: Overlapping member avatars (40px circles, white 2px borders, each shifted ~-12px margin-left)
-  - Current user: smiley emoji avatar with white circular background + colored border matching palette
-  - Placeholder members: ghost icon on grey/muted circle
-  - Real members: User icon on colored circle (color from `getAvatarColor`)
-  - "+" button: white/light circle with plus icon at end of row
-- Right: Settings gear icon (white, outline style, ~40px)
-
-Bottom row:
-- Left: Group name in bold white text (~text-2xl font-bold)
-- Right: BalancePill component (semi-transparent orange-white pill)
-
-Emoji avatar:
-- Large white circle (56px) with group emoji centered
-- Positioned at bottom-left, overlapping the orange/white boundary (translate-y to sit half on each)
-
-### Update: `src/components/dashboard/BalancePill.tsx`
-- Restyle to match screenshot: larger text, semi-transparent orange-tinted background (`bg-white/20`), rounded-xl, with Layers icon
-- Display "$X owed" or "$X owing"
+**Files:** `src/components/dashboard/ExpenseSheet.tsx` -- add `description` state, render text input, use it in the insert call.
 
 ---
 
-## Phase 3: Member Card Components
+## Phase 2: High Priority
 
-### New file: `src/components/dashboard/MemberCard.tsx` (Dashboard version, different from group-settings version)
+### BUG 1: Banner Gradient Not Updating on Dashboard
+**Root cause:** The `DashboardHeader` uses a hardcoded `bg-primary` (line 22) instead of reading `currentGroup.banner_gradient`. When the gradient is changed in settings, `updateGroup` correctly updates `currentGroup` state, but the header never reads the gradient value.
 
-Two visual variants based on `is_placeholder`:
+**Fix:** Update `DashboardHeader.tsx` to read `currentGroup.banner_gradient` and apply the gradient as an inline style, using the same `GRADIENTS` map from `GroupBanner.tsx`.
 
-**Placeholder card:**
-- Background: `bg-muted` (light gray)
-- Left: Ghost emoji (text) in a circle
-- Top row: ghost icon + name (bold) + arrow-up-right icon (right-aligned)
-- Bottom row: balance text ("You pay $X" / "They pay $X" / "All settled") + amount
-- Rounded-xl, ~280px wide, full content height
-- Tappable (active:scale-[0.98])
+**Files:** `src/components/dashboard/DashboardHeader.tsx` -- import GRADIENTS map, apply dynamic background style.
 
-**Real user card:**
-- Background: `bg-white`
-- Left: Colored circle avatar (from palette) with User icon
-- Same layout as placeholder otherwise
-- Arrow-up-right icon on right
+### FEATURE 7: Empty Groups State
+**Current behavior:** Splash page redirects to `/onboarding/group-name` if user has no groups. This is wrong for returning users who left all groups.
 
-### New file: `src/components/dashboard/MemberCardScroll.tsx`
-- Horizontal scrolling container for member cards
-- Uses `overflow-x-auto` with `chip-scroll` class (hide scrollbar)
-- `flex gap-3` layout
-- Shows partial next card to hint at scroll
-- Each card is `min-w-[260px]` flex-shrink-0
-- Used in both Dashboard (normal mode) and GroupSettings
+**Fix:** Create a new page `/groups/empty` with two CTAs: "Create New Group" and "Join via Invite Code". Update Splash.tsx redirect logic: if user has 0 groups, go to `/groups/empty` instead of onboarding.
+
+**Files:**
+- New: `src/pages/EmptyGroups.tsx` -- simple page with two buttons
+- `src/pages/Splash.tsx` -- change redirect from `/onboarding/group-name` to `/groups/empty`
+- `src/pages/Auth.tsx` -- same redirect change
+- `src/App.tsx` -- add route for `/groups/empty`
+
+### BUG 8: Onboarding Shows Again for Returning Users
+**Root cause:** Dashboard mode logic (line 70): `mode = !hasOtherMembers ? "empty" : !hasExpenses ? "prompt" : "normal"`. If a returning user opens a group with no expenses yet, they see the "prompt" (onboarding-like) state. This is actually correct behavior -- the "empty" and "prompt" states ARE the onboarding. The real issue is that the Splash page sends returning users to onboarding (`/onboarding/group-name`) if they have no groups.
+
+This is the same fix as FEATURE 7 above. Additionally, the dashboard "empty" state (`EmptyState`) should be for when the user has no other members in the group, which is fine. No additional changes needed beyond FEATURE 7.
 
 ---
 
-## Phase 4: Dashboard Integration
+## Phase 3: Medium Priority
 
-### Update: `src/pages/Dashboard.tsx`
-- In "normal" mode: render `MemberCardScroll` between header and expense feed
-- Pass member balance data to each card
-- Card tap opens a member detail bottom sheet (Phase 5)
+### BUG 2: Placeholder Invite/Merge Flow
+This requires multiple changes:
 
-### Update: `src/components/dashboard/EmptyState.tsx`
-- No changes needed (already works)
+**Step 1: "Invite to Bountt" button in MemberDetailSheet**
+Currently the button exists (line 157-159) but does nothing. Wire it to:
+- Copy the invite link with `?placeholder=MEMBER_ID` appended
+- Show a toast: "Invite link copied! Share it with [name]"
 
-### Update: `src/components/dashboard/AddExpensePrompt.tsx`
-- No changes needed
+**Step 2: Handle merge on Join page**
+- In `Join.tsx`, read `?placeholder=PLACEHOLDER_ID` from URL query params
+- After joining the group, if placeholder param exists:
+  - Find the placeholder member record
+  - Update it: set `user_id = currentUser.id`, `is_placeholder = false`
+  - Show confirmation before merging
+  - All existing splits with that `member_name` are now linked to the real user
 
----
+**Step 3: Share flow in SettingsCards**
+- When user taps "Share", if group has placeholders, show a selection dialog first
+- "Are you inviting one of these people?" with list of placeholder names
+- If selected, append `?placeholder=ID` to the share link
+- If "Someone new", share generic link
 
-## Phase 5: Group Settings Page Overhaul
-
-### Rewrite: `src/pages/GroupSettings.tsx`
-Full page with sections:
-1. Hero banner (reuses gradient system)
-2. Members section with horizontal card scroll + "+ Add Member" card at end
-3. Settings cards (group name, invite link)
-4. Danger zone
-
-### Update: `src/components/group-settings/GroupBanner.tsx`
-- Remove rounded edges
-- Keep 200px height with gradient
-- Inline editable group name (white text, tap to edit)
-- Tap background area opens GradientPicker
-- Group emoji in white circle overlapping bottom edge
-
-### Update: `src/components/group-settings/GradientPicker.tsx`
-- Add a 6th option: solid orange (the default)
-- Show "Choose a banner" title
-- Grid of 6 swatches
-- Selected has orange border
-
-### New file: `src/components/group-settings/AddMemberSheet.tsx`
-- Bottom sheet (Vaul Drawer)
-- Title: "Add to [Group Name]"
-- Text input for friend's name
-- Explanation text about placeholders
-- "Add as Placeholder" primary button + "Cancel"
-- On submit: calls `addPlaceholderMember`
-
-### New file: `src/components/group-settings/MemberDetailSheet.tsx`
-- Bottom sheet opened when tapping a member card
-- **Placeholder variant:** Ghost icon, name, "Not on Bountt yet" badge (yellow dot), balance summary, expense list, actions (Invite, Edit Name, Remove if admin)
-- **Real user variant:** Colored avatar, name, role badge, "Active" green dot, balance summary, shared expenses, actions (View Expenses, Settle Up, Remove if admin)
-
-### Update: `src/components/group-settings/MembersList.tsx`
-- Replace vertical list with horizontal card scroll
-- Use the same `MemberCard` component from Phase 3
-- Add "+ Add Member" card at end of scroll (dashed border, gray bg, centered text)
-- Tap "+ Add Member" opens `AddMemberSheet`
-- Tap any member card opens `MemberDetailSheet`
-
-### Keep existing: `src/components/group-settings/SettingsCards.tsx`
-- Already has Group Name edit and Invite Link -- keep as-is
-
-### Keep existing: `src/components/group-settings/DangerZone.tsx`
-- Already has Leave Group and Delete Group -- keep as-is
+**Files:**
+- `src/components/group-settings/MemberDetailSheet.tsx` -- wire Invite button
+- `src/pages/Join.tsx` -- handle placeholder merge
+- `src/components/group-settings/SettingsCards.tsx` -- enhanced share flow
+- `src/lib/bountt-utils.ts` -- add `generatePlaceholderInviteUrl` helper
 
 ---
 
-## Phase 6: Database -- No Migration Needed
+## Implementation Order
 
-The existing schema already has:
-- `groups.banner_gradient` (text, default 'orange-red')
-- `group_members.status` (text, default 'active')
-- `group_members.role` (text, default 'member')
-- `group_members.left_at` (timestamptz, nullable)
-- `group_members.is_placeholder` (boolean)
-- `groups.deleted_at` (timestamptz, nullable)
+1. **ExpenseSheet description input** (BUG 4) -- small, self-contained
+2. **DashboardHeader gradient** (BUG 1) -- small, self-contained
+3. **Auth redirect fix for /join flow** (BUG 3) -- fix post-login redirect
+4. **fetchGroups active filter + leaveGroup state update** (BUG 5)
+5. **EmptyGroups page + redirect updates** (FEATURE 7 + BUG 8)
+6. **Placeholder invite/merge flow** (BUG 2)
 
-No new columns needed. The `banner_gradient` field already stores the gradient name. Adding a "solid orange" option just means storing `"solid-orange"` as a new gradient value.
+## Technical Notes
 
----
-
-## Technical Details
-
-### Avatar Color Algorithm
-```text
-function getAvatarColor(memberId: string): string {
-  const COLORS = ['#3B82F6', '#EC4899', '#10B981', '#F97316', '#8B5CF6', '#14B8A6'];
-  let hash = 0;
-  for (let i = 0; i < memberId.length; i++) {
-    hash = memberId.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return COLORS[Math.abs(hash) % COLORS.length];
-}
-```
-
-### Per-Member Balance Calculation
-For member M vs current user U:
-- `theyOweYou` = sum of M's split amounts on expenses where U paid (unsettled)
-- `youOweThem` = sum of U's split amounts on expenses where M paid (unsettled)
-- `net = theyOweYou - youOweThem`
-- If net > 0: "They pay you $net"
-- If net < 0: "You pay $|net|"
-- If net === 0: "All settled"
-
-### Files Created (new)
-1. `src/lib/avatar-utils.ts`
-2. `src/components/dashboard/MemberCard.tsx` (dashboard card)
-3. `src/components/dashboard/MemberCardScroll.tsx`
-4. `src/components/group-settings/AddMemberSheet.tsx`
-5. `src/components/group-settings/MemberDetailSheet.tsx`
-
-### Files Modified
-1. `src/components/dashboard/DashboardHeader.tsx` -- full redesign
-2. `src/components/dashboard/BalancePill.tsx` -- restyle
-3. `src/pages/Dashboard.tsx` -- add member card scroll
-4. `src/pages/GroupSettings.tsx` -- restructure with new components
-5. `src/components/group-settings/GroupBanner.tsx` -- remove rounded edges, add emoji overlap
-6. `src/components/group-settings/GradientPicker.tsx` -- add solid orange option
-7. `src/components/group-settings/MembersList.tsx` -- horizontal scroll + add member + detail sheet
-
-### Implementation Order
-1. `avatar-utils.ts` (foundation)
-2. `DashboardHeader.tsx` redesign (visual impact)
-3. `BalancePill.tsx` restyle
-4. `MemberCard.tsx` + `MemberCardScroll.tsx` (card system)
-5. `Dashboard.tsx` integration
-6. `AddMemberSheet.tsx` + `MemberDetailSheet.tsx`
-7. `GroupSettings.tsx` + `MembersList.tsx` overhaul
-8. `GroupBanner.tsx` + `GradientPicker.tsx` updates
+- No database migrations needed -- all required columns already exist
+- The `fetchGroups` query needs to filter by `status = 'active'` in the `group_members` join to exclude groups the user has left
+- The gradient GRADIENTS map should be extracted to a shared utility to avoid duplication between `GroupBanner.tsx` and `DashboardHeader.tsx`
+- The placeholder merge only requires updating the existing `group_members` row (set `user_id`, `is_placeholder = false`) -- no expense_splits changes needed since splits reference `member_name` which stays the same, but the `user_id` field in splits should also be updated for consistency
 
