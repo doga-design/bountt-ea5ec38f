@@ -17,7 +17,7 @@ export default function Splash() {
         if (!groupsLoading && userGroups.length > 0) {
           navigate(`/dashboard/${userGroups[0].id}`, { replace: true });
         } else if (!groupsLoading) {
-          navigate("/onboarding/group-name", { replace: true });
+          navigate("/groups/empty", { replace: true });
         }
       } else {
         navigate("/auth", { replace: true });

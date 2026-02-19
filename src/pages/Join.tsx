@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useApp } from "@/contexts/AppContext";
@@ -7,9 +7,11 @@ import { Loader2 } from "lucide-react";
 
 export default function Join() {
   const { inviteCode: paramCode } = useParams<{ inviteCode?: string }>();
+  const [searchParams] = useSearchParams();
+  const placeholderId = searchParams.get("placeholder");
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, fetchGroups } = useApp();
+  const { user, fetchGroups, profile } = useApp();
 
   const [code, setCode] = useState(paramCode ?? "");
   const [loading, setLoading] = useState(false);
@@ -17,7 +19,7 @@ export default function Join() {
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      navigate("/auth");
+      navigate("/auth", { state: { from: `${window.location.pathname}${window.location.search}` } });
       return;
     }
 
@@ -35,27 +37,77 @@ export default function Join() {
         return;
       }
 
-      // Check if already a member
+      // Check if already a member (active)
       const { data: existing } = await supabase
         .from("group_members")
-        .select("id")
+        .select("id, status")
         .eq("group_id", group.id)
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (existing) {
+      if (existing && existing.status === "active") {
         toast({ title: "Already a member!", description: "You're already in this group." });
         navigate(`/dashboard/${group.id}`);
         return;
       }
 
-      // Join the group
+      // If there's a placeholder to merge with
+      if (placeholderId) {
+        const { data: placeholder } = await supabase
+          .from("group_members")
+          .select("*")
+          .eq("id", placeholderId)
+          .eq("group_id", group.id)
+          .eq("is_placeholder", true)
+          .maybeSingle();
+
+        if (placeholder) {
+          // Merge: update placeholder to become this user
+          const { error: mergeError } = await supabase
+            .from("group_members")
+            .update({
+              user_id: user.id,
+              is_placeholder: false,
+              name: profile?.display_name ?? user.email?.split("@")[0] ?? placeholder.name,
+            })
+            .eq("id", placeholderId);
+
+          if (mergeError) throw mergeError;
+
+          // Also update expense_splits user_id for this member
+          await supabase
+            .from("expense_splits")
+            .update({ user_id: user.id })
+            .eq("member_name", placeholder.name)
+            .is("user_id", null);
+
+          await fetchGroups();
+          toast({ title: `Joined ${group.name}!`, description: `Merged with ${placeholder.name}'s expenses 🎉` });
+          navigate(`/dashboard/${group.id}`);
+          return;
+        }
+      }
+
+      // If user was previously in group but left, rejoin
+      if (existing && existing.status === "left") {
+        await supabase
+          .from("group_members")
+          .update({ status: "active", left_at: null })
+          .eq("id", existing.id);
+
+        await fetchGroups();
+        toast({ title: `Rejoined ${group.name}!`, description: "Welcome back 🎉" });
+        navigate(`/dashboard/${group.id}`);
+        return;
+      }
+
+      // Join the group as new member
       const { error: joinError } = await supabase
         .from("group_members")
         .insert({
           group_id: group.id,
           user_id: user.id,
-          name: user.email?.split("@")[0] ?? "Member",
+          name: profile?.display_name ?? user.email?.split("@")[0] ?? "Member",
           is_placeholder: false,
         });
 

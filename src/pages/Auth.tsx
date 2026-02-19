@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { useToast } from "@/hooks/use-toast";
@@ -10,8 +10,10 @@ type Mode = "signup" | "signin";
 
 export default function Auth() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { user, authLoading, userGroups, groupsLoading, fetchGroups } = useApp();
+  const redirectTo = (location.state as { from?: string })?.from;
   const [mode, setMode] = useState<Mode>("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,10 +28,12 @@ export default function Auth() {
     // Wait for groups to load
     if (groupsLoading) return;
 
-    if (userGroups.length > 0) {
+    if (redirectTo) {
+      navigate(redirectTo, { replace: true });
+    } else if (userGroups.length > 0) {
       navigate(`/dashboard/${userGroups[0].id}`, { replace: true });
     } else {
-      navigate("/onboarding/group-name", { replace: true });
+      navigate("/groups/empty", { replace: true });
     }
   }, [user, authLoading, userGroups, groupsLoading, navigate]);
 

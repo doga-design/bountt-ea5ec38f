@@ -55,11 +55,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setError(null);
 
     try {
-      // Get groups where user is a member
+      // Get groups where user is an active member
       const { data: memberRows, error: memberErr } = await supabase
         .from("group_members")
         .select("group_id")
-        .eq("user_id", uid);
+        .eq("user_id", uid)
+        .eq("status", "active");
 
       if (memberErr) throw memberErr;
 
@@ -74,6 +75,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .from("groups")
         .select("*")
         .in("id", groupIds)
+        .is("deleted_at", null)
         .order("created_at", { ascending: false });
 
       if (fetchError) throw fetchError;

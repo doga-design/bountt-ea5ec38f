@@ -26,8 +26,9 @@ export default function ExpenseSheet({
   isFirstExpense = false,
 }: ExpenseSheetProps) {
   const [amount, setAmount] = useState("0");
+  const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
-  const [selectedPayerIdx, setSelectedPayerIdx] = useState(0); // index into groupMembers; 0 = current user (self)
+  const [selectedPayerIdx, setSelectedPayerIdx] = useState(0);
   const { currentGroup, user, groupMembers, addExpense, fetchExpenseSplits } = useApp();
   const { toast } = useToast();
 
@@ -70,7 +71,7 @@ export default function ExpenseSheet({
         .insert({
           group_id: currentGroup.id,
           amount: numAmount,
-          description: "Quick Expense",
+          description: description.trim() || "Quick Expense",
           paid_by_user_id: payer.user_id,
           paid_by_name: isPayerSelf ? "You" : payer.name,
           created_by: user.id,
@@ -119,6 +120,7 @@ export default function ExpenseSheet({
       }
 
       setAmount("0");
+      setDescription("");
       setSelectedPayerIdx(0);
       onOpenChange(false);
     } catch (err) {
@@ -178,9 +180,20 @@ export default function ExpenseSheet({
           </div>
 
           {/* Amount display */}
-          <div className="flex items-baseline justify-center mb-8">
+          <div className="flex items-baseline justify-center mb-4">
             <span className="text-2xl text-muted-foreground mr-1">$</span>
             <span className="text-5xl font-bold text-foreground">{displayAmount}</span>
+          </div>
+
+          {/* Description input */}
+          <div className="mb-6">
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value.slice(0, 50))}
+              placeholder="e.g., Pizza, Rent, Groceries"
+              className="w-full text-center text-sm text-foreground bg-muted rounded-xl px-4 py-3 outline-none placeholder:text-muted-foreground"
+            />
           </div>
 
           {/* Numpad */}

@@ -1,7 +1,9 @@
 import { Ghost, User, Send, Pencil, Trash2, ArrowRight, HandCoins } from "lucide-react";
 import { GroupMember, Expense, ExpenseSplit } from "@/types";
 import { getAvatarColor, getMemberBalance } from "@/lib/avatar-utils";
-import { formatCurrency } from "@/lib/bountt-utils";
+import { formatCurrency, generateJoinUrl } from "@/lib/bountt-utils";
+import { useApp } from "@/contexts/AppContext";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -19,6 +21,7 @@ interface MemberDetailSheetProps {
   currentUserId: string;
   isAdmin: boolean;
   onRemove?: () => void;
+  groupInviteCode?: string;
 }
 
 export default function MemberDetailSheet({
@@ -30,7 +33,10 @@ export default function MemberDetailSheet({
   currentUserId,
   isAdmin,
   onRemove,
+  groupInviteCode,
 }: MemberDetailSheetProps) {
+  const { toast } = useToast();
+
   if (!member) return null;
 
   const isPlaceholder = member.is_placeholder;
@@ -154,7 +160,16 @@ export default function MemberDetailSheet({
           <div className="space-y-2">
             {isPlaceholder ? (
               <>
-                <Button className="w-full gap-2" size="lg">
+                <Button
+                  className="w-full gap-2"
+                  size="lg"
+                  onClick={async () => {
+                    if (!groupInviteCode) return;
+                    const url = `${generateJoinUrl(groupInviteCode)}?placeholder=${member.id}`;
+                    await navigator.clipboard.writeText(url);
+                    toast({ title: `Invite link copied! Share it with ${member.name}` });
+                  }}
+                >
                   <Send className="w-4 h-4" /> Invite to Bountt
                 </Button>
                 <Button variant="outline" className="w-full gap-2" size="lg">
