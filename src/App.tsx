@@ -2,12 +2,15 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppProvider } from "@/contexts/AppContext";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import AuthGuard from "@/components/AuthGuard";
 
 // Pages
 import Splash from "./pages/Splash";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import GroupName from "./pages/onboarding/GroupName";
 import Invite from "./pages/onboarding/Invite";
 import Join from "./pages/Join";
@@ -18,42 +21,43 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AppProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            {/* Splash */}
-            <Route path="/" element={<Splash />} />
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <AppProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              {/* Public */}
+              <Route path="/" element={<Splash />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
 
-            {/* Auth */}
-            <Route path="/auth" element={<Auth />} />
+              {/* Protected — Onboarding */}
+              <Route path="/onboarding/group-name" element={<AuthGuard><GroupName /></AuthGuard>} />
+              <Route path="/onboarding/invite" element={<AuthGuard><Invite /></AuthGuard>} />
 
-            {/* Onboarding */}
-            <Route path="/onboarding/group-name" element={<GroupName />} />
-            <Route path="/onboarding/invite" element={<Invite />} />
+              {/* Protected — Join */}
+              <Route path="/join" element={<AuthGuard><Join /></AuthGuard>} />
+              <Route path="/join/:inviteCode" element={<AuthGuard><Join /></AuthGuard>} />
 
-            {/* Join via invite code */}
-            <Route path="/join" element={<Join />} />
-            <Route path="/join/:inviteCode" element={<Join />} />
+              {/* Protected — Dashboard */}
+              <Route path="/dashboard/:groupId" element={<AuthGuard><Dashboard /></AuthGuard>} />
 
-            {/* Phase 2 — Dashboard */}
-            <Route path="/dashboard/:groupId" element={<Dashboard />} />
+              {/* Protected — Phase 2 stubs */}
+              <Route path="/groups" element={<AuthGuard><ComingSoon title="All Groups — Phase 2" /></AuthGuard>} />
+              <Route path="/groups/:groupId/members" element={<AuthGuard><ComingSoon title="Members — Phase 2" /></AuthGuard>} />
+              <Route path="/groups/:groupId/settings" element={<AuthGuard><ComingSoon title="Settings — Phase 2" /></AuthGuard>} />
 
-            {/* Phase 2 — Groups */}
-            <Route path="/groups" element={<ComingSoon title="All Groups — Phase 2" />} />
-            <Route path="/groups/:groupId/members" element={<ComingSoon title="Members — Phase 2" />} />
-            <Route path="/groups/:groupId/settings" element={<ComingSoon title="Settings — Phase 2" />} />
-
-            {/* Catch-all */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </AppProvider>
-  </QueryClientProvider>
+              {/* Catch-all */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AppProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

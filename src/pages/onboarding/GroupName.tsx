@@ -43,7 +43,7 @@ export default function GroupName() {
     setLoading(false);
 
     if (group) {
-      navigate("/onboarding/invite", { state: { group } });
+      navigate(`/onboarding/invite?groupId=${group.id}`, { state: { group } });
     } else {
       toast({ title: "Failed to create group", description: "Please try again.", variant: "destructive" });
     }
@@ -67,7 +67,7 @@ export default function GroupName() {
         </h1>
 
         {/* Progress dots — step 1 of 2 */}
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex items-center justify-center gap-2" role="progressbar" aria-label="Step 1 of 2" aria-valuenow={1} aria-valuemax={2}>
           <div className="w-8 h-2 bg-primary-foreground rounded-full" />
           <div className="w-2 h-2 bg-primary-foreground/40 rounded-full" />
         </div>
@@ -76,14 +76,16 @@ export default function GroupName() {
         <div className="flex items-center justify-between mt-4">
           <button
             onClick={() => navigate("/auth")}
-            className="w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center"
+            className="w-11 h-11 rounded-full bg-primary-foreground/20 flex items-center justify-center"
+            aria-label="Go back"
           >
             <ChevronLeft className="w-5 h-5 text-primary-foreground" />
           </button>
           <button
             onClick={handleContinue}
             disabled={loading || !name.trim()}
-            className="w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center disabled:opacity-40"
+            className="w-11 h-11 rounded-full bg-primary-foreground/20 flex items-center justify-center disabled:opacity-40"
+            aria-label="Continue"
           >
             {loading ? (
               <Loader2 className="w-4 h-4 text-primary-foreground animate-spin" />
