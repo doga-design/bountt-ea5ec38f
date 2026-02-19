@@ -1,172 +1,221 @@
+# Task 1: Fix Expense Split Math + Task 2: Group Management
 
+## Task 1: Fix Split Math (Critical Bug)
 
-# Phase 2A: Dashboard Onboarding — Implementation Plan
+### Bug 1: Rounding doesn't preserve totals
 
-## Screenshot Analysis
+**File:** `src/components/dashboard/ExpenseSheet.tsx` (line 76)
 
-### Screen 1 — Empty State (no members yet)
-- **Orange header** (~40% of viewport): group emoji avatar (white circle with smiley), member avatars row (single smiley + "+" button), settings gear icon (top-right), group name "Condo Squad" in bold white
-- **Grey body**: bold black heading "Who've you been splitting costs with?", grey subtitle "Type your friend's name to get started!", white rounded input card with placeholder "e.g. Kyle, Sarah..." and a grey circle arrow button (disabled state)
-- When text is typed (screenshot 2): input card gets an orange border, arrow button turns orange (enabled)
+Current code: `Math.round((numAmount / memberCount) * 100) / 100` assigns same rounded value to every member. For $10 / 3 this produces $3.33 x 3 = $9.99.
 
-### Screen 2 — Member Added (after confetti)
-- Header now shows 2 member avatars (smiley + blue person) plus "+" button
-- Body: bold heading "Cool, you added **Kyle**! Let's bring your group to life." (Kyle in orange)
-- Grey subtitle: "What's the last thing you and **Kyle** paid for together?" (Kyle in orange)
-- Large orange gradient pill button: "Add a quick **shared expense** +" ("shared expense" in bold white)
+**Fix:** Implement cent-distribution algorithm:
 
-### Screen 3 — Expense Bottom Sheet
-- Background dimmed, dashboard visible behind
-- Bottom sheet with drag handle, rounded top corners
-- Title: "What did you pay for?" in bold
-- Subtitle: "Splitting equally with **kyle**" (kyle in orange, lowercase)
-- Large centered amount display: "$13" (dollar sign in grey, number in bold black)
-- 4x3 grid of grey rounded rectangles (numpad buttons — numbers not visible in screenshot but implied)
-- Orange "Continue" button with arrow at bottom
+- Convert total to cents
+- Base share = Math.floor(totalCents / memberCount)
+- Remainder = totalCents % memberCount
+- First `remainder` members get base + 1 cent, rest get base
+- Guarantees splits sum to exact total
 
-### Screen 4 — Alive Dashboard (after expense logged)
-- Header: same 2 member avatars + "+", group name, **balance pill** on right: "$10 owed" in white on grey pill with stack icon
-- Settings gear top-right
-- Body: single expense card (white, rounded)
-  - Left: package icon + "Quick Expense" bold + "Paid by **You**" below
-  - Right: "$10" in grey pill + "**Kyle**'s share is $5" below
-- Bottom navigation bar: Home icon + "Home" label (left), orange FAB circle with "+" (center), stack icon + "All Groups" label (right)
+### Bug 2: ExpenseCard display logic breaks with 3+ members
 
-## State Machine
+**File:** `src/components/dashboard/ExpenseCard.tsx` (lines 16-21)
+
+Current code finds only one "other" split. With 3+ members this is misleading.
+
+**Fix:** Show the current user's net position:
+
+- If you paid: show "Others owe you $X" where X = total - your share
+- If someone else paid: show "Your share is $X"
+
+### Bug 3: BalancePill member matching
+
+**File:** `src/components/dashboard/BalancePill.tsx` (line 23)
+
+The matching condition for placeholder members is convoluted. Simplify to match by `user_id` only (the current user always has a user_id, never a placeholder).
+
+**Fix:** Replace line 23 with simply `split.user_id === user?.id`.
+
+---
+
+## Task 2A: "Who Paid?" Selector in ExpenseSheet
+
+### Changes to `src/components/dashboard/ExpenseSheet.tsx`
+
+- Add state `selectedPayer` (defaults to current user)
+- After the amount display and before the numpad, render a row of member buttons
+- Each button shows the member name (or "You" for current user)
+- Selected button highlighted in orange, others grey
+- On submit: use `selectedPayer` for `paid_by_user_id` and `paid_by_name`
+- Update subtitle from "Splitting equally with [name]" to "Split equally among [count] people"
+
+### Changes to `src/pages/Dashboard.tsx`
+
+- Pass all group members info to ExpenseSheet (already available via useApp)
+- Remove `memberName` prop from ExpenseSheet, it will use groupMembers internally
+
+### Changes to `src/components/dashboard/AddExpensePrompt.tsx`
+
+- Update ExpenseSheet usage to match new props
+
+---
+
+## Task 2B: Group Settings Page
+
+### Database Migration
+
+Add columns to support member management and group customization:
 
 ```text
-Dashboard loads -> check groupMembers.length and expenses.length
+-- group_members: add status and left_at
+ALTER TABLE group_members ADD COLUMN status text NOT NULL DEFAULT 'active';
+ALTER TABLE group_members ADD COLUMN left_at timestamptz;
+ALTER TABLE group_members ADD COLUMN role text NOT NULL DEFAULT 'member';
 
-if members <= 1 (just creator) AND expenses === 0:
-  -> Show STEP 1: Add Member
+-- groups: add banner_gradient and deleted_at for soft delete
+ALTER TABLE groups ADD COLUMN banner_gradient text NOT NULL DEFAULT 'orange-red';
+ALTER TABLE groups ADD COLUMN deleted_at timestamptz;
 
-if members > 1 AND expenses === 0:
-  -> Show STEP 2: Prompt Expense
+-- RLS: allow group creator to delete members (remove)
+CREATE POLICY "Group creator can delete members"
+ON group_members FOR DELETE TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM groups g
+    WHERE g.id = group_members.group_id
+    AND g.created_by = auth.uid()
+  )
+);
 
-if members > 1 AND expenses > 0:
-  -> Show NORMAL DASHBOARD
+-- RLS: allow members to update group name/banner
+CREATE POLICY "Group members can update group"
+ON groups FOR UPDATE TO authenticated
+USING (is_group_member(id, auth.uid()));
+-- Drop the old creator-only update policy first
 ```
 
-On return visits: if user added Kyle but no expenses, show Step 2. If they have expenses, show normal dashboard.
+### New Files
 
-## Files to Create
+`**src/pages/GroupSettings.tsx**` -- Main settings page
 
-### 1. `src/components/dashboard/DashboardHeader.tsx`
-Orange header section containing:
-- Member avatars row (circular, overlapping) with "+" add button
-- Group name (bold white)
-- Group emoji in white circle
-- Settings gear icon (top-right)
-- Balance pill (conditionally shown when expenses exist)
+- Hero banner with gradient background (5 presets)
+- Group name overlay (tap to edit inline)
+- Members list section
+- Settings cards section
+- Danger zone section
 
-### 2. `src/components/dashboard/EmptyState.tsx`
-Step 1: "Who've you been splitting costs with?"
-- Heading, subtitle, input card with arrow submit button
-- Input gets orange border on focus/when has text
-- Arrow button grey when empty, orange when has text
-- On submit: calls `addPlaceholderMember`, triggers confetti, transitions to Step 2
+`**src/components/group-settings/GroupBanner.tsx**`
 
-### 3. `src/components/dashboard/AddExpensePrompt.tsx`
-Step 2: "Cool, you added [Name]!"
-- Dynamic heading with member name in orange
-- Subtitle with member name in orange
-- Large orange gradient pill button "Add a quick shared expense +"
-- On tap: opens expense bottom sheet
+- 200px gradient hero with group name + emoji
+- Tap banner opens GradientPicker modal
+- Tap name enables inline editing
 
-### 4. `src/components/dashboard/ExpenseSheet.tsx`
-Bottom sheet (using Vaul drawer):
-- "What did you pay for?" title
-- "Splitting equally with [name]" subtitle
-- Large amount display ($XX)
-- Numpad grid (1-9, ., 0, backspace)
-- "Continue" orange button at bottom
-- On submit: calls `addExpense` + inserts splits, triggers big confetti
+`**src/components/group-settings/GradientPicker.tsx**`
 
-### 5. `src/components/dashboard/ExpenseCard.tsx`
-Single expense display card:
-- Package icon + description (bold) on left
-- Amount in grey pill on right
-- "Paid by [Name]" below left
-- "[Name]'s share is $X" below right
+- Modal with 5 gradient swatches: orange-red, blue-purple, green-teal, pink-orange, gray-black
+- Tap to select, saves to `groups.banner_gradient`
 
-### 6. `src/components/dashboard/BalancePill.tsx`
-Header balance indicator:
-- "$X owed" text with stack icon
-- Grey/white pill background
-- Only shown when expenses exist
+`**src/components/group-settings/MembersList.tsx**`
 
-### 7. `src/components/BottomNav.tsx`
-Sticky bottom navigation:
-- Home icon + "Home" label (left)
-- Orange FAB circle with "+" (center, elevated)
-- Stack icon + "All Groups" label (right)
-- Only shown in normal dashboard mode (not during onboarding)
+- 4 sections: Active, Pending, Placeholder, Former
+- Each section collapsible
+- Former section collapsed by default
 
-### 8. Modified: `src/pages/Dashboard.tsx`
-Main orchestrator:
-- Sets current group from URL param
-- Determines onboarding step vs normal mode
-- Renders DashboardHeader + appropriate body content
-- Renders BottomNav when in normal mode
+`**src/components/group-settings/MemberCard.tsx**`
 
-### 9. Modified: `src/contexts/AppContext.tsx`
-- Extend `addExpense` to also insert `expense_splits` rows (equal split among all members)
-- Add `expenseSplits` state array + `fetchExpenseSplits`
-- Add proper balance calculation using splits
+- Avatar + name + role badge
+- Status dot (green=active, yellow=pending, dashed border=placeholder)
+- Swipe-to-remove for admins (using CSS transform + touch events, no extra library)
+- "Invite" button on placeholder members
 
-### 10. Modified: `src/types/index.ts`
-- Add `addExpenseWithSplits` to `AppContextValue`
-- Add `expenseSplits` and `expenseSplitsLoading` to `AppState`
+`**src/components/group-settings/SettingsCards.tsx**`
 
-## Technical Details
+- Group Name card (tap to edit)
+- Invite Link card (copy/share buttons)
+- No currency picker (USD only)
 
-### Expense + Splits Insert Logic
-When user submits an expense from the onboarding sheet:
-1. Insert into `expenses`: amount, description="Quick Expense", paid_by_user_id=current user, paid_by_name="You", group_id, created_by
-2. Insert into `expense_splits`: one row per member, share_amount = amount / memberCount
-3. Both inserts happen in sequence (expense first to get ID, then splits)
+`**src/components/group-settings/DangerZone.tsx**`
 
-### Balance Calculation (Corrected)
-For the current user's net balance:
-- Sum all amounts where they paid (unsettled) = totalPaid
-- Sum all their split shares (unsettled) = totalOwed
-- netBalance = totalPaid - totalOwed
-- Positive means others owe you, negative means you owe others
-- Display: "$X owed" (positive) or "$X owing" (negative)
+- Leave Group button with confirmation dialog
+- Delete Group button (admin only) with name-typing confirmation
+- Both use AlertDialog from shadcn
 
-### Confetti
-- Install `canvas-confetti` package
-- Small confetti: `confetti({ particleCount: 40, spread: 60, origin: { y: 0.6 }, colors: ['#E8480A', '#FFFFFF'] })`
-- Big confetti: `confetti({ particleCount: 120, spread: 100, origin: { y: 0.5 }, colors: ['#E8480A', '#FFFFFF', '#D4D4D4'] })`
+### Route Update
 
-### Numpad Component
-Custom numpad grid (not native keyboard):
-- 4 rows x 3 columns: [1,2,3], [4,5,6], [7,8,9], [.,0, backspace-icon]
-- Tapping numbers builds the amount string
-- Dollar sign prefix always shown
-- Max amount: $999,999.99
-- Max 2 decimal places
+`**src/App.tsx**` -- Replace ComingSoon stub at `/groups/:groupId/settings` with the new GroupSettings page.
 
-## Estimated Timeline
-- Phase 2A total: 3-4 days
-  - Day 1: DashboardHeader, EmptyState (Step 1), confetti
-  - Day 2: AddExpensePrompt (Step 2), ExpenseSheet with numpad
-  - Day 3: ExpenseCard, BalancePill, BottomNav, state machine logic
-  - Day 4: AppContext extensions (splits insert, balance calc), testing + polish
+### DashboardHeader Update
 
-## Dependencies
-- `canvas-confetti` npm package (new)
-- `vaul` (already installed) for bottom sheet
+Wire the settings gear button to navigate to `/groups/:groupId/settings`.
 
-## Done Criteria
-1. User lands on empty dashboard after onboarding invite screen
-2. Sees "Who've you been splitting costs with?" with input
-3. Types "Kyle", arrow turns orange, taps submit
-4. Small confetti plays, prompt updates to "Cool, you added Kyle!"
-5. Taps "Add a quick shared expense +"
-6. Bottom sheet opens with numpad, enters amount
-7. Taps "Continue", big confetti plays
-8. Dashboard shows expense card, balance pill "$X owed", bottom nav appears
-9. On refresh/return: shows normal dashboard (not onboarding again)
-10. Expense + splits saved correctly in database
+### AppContext Additions
 
+- `updateGroup(groupId, updates)` -- update group name/banner
+- `removeMember(memberId)` -- set status='left', left_at=now (or delete)
+- `leaveGroup(groupId)` -- current user leaves
+- `deleteGroup(groupId)` -- soft delete (set deleted_at)
+
+### Types Update
+
+- Add `status`, `left_at`, `role` to `GroupMember` interface
+- Add `banner_gradient`, `deleted_at` to `Group` interface
+
+---
+
+## Implementation Order
+
+1. **ExpenseSheet math fix** -- cent-distribution algorithm
+2. **ExpenseCard display fix** -- clear share labels for any group size
+3. **BalancePill fix** -- simplify user matching
+4. **ExpenseSheet "Who paid?" selector** -- member buttons UI
+5. **Database migration** -- new columns + policies
+6. **GroupSettings page** -- banner, members list, settings cards, danger zone
+7. **Wire routing** -- settings gear navigates, App.tsx route update
+
+## Swipe Implementation
+
+Instead of adding `react-swipeable` dependency, implement swipe-to-remove using native touch events (`onTouchStart`, `onTouchMove`, `onTouchEnd`) with CSS `transform: translateX()`. This keeps the bundle small and avoids a new dependency.  
+
+
+# **Testing Checklist**
+
+**Math Validation:**
+
+- [ ] $0.01 ÷ 2 = $0.00 + $0.01
+
+- [ ] $10.00 ÷ 3 = $3.33 + $3.33 + $3.34
+
+- [ ] $99.99 ÷ 5 = $20.00 + $19.99 + $20.00 + $20.00 + $20.00
+
+- [ ] Balance pill matches manual calculation
+
+- [ ] ExpenseCard shows correct text for 2-person and 3-person splits
+
+**Who Paid Feature:**
+
+- [ ] Can select any member from buttons
+
+- [ ] Can log "Kyle paid $20" when Kyle is placeholder
+
+- [ ] Expense shows "Paid by Kyle" in feed
+
+- [ ] Your share calculated correctly when you didn't pay
+
+**Group Settings:**
+
+- [ ] Settings icon navigates to /groups/:id/settings
+
+- [ ] Can change gradient background
+
+- [ ] Can edit group name inline
+
+- [ ] Member list shows all 4 sections
+
+- [ ] Admin can swipe any member except self
+
+- [ ] Non-admin cannot swipe
+
+- [ ] Removed member appears in Former section
+
+- [ ] Leave Group works with confirmation
+
+- [ ] Delete Group blocked if not admin
