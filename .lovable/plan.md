@@ -1,127 +1,56 @@
-## Bountt — Phase 1: Complete Onboarding Foundation
 
-Here's what I'll build — a pixel-perfect onboarding flow sitting on top of a rock-solid architectural foundation that makes Phase 2 seamless.
 
----
+## Fix: RLS Infinite Recursion + Google OAuth
 
-### 🎨 Design System
-- **Color palette**: Bountt Orange (`#E8480A`), Near-black (`#1A1A1A`), Light grey background (`#EBEBEB`), White
-- **Typography**: Serif-style bold for the "bountt." wordmark, clean sans-serif for body
-- **Components**: Reusable Button (primary orange, dark, ghost/pill variants), Input (with validation), Card, ProgressBar, Toast, LoadingSpinner, EmptyState
+### Problem
+Two database issues and one auth issue are blocking the onboarding flow:
 
----
+1. **Infinite recursion in RLS policies** -- The `group_members` SELECT policy queries the `group_members` table itself to check if the current user is a member. The `groups` SELECT policy also queries `group_members`. When `createGroup` does `.insert().select().single()`, the returning SELECT triggers these policies in a loop, causing Postgres error `42P17`.
 
-### 📱 Screens (Pixel-Perfect from Mockups)
+2. **Bug in groups SELECT policy** -- The policy compares `gm.group_id = gm.id` (both from `group_members`) instead of `gm.group_id = groups.id`. This means the policy would never match even without the recursion issue.
 
-**Screen 0 — Splash**
-- Light grey background
-- "bountt." wordmark centered with orange period
-- "Shared expenses made simple." tagline
-- Orange hand illustration asset at bottom
-- Auto-advances to Auth after 2 seconds
+3. **Google OAuth not enabled** -- The auth logs show `"provider is not enabled"` when attempting Google sign-in.
 
-**Screen 1 — Auth (Sign Up / Sign In)**
-- "bountt." wordmark at top
-- Dark pill header "Let's get you started ↙"
-- Email + Password fields (white rounded cards)
-- "or" divider
-- "Continue with Google" button
-- Orange pill "Continue →" CTA
-- "I have a group invite code →" link at bottom (routes to join flow)
+### Solution
 
-**Screen 2 — Group Name & Icon**
-- Orange curved header with "bountt." logo + progress dots (step 1 of 3)
-- Back/Forward navigation arrows
-- "Name your group 🏅" dark pill header
-- "This is what everyone will see" subtext
-- Text input with emoji picker icon
-- Horizontal scrolling suggestion chips: "Lake House 😊", "The Condo ⭐", "Planners 🗂️", etc.
-- Grey "Continue →" pill CTA at bottom
+**Database migration** to drop and recreate the problematic RLS policies:
 
-**Screen 3 — Invite Friends**
-- Full orange background top half with "bountt." + progress dots
-- White "Invite your friends to group 🔓" header card
-- Inner card showing:
-  - "YOUR BOUNTT GROUP CODE" label
-  - Generated **BNTT-XXXX** code in bold
-  - Share icon + external link icon buttons
-  - "OR LET YOUR FRIENDS SCAN" + QR code (orange, generated from invite URL)
-- Bottom section: Orange "Continue →" CTA + "Skip invite and continue →" text link
+- **groups SELECT**: Allow if `created_by = auth.uid()` OR user exists in `group_members` (using a security definer helper function to avoid recursion).
+- **group_members SELECT**: Use a security definer function `is_group_member(group_id, user_id)` that bypasses RLS to check membership, breaking the self-referencing loop.
+- Apply the same pattern to `expenses`, `expense_splits`, and `smart_match_dismissals` SELECT policies that also reference `group_members`.
 
----
+The security definer function:
+```text
+CREATE FUNCTION public.is_group_member(p_group_id UUID, p_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM group_members
+    WHERE group_id = p_group_id
+      AND user_id = p_user_id
+  );
+$$;
+```
 
-### 🗃️ Complete Database Schema (All Tables Created Now)
+Then all policies referencing group_members will call `is_group_member(group_id, auth.uid())` instead of a subquery, which avoids recursion since the function runs with definer privileges (bypassing RLS).
 
-- **profiles** — display name, avatar url, linked to auth user
-- **groups** — name, emoji/icon, invite_code (BNTT-XXXX), created_by, created_at
-- **group_members** — group_id, user_id (nullable), name (for placeholders), is_placeholder flag, joined_at
-- **expenses** — group_id, amount, description, paid_by_user_id (nullable), paid_by_name, date, is_settled, created_by, timestamps
-- **expense_splits** — expense_id, user_id (nullable), member_name, share_amount
-- **smart_match_dismissals** — group_id, expense_id_1, expense_id_2, dismissed_by, dismissed_at
+**Google OAuth** -- Enable managed Google OAuth via the configure-auth tool so the "Continue with Google" button works.
 
-All tables with Row Level Security (RLS) so users only see data from their groups.
+### Changes
 
----
+1. **New database migration** -- Drop all recursive SELECT policies on `groups`, `group_members`, `expenses`, `expense_splits`, `smart_match_dismissals`. Create `is_group_member` function. Recreate policies using that function.
+2. **Enable Google OAuth** via the auth configuration tool.
+3. No frontend code changes needed -- the existing `createGroup` flow and Google sign-in code will work once the backend is fixed.
 
-### ⚙️ State Management (AppContext)
+### Technical Details
 
-A single `AppContext` wrapping the whole app managing:
-- `currentUser` + `session`
-- `currentGroup` + `setCurrentGroup(groupId)`
-- `userGroups` list + `fetchGroups()`
-- `expenses` for active group + `fetchExpenses()`
-- `groupMembers` for active group + `fetchMembers()`
-- `loading` / `error` states
-- `addExpense`, `calculateBalances` functions
+Policies to drop and recreate:
+- `groups`: "Members can view their groups" -- replace with `created_by = auth.uid() OR is_group_member(id, auth.uid())`
+- `group_members`: "Members can view group members" -- replace with `is_group_member(group_id, auth.uid())`
+- `expenses`: "Group members can view expenses" and "Group members can create expenses" -- replace subqueries with `is_group_member(group_id, auth.uid())`
+- `expense_splits`: "Group members can view splits" -- replace with join-based subquery using `is_group_member`
+- `smart_match_dismissals`: "Group members can view dismissals" -- replace with `is_group_member(group_id, auth.uid())`
 
-Real-time Supabase subscriptions wired up for `expenses` and `group_members` (dormant but ready for Phase 2).
-
----
-
-### 🛣️ Full Route Structure
-
-- `/` → Splash (auto-redirect)
-- `/auth` → Sign up / sign in
-- `/onboarding/group-name` → Step 1: Name your group
-- `/onboarding/invite` → Step 2: Invite friends + QR code
-- `/join/:inviteCode` → Join via invite code (stubbed)
-- `/dashboard/:groupId` → Main dashboard (Coming Soon placeholder)
-- `/groups` → All groups list (Coming Soon placeholder)
-- `/groups/:groupId/members` → Member management (Coming Soon)
-- `/groups/:groupId/settings` → Group settings (Coming Soon)
-
----
-
-### 🔧 Utility Functions Library
-
-- `generateInviteCode()` → `BNTT-XXXX` format
-- `formatCurrency(amount)` → `$XX.XX`
-- `formatRelativeDate(date)` → "Today", "Yesterday", "Last Week"
-- `calculateNetBalance(expenses, userId)` → net balance
-- `validateExpenseAmount(value)` → boolean
-- `detectSmartMatch(expense1, expense2)` → boolean (stubbed)
-- `generateJoinUrl(inviteCode)` → full shareable URL
-
----
-
-### 🔌 Backend (Lovable Cloud)
-
-- Email/password auth + Google OAuth
-- All 6 database tables with migrations
-- RLS policies on all tables
-- Auto-create profile trigger on signup
-- QR code generation for invite screen
-
----
-
-### ✅ Acceptance Criteria
-
-1. ✅ Can sign up and create a group
-2. ✅ Can generate and share invite code + QR
-3. ✅ All 6 database tables exist in Supabase
-4. ✅ AppContext wired to all components
-5. ✅ 8+ reusable components in component library
-6. ✅ Phase 2 routes exist (stubbed)
-7. ✅ Full TypeScript with proper types
-8. ✅ Error handling on all API calls
-9. ✅ Loading states on all async operations
