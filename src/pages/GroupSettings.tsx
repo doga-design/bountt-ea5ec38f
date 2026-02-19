@@ -111,6 +111,7 @@ export default function GroupSettings() {
         splits={expenseSplits}
         currentUserId={user?.id ?? ""}
         isAdmin={isAdmin}
+        groupInviteCode={currentGroup.invite_code}
         onRemove={async () => {
           if (selectedMember) {
             await removeMember(selectedMember.id);

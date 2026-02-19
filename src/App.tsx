@@ -18,6 +18,7 @@ import Dashboard from "./pages/Dashboard";
 import ComingSoon from "./pages/ComingSoon";
 import GroupSettings from "./pages/GroupSettings";
 import NotFound from "./pages/NotFound";
+import EmptyGroups from "./pages/EmptyGroups";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,9 @@ const App = () => (
               <Route path="/" element={<Splash />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+
+              {/* Empty Groups */}
+              <Route path="/groups/empty" element={<AuthGuard><EmptyGroups /></AuthGuard>} />
 
               {/* Protected — Onboarding */}
               <Route path="/onboarding/group-name" element={<AuthGuard><GroupName /></AuthGuard>} />
