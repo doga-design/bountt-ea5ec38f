@@ -47,6 +47,12 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        bountt: {
+          orange: "hsl(var(--bountt-orange))",
+          "orange-light": "hsl(var(--bountt-orange-light))",
+          dark: "hsl(var(--bountt-dark))",
+          grey: "hsl(var(--bountt-grey))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
