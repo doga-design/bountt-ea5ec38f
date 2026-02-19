@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
@@ -48,9 +49,8 @@ export default function Auth() {
   };
 
   const handleGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/onboarding/group-name` },
+    const { error } = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: `${window.location.origin}/onboarding/group-name`,
     });
     if (error) {
       toast({ title: "Google sign-in failed", description: error.message, variant: "destructive" });
