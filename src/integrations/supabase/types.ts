@@ -260,6 +260,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_placeholder: { Args: { p_placeholder_id: string }; Returns: string }
       is_group_member: {
         Args: { p_group_id: string; p_user_id: string }
         Returns: boolean

@@ -61,25 +61,12 @@ export default function Join() {
           .eq("is_placeholder", true)
           .maybeSingle();
 
-        if (placeholder) {
-          // Merge: update placeholder to become this user
+      if (placeholder) {
+          // Merge via SECURITY DEFINER function (bypasses RLS)
           const { error: mergeError } = await supabase
-            .from("group_members")
-            .update({
-              user_id: user.id,
-              is_placeholder: false,
-              name: profile?.display_name ?? user.email?.split("@")[0] ?? placeholder.name,
-            })
-            .eq("id", placeholderId);
+            .rpc("claim_placeholder", { p_placeholder_id: placeholderId });
 
           if (mergeError) throw mergeError;
-
-          // Also update expense_splits user_id for this member
-          await supabase
-            .from("expense_splits")
-            .update({ user_id: user.id })
-            .eq("member_name", placeholder.name)
-            .is("user_id", null);
 
           await fetchGroups();
           toast({ title: `Joined ${group.name}!`, description: `Merged with ${placeholder.name}'s expenses 🎉` });
