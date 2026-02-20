@@ -12,7 +12,7 @@ export default function BottomNav({ onFabPress }: BottomNavProps) {
   const isGroups = location.pathname === "/groups";
 
   return (
-    <div className="fixed bottom-0 bg-card border-t border-border px-6 pb-6 pt-3">
+    <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border px-6 pb-6 pt-3">
       <div className="flex items-center justify-between">
         {/* Home */}
         <button onClick={() => {}} className="flex flex-col items-center gap-1" aria-label="Home">
