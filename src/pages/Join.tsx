@@ -37,12 +37,11 @@ export default function Join() {
 
     setLoading(true);
     try {
-      // Look up group by invite code
-      const { data: group, error: groupError } = await supabase
-        .from("groups")
-        .select("*")
-        .eq("invite_code", code.toUpperCase().trim())
-        .maybeSingle();
+      // Look up group by invite code using secure RPC
+      const { data: groups, error: groupError } = await supabase
+        .rpc("lookup_group_by_invite", { p_invite_code: code.toUpperCase().trim() });
+
+      const group = groups?.[0] ?? null;
 
       if (groupError || !group) {
         toast({ title: "Invalid code", description: "No group found with that invite code.", variant: "destructive" });
