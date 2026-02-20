@@ -1,60 +1,76 @@
 
-# Fix: Store Real Name Instead of "You" in Database
 
-## Problem
+# Make Bountt Feel Like a Native App (PWA Setup)
 
-When any user logs an expense as themselves, `ExpenseSheet.tsx` stores the literal string `"You"` as `paid_by_name` in the database. Every other user viewing that expense then also sees "You" instead of the payer's actual name, because the `ExpenseCard` falls back to the stored `paid_by_name` when the viewer isn't the payer.
+## Overview
 
-## Root Cause
+Set up Bountt as a Progressive Web App so it launches fullscreen (no browser chrome) when installed to a user's home screen on iOS or Android.
 
-Line 76 in `src/components/dashboard/ExpenseSheet.tsx`:
-```
-paid_by_name: isPayerSelf ? "You" : payer.name
-```
+## What Exists Today
 
-This violates the app's established pattern of storing absolute values in the database and rendering user-relative labels ("You") dynamically in the UI.
+- No `manifest.json`
+- No service worker
+- No Apple-specific meta tags
+- No theme-color meta tags
+- Title still says "Lovable App"
 
-## Fix
+## What Changes
 
-### 1. `src/components/dashboard/ExpenseSheet.tsx`
+### 1. Create `public/manifest.json`
 
-Change line 76 from:
-```
-paid_by_name: isPayerSelf ? "You" : payer.name,
-```
-to:
-```
-paid_by_name: payer.name,
-```
+A web app manifest that tells browsers Bountt is installable:
 
-Always store the real member name. The UI layer (`ExpenseCard.tsx`) already handles displaying "You" dynamically based on `paid_by_user_id === user.id`.
+- `display: "standalone"` -- removes browser UI when launched from home screen
+- `name: "Bountt"`, `short_name: "Bountt"`
+- `start_url: "/"`
+- `theme_color: "#E35205"` (Bountt orange)
+- `background_color: "#EBEBEB"` (matches `--background`)
+- Icon entries (we'll use the existing favicon initially; ideally you'd add 192x192 and 512x512 PNG icons later for best results)
 
-### 2. Fix Existing Bad Data
+### 2. Update `index.html`
 
-Run an UPDATE query to fix any existing expenses that have `paid_by_name = 'You'`. We can resolve the correct name by looking up the payer's `group_members` record:
+Add the following meta tags and links:
 
-```sql
-UPDATE expenses e
-SET paid_by_name = gm.name
-FROM group_members gm
-WHERE e.paid_by_user_id = gm.user_id
-  AND e.group_id = gm.group_id
-  AND e.paid_by_name = 'You';
-```
+- `<link rel="manifest" href="/manifest.json">`
+- `<meta name="theme-color" content="#E35205">` -- colors the status bar on Android
+- `<meta name="apple-mobile-web-app-capable" content="yes">` -- enables standalone mode on iOS Safari
+- `<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">` -- blends status bar on iOS
+- `<meta name="apple-mobile-web-app-title" content="Bountt">`
+- `<link rel="apple-touch-icon" href="/favicon.ico">` -- home screen icon on iOS
+- Update `<title>` and OG tags from "Lovable App" to "Bountt"
+- Update description to "Shared expenses made simple."
 
-This ensures all historical data is also corrected.
+### 3. Install and Configure `vite-plugin-pwa`
+
+- Install `vite-plugin-pwa` dependency
+- Add to `vite.config.ts` with:
+  - `registerType: 'autoUpdate'` -- service worker auto-updates in background
+  - `navigateFallbackDenylist: [/^\/~oauth/]` -- ensures OAuth redirects always hit the network
+  - Workbox config for basic runtime caching
+  - Inline manifest config (mirrors `public/manifest.json`)
+
+This generates a service worker automatically at build time, enabling:
+- Offline fallback (cached app shell)
+- Install prompt on supported browsers
+
+### 4. No Other Changes
+
+- No changes to routing, components, or backend
+- No changes to `index.css` or `AppContext`
 
 ## Files Changed
 
-| File | Change |
+| File | Action |
 |------|--------|
-| `src/components/dashboard/ExpenseSheet.tsx` | Always store `payer.name` instead of conditional "You" |
+| `public/manifest.json` | Create |
+| `index.html` | Update meta tags, title, manifest link |
+| `vite.config.ts` | Add vite-plugin-pwa plugin |
+| `package.json` | Add vite-plugin-pwa dependency (auto) |
 
-## Why This Works
+## Tradeoffs and Limitations
 
-The `ExpenseCard` component already renders the payer label correctly:
-```
-{isPayer ? "You" : expense.paid_by_name}
-```
+- **iOS limitations**: iOS Safari doesn't support push notifications from PWAs, and the install experience is manual (Share > Add to Home Screen). There's no automatic install banner like on Android.
+- **Icons**: The current `favicon.ico` will work as a placeholder, but for the best home screen appearance you should later add proper 192x192 and 512x512 PNG icons.
+- **Offline support**: The service worker will cache the app shell so it loads offline, but data operations still require network connectivity (Lovable Cloud calls).
+- **No app store listing**: PWAs don't appear in the App Store or Play Store (though Android does support TWA wrapping if you want that later).
 
-By storing the real name, each user sees "You" for their own expenses and the actual payer name for others -- exactly as intended by the user-perspective logic pattern.
