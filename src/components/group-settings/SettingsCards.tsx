@@ -33,7 +33,10 @@ export default function SettingsCards({ group }: SettingsCardsProps) {
     if (navigator.share) {
       await navigator.share({ title: group.name, url: joinUrl });
     } else {
-      handleCopy();
+      // Open email client
+      const subject = encodeURIComponent(`Join ${group.name} on Bountt`);
+      const body = encodeURIComponent(`Hey! Join my group on Bountt:\n\n${joinUrl}`);
+      window.location.href = `mailto:?subject=${subject}&body=${body}`;
     }
   };
 
