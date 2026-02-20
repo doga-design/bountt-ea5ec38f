@@ -1,52 +1,60 @@
 
-
-# Fix: Splash Screen During Loading
+# Fix: Store Real Name Instead of "You" in Database
 
 ## Problem
 
-When opening the app directly to `/dashboard/:groupId`:
+When any user logs an expense as themselves, `ExpenseSheet.tsx` stores the literal string `"You"` as `paid_by_name` in the database. Every other user viewing that expense then also sees "You" instead of the payer's actual name, because the `ExpenseCard` falls back to the stored `paid_by_name` when the viewer isn't the payer.
 
-1. `authLoading` starts `true`, `groupsLoading` starts `false`
-2. Auth resolves -- `authLoading` becomes `false`, `fetchGroups` is called
-3. Brief gap before `groupsLoading` becomes `true`
-4. During that gap, AuthGuard renders children, Dashboard sees empty `userGroups`, flashes the empty state
-5. Groups finish loading, Dashboard re-renders correctly
+## Root Cause
 
-## Fix (2 small changes)
-
-### 1. `src/contexts/AppContext.tsx` -- Initialize `groupsLoading` to `true`
-
-Change line 26 from:
+Line 76 in `src/components/dashboard/ExpenseSheet.tsx`:
 ```
-const [groupsLoading, setGroupsLoading] = useState(false);
+paid_by_name: isPayerSelf ? "You" : payer.name
+```
+
+This violates the app's established pattern of storing absolute values in the database and rendering user-relative labels ("You") dynamically in the UI.
+
+## Fix
+
+### 1. `src/components/dashboard/ExpenseSheet.tsx`
+
+Change line 76 from:
+```
+paid_by_name: isPayerSelf ? "You" : payer.name,
 ```
 to:
 ```
-const [groupsLoading, setGroupsLoading] = useState(true);
+paid_by_name: payer.name,
 ```
 
-This eliminates the gap where groups appear "loaded" but are actually empty. When auth resolves with no user, we set `groupsLoading` to `false` explicitly in the sign-out branch (lines 108-113).
+Always store the real member name. The UI layer (`ExpenseCard.tsx`) already handles displaying "You" dynamically based on `paid_by_user_id === user.id`.
 
-Also add `setGroupsLoading(false)` to the sign-out/no-user branch so it resets properly when there's no authenticated user.
+### 2. Fix Existing Bad Data
 
-### 2. `src/components/AuthGuard.tsx` -- Wait for groups too
+Run an UPDATE query to fix any existing expenses that have `paid_by_name = 'You'`. We can resolve the correct name by looking up the payer's `group_members` record:
 
-Update AuthGuard to show the loading spinner while either `authLoading` OR `groupsLoading` is true. This ensures no protected page renders until groups data is ready.
-
+```sql
+UPDATE expenses e
+SET paid_by_name = gm.name
+FROM group_members gm
+WHERE e.paid_by_user_id = gm.user_id
+  AND e.group_id = gm.group_id
+  AND e.paid_by_name = 'You';
 ```
-const { user, authLoading, groupsLoading } = useApp();
 
-if (authLoading || groupsLoading) {
-  // show spinner
-}
-```
+This ensures all historical data is also corrected.
 
-This way the splash/spinner is shown continuously from app load until both auth AND groups are resolved, preventing any intermediate screen from flashing.
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `src/components/dashboard/ExpenseSheet.tsx` | Always store `payer.name` instead of conditional "You" |
 
 ## Why This Works
 
-- No more gap between "auth done" and "groups loading started"
-- AuthGuard acts as a gate: nothing renders until all critical data is ready
-- The Splash page (route `/`) already handles its own loading logic and is unaffected
-- Sign-out properly resets `groupsLoading` to `false`
+The `ExpenseCard` component already renders the payer label correctly:
+```
+{isPayer ? "You" : expense.paid_by_name}
+```
 
+By storing the real name, each user sees "You" for their own expenses and the actual payer name for others -- exactly as intended by the user-perspective logic pattern.
