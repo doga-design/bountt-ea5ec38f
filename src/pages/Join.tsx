@@ -1,25 +1,37 @@
 import { useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useApp } from "@/contexts/AppContext";
 import { Loader2 } from "lucide-react";
+import PlaceholderSelectDialog from "@/components/join/PlaceholderSelectDialog";
+import { formatCurrency } from "@/lib/bountt-utils";
+
+interface PlaceholderWithExpenses {
+  id: string;
+  name: string;
+  totalExpenses: number;
+}
 
 export default function Join() {
   const { inviteCode: paramCode } = useParams<{ inviteCode?: string }>();
-  const [searchParams] = useSearchParams();
-  const placeholderId = searchParams.get("placeholder");
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, fetchGroups, profile } = useApp();
 
   const [code, setCode] = useState(paramCode ?? "");
   const [loading, setLoading] = useState(false);
+  const [mergeLoading, setMergeLoading] = useState(false);
+
+  // Placeholder dialog state
+  const [showPlaceholderDialog, setShowPlaceholderDialog] = useState(false);
+  const [placeholders, setPlaceholders] = useState<PlaceholderWithExpenses[]>([]);
+  const [pendingGroup, setPendingGroup] = useState<{ id: string; name: string } | null>(null);
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      navigate("/auth", { state: { from: `${window.location.pathname}${window.location.search}` } });
+      navigate("/auth", { state: { from: `${window.location.pathname}` } });
       return;
     }
 
@@ -51,43 +63,6 @@ export default function Join() {
         return;
       }
 
-      // If there's a placeholder to merge with
-      if (placeholderId) {
-        const { data: placeholder } = await supabase
-          .from("group_members")
-          .select("*")
-          .eq("id", placeholderId)
-          .eq("group_id", group.id)
-          .eq("is_placeholder", true)
-          .maybeSingle();
-
-        if (placeholder) {
-          // Merge: update placeholder to become this user
-          const { error: mergeError } = await supabase
-            .from("group_members")
-            .update({
-              user_id: user.id,
-              is_placeholder: false,
-              name: profile?.display_name ?? user.email?.split("@")[0] ?? placeholder.name,
-            })
-            .eq("id", placeholderId);
-
-          if (mergeError) throw mergeError;
-
-          // Also update expense_splits user_id for this member
-          await supabase
-            .from("expense_splits")
-            .update({ user_id: user.id })
-            .eq("member_name", placeholder.name)
-            .is("user_id", null);
-
-          await fetchGroups();
-          toast({ title: `Joined ${group.name}!`, description: `Merged with ${placeholder.name}'s expenses 🎉` });
-          navigate(`/dashboard/${group.id}`);
-          return;
-        }
-      }
-
       // If user was previously in group but left, rejoin
       if (existing && existing.status === "left") {
         await supabase
@@ -101,25 +76,109 @@ export default function Join() {
         return;
       }
 
-      // Join the group as new member
-      const { error: joinError } = await supabase
+      // Fetch placeholders for this group
+      const { data: placeholderMembers } = await supabase
         .from("group_members")
-        .insert({
-          group_id: group.id,
-          user_id: user.id,
-          name: profile?.display_name ?? user.email?.split("@")[0] ?? "Member",
-          is_placeholder: false,
-        });
+        .select("id, name")
+        .eq("group_id", group.id)
+        .eq("is_placeholder", true)
+        .is("user_id", null);
 
-      if (joinError) throw joinError;
+      if (placeholderMembers && placeholderMembers.length > 0) {
+        // Compute expense totals for each placeholder
+        const withExpenses: PlaceholderWithExpenses[] = await Promise.all(
+          placeholderMembers.map(async (ph) => {
+            const { data: splits } = await supabase
+              .from("expense_splits")
+              .select("share_amount, expense_id")
+              .eq("member_name", ph.name)
+              .is("user_id", null);
 
-      await fetchGroups();
-      toast({ title: `Joined ${group.name}!`, description: "Welcome to the group 🎉" });
-      navigate(`/dashboard/${group.id}`);
+            // Filter splits to only this group's expenses
+            let total = 0;
+            if (splits && splits.length > 0) {
+              const expenseIds = [...new Set(splits.map((s) => s.expense_id))];
+              const { data: expenses } = await supabase
+                .from("expenses")
+                .select("id")
+                .eq("group_id", group.id)
+                .in("id", expenseIds);
+
+              const validIds = new Set(expenses?.map((e) => e.id) ?? []);
+              total = splits
+                .filter((s) => validIds.has(s.expense_id))
+                .reduce((sum, s) => sum + Number(s.share_amount), 0);
+            }
+
+            return { id: ph.id, name: ph.name, totalExpenses: total };
+          })
+        );
+
+        setPendingGroup({ id: group.id, name: group.name });
+        setPlaceholders(withExpenses);
+        setShowPlaceholderDialog(true);
+        return;
+      }
+
+      // No placeholders — join as new member directly
+      await joinAsNewMember(group.id, group.name);
     } catch (err) {
       toast({ title: "Failed to join", description: err instanceof Error ? err.message : "Please try again.", variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const joinAsNewMember = async (groupId: string, groupName: string) => {
+    const { error: joinError } = await supabase
+      .from("group_members")
+      .insert({
+        group_id: groupId,
+        user_id: user!.id,
+        name: profile?.display_name ?? user!.email?.split("@")[0] ?? "Member",
+        is_placeholder: false,
+      });
+
+    if (joinError) throw joinError;
+
+    await fetchGroups();
+    toast({ title: `Joined ${groupName}!`, description: "Welcome to the group 🎉" });
+    navigate(`/dashboard/${groupId}`);
+  };
+
+  const handlePlaceholderSelection = async (placeholderId: string | null) => {
+    if (!pendingGroup) return;
+    setMergeLoading(true);
+
+    try {
+      if (placeholderId) {
+        // Merge with placeholder using RPC
+        const { error } = await supabase.rpc("claim_placeholder", {
+          p_placeholder_id: placeholderId,
+        });
+
+        if (error) throw error;
+
+        const selected = placeholders.find((p) => p.id === placeholderId);
+        await fetchGroups();
+        toast({
+          title: `Joined ${pendingGroup.name}!`,
+          description: `Merged with ${selected?.name}'s expenses 🎉`,
+        });
+        navigate(`/dashboard/${pendingGroup.id}`);
+      } else {
+        // Join as new member
+        await joinAsNewMember(pendingGroup.id, pendingGroup.name);
+      }
+    } catch (err) {
+      toast({
+        title: "Failed to join",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setMergeLoading(false);
+      setShowPlaceholderDialog(false);
     }
   };
 
@@ -160,6 +219,14 @@ export default function Join() {
           </button>
         </form>
       </div>
+
+      <PlaceholderSelectDialog
+        open={showPlaceholderDialog}
+        onOpenChange={setShowPlaceholderDialog}
+        placeholders={placeholders}
+        onSelect={handlePlaceholderSelection}
+        loading={mergeLoading}
+      />
     </div>
   );
 }

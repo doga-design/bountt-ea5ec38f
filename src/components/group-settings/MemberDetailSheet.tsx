@@ -165,9 +165,9 @@ export default function MemberDetailSheet({
                   size="lg"
                   onClick={async () => {
                     if (!groupInviteCode) return;
-                    const url = `${generateJoinUrl(groupInviteCode)}?placeholder=${member.id}`;
+                    const url = generateJoinUrl(groupInviteCode);
                     await navigator.clipboard.writeText(url);
-                    toast({ title: `Invite link copied! Share it with ${member.name}` });
+                    toast({ title: `Invite link copied!`, description: `Share it with ${member.name} — they'll be able to merge with their placeholder when they join.` });
                   }}
                 >
                   <Send className="w-4 h-4" /> Invite to Bountt
