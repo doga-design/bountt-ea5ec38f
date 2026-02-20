@@ -1,84 +1,109 @@
 
 
-# Fix Placeholder Merge Flow
+# Bug Fixes and Improvements -- Implementation Plan
 
-## Root Cause
+## Phase 1: Critical Fixes
 
-The merge logic already exists in `Join.tsx` (lines 55-88) but **silently fails** because RLS policies block the database updates:
+### BUG 6: Persistent Authentication
+**Status:** Already working correctly.
+The auth setup in `AppContext.tsx` (lines 91-130) already calls `onAuthStateChange` first, then `getSession()`. Supabase handles session persistence via localStorage automatically. However, the Splash page (`Splash.tsx`) has a 2200ms delay timer that may cause issues if auth resolves slowly. No code changes needed here -- this should already work. Will verify during testing.
 
-- **group_members UPDATE**: Only allows updates by group creator (`g.created_by = auth.uid()`) or the member themselves (`auth.uid() = user_id`). A placeholder has `user_id = NULL`, so neither policy matches for the joining user.
-- **expense_splits UPDATE**: No UPDATE policy exists at all -- updates are completely blocked.
-- **expenses UPDATE**: Only allows updates by the expense creator (`auth.uid() = created_by`). The joining user didn't create the placeholder's expenses.
+### BUG 3: Join via Invite Code Not Working
+**Status:** Already working.
+The `/join` route exists in `App.tsx`, and the `Join.tsx` page has a form with a code input and validation. The Auth page links to `/join` with the text "I have a group invite code". The join page handles both URL params and manual code entry. However, the join page requires authentication (`AuthGuard` wraps it). If a user is not logged in and clicks the link on the auth page, they'll be redirected to `/auth` by the guard -- but they're already on `/auth`. This creates a loop for unauthenticated users.
 
-The code runs, the updates fail silently (Supabase returns empty results on RLS denial), and then it falls through to the normal join flow, creating a duplicate member.
+**Fix:** Move the `/join` route outside of `AuthGuard` OR handle the auth-first flow inside Join.tsx (redirect to auth, then back to join after login). The simplest fix: keep the guard but store the invite code. The current code already has `state={{ from: location.pathname }}` in AuthGuard, so after login the user should be redirected back. However, `Auth.tsx` doesn't read `location.state.from`. Need to fix the post-login redirect in Auth.tsx to check for a `from` state.
 
-## Fix Overview
+**Files:** `src/pages/Auth.tsx` -- after successful sign-in, check `location.state?.from` and navigate there instead of the default dashboard redirect.
 
-### 1. Database Migration: 3 New RLS Policies
+### BUG 5: Member Count Doesn't Update After User Leaves
+**Root cause:** `fetchGroups` filters by `user_id` in `group_members` but doesn't filter by `status='active'`. Also, `fetchMembers` fetches ALL members regardless of status. The member count in `GroupSettings.tsx` line 48 already filters by `status === "active"` -- that's correct. But `DashboardHeader.tsx` line 17 also filters by `status === "active"`. The issue is likely that after `leaveGroup` is called, the `groupMembers` state doesn't update because the member's status is changed in the DB but the local state may not reflect it if the realtime subscription doesn't fire or the user navigates away.
 
-**group_members** -- allow claiming unclaimed placeholders:
-```sql
-CREATE POLICY "Authenticated users can claim placeholders"
-ON group_members FOR UPDATE
-USING (is_placeholder = true AND user_id IS NULL)
-WITH CHECK (is_placeholder = false AND user_id = auth.uid());
-```
-Safe because: can only update rows where placeholder is unclaimed, result must set your user_id.
+**Fix:** In `leaveGroup` (AppContext line 361-378), after updating the member status, also update `groupMembers` state to reflect the change (set the member's status to "left"). Currently it only removes the group from `userGroups` and clears `currentGroup`, but doesn't update `groupMembers`. Also, `fetchGroups` should filter out groups where the user's membership status is "left".
 
-**expense_splits** -- allow claiming unclaimed splits (scoped to user's groups):
-```sql
-CREATE POLICY "Users can claim placeholder splits"
-ON expense_splits FOR UPDATE
-USING (
-  user_id IS NULL
-  AND EXISTS (
-    SELECT 1 FROM expenses e
-    WHERE e.id = expense_splits.expense_id
-    AND is_group_member(e.group_id, auth.uid())
-  )
-)
-WITH CHECK (user_id = auth.uid());
-```
+**Files:** `src/contexts/AppContext.tsx` -- update `fetchGroups` to join with `group_members` and filter `status = 'active'`, and update `leaveGroup` to also update local `groupMembers` state.
 
-**expenses** -- allow claiming unclaimed paid_by_user_id:
-```sql
-CREATE POLICY "Users can claim placeholder expenses"
-ON expenses FOR UPDATE
-USING (paid_by_user_id IS NULL AND is_group_member(group_id, auth.uid()))
-WITH CHECK (paid_by_user_id = auth.uid());
-```
+### BUG 4: Expense Description Not Editable
+**Root cause:** `ExpenseSheet.tsx` line 73 hardcodes `description: "Quick Expense"`.
 
-### 2. Rewrite Join.tsx with Confirmation UI + Scoped Merge
+**Fix:** Add a text input state for description. Place it between the amount display and the numpad. Default to empty, auto-fill "Quick Expense" on submit if empty.
 
-Add a two-step flow when `?placeholder=ID` is present:
+**Files:** `src/components/dashboard/ExpenseSheet.tsx` -- add `description` state, render text input, use it in the insert call.
 
-**Step 1**: After looking up the group, fetch the placeholder record and show a confirmation card:
-- "Are you [Name]?" with expense count info
-- "Yes, that's me" button triggers merge
-- "No, join as new member" button triggers normal join
-- If user's display name differs from placeholder name, show a warning note
+---
 
-**Step 2 (Merge path)**: Execute three scoped updates:
-1. `group_members`: SET user_id, is_placeholder=false
-2. `expense_splits`: Fetch expense IDs for THIS group first, then update only matching splits with `.in('expense_id', groupExpenseIds)`
-3. `expenses`: Update paid_by_user_id WHERE paid_by_name matches AND group_id matches
+## Phase 2: High Priority
 
-**Step 2 (New member path)**: Normal join flow (existing code).
+### BUG 1: Banner Gradient Not Updating on Dashboard
+**Root cause:** The `DashboardHeader` uses a hardcoded `bg-primary` (line 22) instead of reading `currentGroup.banner_gradient`. When the gradient is changed in settings, `updateGroup` correctly updates `currentGroup` state, but the header never reads the gradient value.
 
-### 3. Error Handling
+**Fix:** Update `DashboardHeader.tsx` to read `currentGroup.banner_gradient` and apply the gradient as an inline style, using the same `GRADIENTS` map from `GroupBanner.tsx`.
 
-If the group_members update fails (RLS denial), throw an error instead of silently falling through. Check the update result and show a toast if merge failed.
+**Files:** `src/components/dashboard/DashboardHeader.tsx` -- import GRADIENTS map, apply dynamic background style.
 
-## Files Modified
+### FEATURE 7: Empty Groups State
+**Current behavior:** Splash page redirects to `/onboarding/group-name` if user has no groups. This is wrong for returning users who left all groups.
 
-1. **Database migration** -- 3 new RLS policies (group_members, expense_splits, expenses UPDATE)
-2. **`src/pages/Join.tsx`** -- Add confirmation UI state, name mismatch warning, scoped merge logic with proper error handling
+**Fix:** Create a new page `/groups/empty` with two CTAs: "Create New Group" and "Join via Invite Code". Update Splash.tsx redirect logic: if user has 0 groups, go to `/groups/empty` instead of onboarding.
 
-## Security Validations (in application code)
+**Files:**
+- New: `src/pages/EmptyGroups.tsx` -- simple page with two buttons
+- `src/pages/Splash.tsx` -- change redirect from `/onboarding/group-name` to `/groups/empty`
+- `src/pages/Auth.tsx` -- same redirect change
+- `src/App.tsx` -- add route for `/groups/empty`
 
-- Placeholder must exist in the group being joined (already checked: `.eq("group_id", group.id)`)
-- Placeholder must be unclaimed (already checked: `.eq("is_placeholder", true)`)
-- Expense split updates scoped to group's expense IDs only (new)
-- Expense paid_by updates scoped to group_id (new)
-- RLS prevents cross-group claims at database level
+### BUG 8: Onboarding Shows Again for Returning Users
+**Root cause:** Dashboard mode logic (line 70): `mode = !hasOtherMembers ? "empty" : !hasExpenses ? "prompt" : "normal"`. If a returning user opens a group with no expenses yet, they see the "prompt" (onboarding-like) state. This is actually correct behavior -- the "empty" and "prompt" states ARE the onboarding. The real issue is that the Splash page sends returning users to onboarding (`/onboarding/group-name`) if they have no groups.
+
+This is the same fix as FEATURE 7 above. Additionally, the dashboard "empty" state (`EmptyState`) should be for when the user has no other members in the group, which is fine. No additional changes needed beyond FEATURE 7.
+
+---
+
+## Phase 3: Medium Priority
+
+### BUG 2: Placeholder Invite/Merge Flow
+This requires multiple changes:
+
+**Step 1: "Invite to Bountt" button in MemberDetailSheet**
+Currently the button exists (line 157-159) but does nothing. Wire it to:
+- Copy the invite link with `?placeholder=MEMBER_ID` appended
+- Show a toast: "Invite link copied! Share it with [name]"
+
+**Step 2: Handle merge on Join page**
+- In `Join.tsx`, read `?placeholder=PLACEHOLDER_ID` from URL query params
+- After joining the group, if placeholder param exists:
+  - Find the placeholder member record
+  - Update it: set `user_id = currentUser.id`, `is_placeholder = false`
+  - Show confirmation before merging
+  - All existing splits with that `member_name` are now linked to the real user
+
+**Step 3: Share flow in SettingsCards**
+- When user taps "Share", if group has placeholders, show a selection dialog first
+- "Are you inviting one of these people?" with list of placeholder names
+- If selected, append `?placeholder=ID` to the share link
+- If "Someone new", share generic link
+
+**Files:**
+- `src/components/group-settings/MemberDetailSheet.tsx` -- wire Invite button
+- `src/pages/Join.tsx` -- handle placeholder merge
+- `src/components/group-settings/SettingsCards.tsx` -- enhanced share flow
+- `src/lib/bountt-utils.ts` -- add `generatePlaceholderInviteUrl` helper
+
+---
+
+## Implementation Order
+
+1. **ExpenseSheet description input** (BUG 4) -- small, self-contained
+2. **DashboardHeader gradient** (BUG 1) -- small, self-contained
+3. **Auth redirect fix for /join flow** (BUG 3) -- fix post-login redirect
+4. **fetchGroups active filter + leaveGroup state update** (BUG 5)
+5. **EmptyGroups page + redirect updates** (FEATURE 7 + BUG 8)
+6. **Placeholder invite/merge flow** (BUG 2)
+
+## Technical Notes
+
+- No database migrations needed -- all required columns already exist
+- The `fetchGroups` query needs to filter by `status = 'active'` in the `group_members` join to exclude groups the user has left
+- The gradient GRADIENTS map should be extracted to a shared utility to avoid duplication between `GroupBanner.tsx` and `DashboardHeader.tsx`
+- The placeholder merge only requires updating the existing `group_members` row (set `user_id`, `is_placeholder = false`) -- no expense_splits changes needed since splits reference `member_name` which stays the same, but the `user_id` field in splits should also be updated for consistency
 
