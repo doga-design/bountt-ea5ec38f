@@ -43,7 +43,7 @@ export default function GroupBanner({ group }: GroupBannerProps) {
         <span className="text-5xl mb-3">{group.emoji}</span>
         {editing ? (
           <input
-            className="text-2xl font-bold text-primary-foreground bg-transparent border-b-2 border-primary-foreground/50 text-center outline-none"
+            className="text-2xl font-bold text-primary-foreground bg-transparent text-center outline-none"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onBlur={handleNameSave}
@@ -54,7 +54,10 @@ export default function GroupBanner({ group }: GroupBannerProps) {
         ) : (
           <h1
             className="text-2xl font-bold text-primary-foreground cursor-text"
-            onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditing(true);
+            }}
           >
             {group.name}
           </h1>
