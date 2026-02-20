@@ -49,10 +49,14 @@ export default function DashboardHeader({ onAddMember, showBalance = false }: Da
               return (
                 <div
                   key={member.id}
-                  className="w-10 h-10 rounded-full flex items-center justify-center"
+                  className="w-10 h-10 rounded-full flex items-center justify-center border-2 border-primary-foreground"
                   style={{
                     marginLeft: i > 0 ? "-12px" : "0",
-                    backgroundColor: isCurrentUser ? "hsl(var(--card))" : isPlaceholder ? "hsl(var(--muted))" : color,
+                    backgroundColor: isCurrentUser
+                      ? "hsl(var(--card))"
+                      : isPlaceholder
+                      ? "hsl(var(--muted))"
+                      : color,
                     zIndex: activeMembers.length - i,
                     position: "relative",
                   }}
@@ -92,13 +96,17 @@ export default function DashboardHeader({ onAddMember, showBalance = false }: Da
 
         {/* Bottom row: group name + balance */}
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-primary-foreground">{currentGroup.name}</h1>
+          <h1 className="text-2xl font-bold text-primary-foreground">
+            {currentGroup.name}
+          </h1>
           {showBalance && <BalancePill />}
         </div>
       </div>
 
       {/* Group emoji overlapping bottom edge */}
-      <div className="absolute left-5 bottom-0 translate-y-1/2 w-14 h-14 rounded-full bg-card flex items-center justify-center text-2xl border-2 border-background z-10">
+      <div
+        className="absolute left-5 bottom-0 translate-y-1/2 w-14 h-14 rounded-full bg-card flex items-center justify-center text-2xl border-2 border-background z-10"
+      >
         {currentGroup.emoji}
       </div>
 
