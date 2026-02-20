@@ -23,7 +23,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Groups state
   const [currentGroup, setCurrentGroupState] = useState<Group | null>(null);
   const [userGroups, setUserGroups] = useState<Group[]>([]);
-  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [groupsLoading, setGroupsLoading] = useState(true);
 
   // Members state
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
@@ -110,6 +110,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setCurrentGroupState(null);
           setExpenses([]);
           setGroupMembers([]);
+          setGroupsLoading(false);
           groupsFetchedForRef.current = null;
         }
       }
@@ -125,6 +126,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           groupsFetchedForRef.current = initialSession.user.id;
           fetchGroups(initialSession.user.id);
         }
+      } else {
+        setGroupsLoading(false);
       }
     });
 
