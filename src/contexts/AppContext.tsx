@@ -290,7 +290,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (fetchError) throw fetchError;
       setExpenseSplits((data as ExpenseSplit[]) ?? []);
     } catch (err) {
-      console.error("Failed to fetch expense splits", err);
+      if (import.meta.env.DEV) console.error("Failed to fetch expense splits", err);
     }
   }, []);
 
