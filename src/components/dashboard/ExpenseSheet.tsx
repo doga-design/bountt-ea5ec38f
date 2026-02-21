@@ -96,7 +96,7 @@ export default function ExpenseSheet({
       const splitsSum = splits.reduce((s, sp) => s + Math.round(sp.share_amount * 100), 0);
       const totalCents = Math.round(numAmount * 100);
       if (Math.abs(splitsSum - totalCents) > 0) {
-        console.error("Split validation failed:", { splitsSum, totalCents, shares });
+        if (import.meta.env.DEV) console.error("Split validation failed:", { splitsSum, totalCents, shares });
       }
 
       const { error: splitsError } = await supabase
