@@ -1,102 +1,55 @@
-# Redesign Dashboard Expense Feed
 
-## Overview
+# Fix Member Color Assignment
 
-Rebuild the expense card list to match the new visual design: colored left accent bars, two-column layout with dynamic color logic, split indicators, and a collapsible "SETTLED" section at the bottom.
+## Problem
+Currently, avatar colors are derived by hashing the member's UUID against a 6-color palette. This causes frequent color collisions (multiple members get the same color). Placeholder members get no color at all (`undefined`).
 
-## Files Changed
+## Solution
+Store a persistent `avatar_color` on each `group_members` row, assigned at creation time. When adding a new member, pick a color from an expanded 10-color palette that is not yet used by other active members in the same group (or pick randomly if all are taken).
 
+## Changes
 
-| File                                       | Action                                                 |
-| ------------------------------------------ | ------------------------------------------------------ |
-| `src/components/dashboard/ExpenseCard.tsx` | Rewrite -- new layout and color logic                  |
-| `src/pages/Dashboard.tsx`                  | Update -- new grouping logic with SETTLED section      |
-| `src/lib/bountt-utils.ts`                  | Update -- uppercase date labels ("TODAY", "YESTERDAY") |
+### 1. Database Migration
+Add a nullable `avatar_color` text column to `group_members`. Then backfill existing rows with deterministic colors from the current hash logic so nothing changes visually for existing data.
 
-
-## Detailed Changes
-
-### 1. Update `formatRelativeDate` in `bountt-utils.ts`
-
-Change return values to uppercase: `"TODAY"`, `"YESTERDAY"`, `"LAST WEEK"`, `"2 WEEKS AGO"`, and uppercase month/day for older dates.
-
-### 2. Rewrite `ExpenseCard` Component
-
-**New props:**
-
-```text
-interface ExpenseCardProps {
-  expense: Expense;
-  splits: ExpenseSplit[];
-  groupMembers: GroupMember[];  // NEW -- needed to look up payer's member ID for color
-}
+```
+ALTER TABLE public.group_members ADD COLUMN avatar_color text;
 ```
 
-**Layout structure:**
+Backfill existing members using the same hash logic currently in the frontend, so colors stay consistent for existing users.
 
-```text
-+--+-----------------------------------------------+
-|  | Groceries                        $84           |
-|  | Paid by You . Kyle owes $42.00   50 / 50       |
-+--+-----------------------------------------------+
- ^
- 4px colored left border (border-l-4)
-```
+### 2. Update `src/lib/avatar-utils.ts`
+- Expand palette to 10 colors
+- Add a new helper `pickAvailableColor(existingColors: string[]): string` that picks a color not yet used by other group members (falls back to random if all taken)
+- Update `getAvatarColor(member)` to simply return `member.avatar_color` if it exists, falling back to the hash-based logic for any un-migrated rows
 
-- Use `border-l-4` with dynamic `style={{ borderColor }}` on the card container
-- Remove the icon/Package element entirely
-- Two-column flex: left = title + subtitle, right = amount + split indicator
+### 3. Update `src/types/index.ts`
+Add `avatar_color: string | null` to the `GroupMember` interface.
 
-**Color logic (accent bar and amount text):**
+### 4. Update `src/contexts/AppContext.tsx`
+When calling `addPlaceholderMember`, compute the next available color by checking existing group members' colors, then pass it to the database insert.
 
-```text
-if (expense.is_settled)        -> green (#10B981)
-else if (isPayer)              -> orange (#E8480A)
-else                           -> payer's avatar color via getAvatarColor(payerMemberId)
-```
+### 5. Update All Consumers
+Files that call `getAvatarColor(member.id)` will be updated to call `getAvatarColor(member)` (passing the full member object so it can read `avatar_color`):
+- `src/components/dashboard/MemberCard.tsx`
+- `src/components/dashboard/ExpenseCard.tsx`
+- `src/components/dashboard/DashboardHeader.tsx`
+- `src/components/group-settings/MemberDetailSheet.tsx`
 
-To find the payer's member ID: look up `groupMembers.find(m => m.user_id === expense.paid_by_user_id)` and use their `m.id` with `getAvatarColor()`.
+Placeholder members will no longer get `undefined` -- they will have a real assigned color like everyone else.
 
-**Subtitle logic ("Paid by X . Y owes $Z"):**
+### 6. Handle Join Flow
+When a real user joins a group (not placeholder), also assign them a color. This happens in the existing join RPC / insert logic in AppContext.
 
-- Payer label: `"You"` (orange) if current user paid, otherwise `expense.paid_by_name` (colored with payer's avatar color). If settled, gray.
-- Owes label (for 2-person splits): find the split belonging to the non-payer. If current user paid, show `"[other name] owes $[share]"`. If other paid, show `"You owe $[your share]"`.
-- For 3+ person splits: find the largest non-payer split and show that person's name and share.
-- For settled: show `"Settled"` with a checkmark instead of the owes text.
-- Separator: `.` (middle dot character)
+---
 
-**Split indicator (below amount, right-aligned):**
+## Technical Details
 
-- If settled: `"settled"` in green text
-- If 2 splits: `"50 / 50"` in muted text
-- If 3+ splits: `"[count]-way"` in muted text
+**10-Color Palette:**
+Blue (#3B82F6), Pink (#EC4899), Green (#10B981), Orange (#F97316), Purple (#8B5CF6), Teal (#14B8A6), Red (#EF4444), Amber (#F59E0B), Indigo (#6366F1), Rose (#F43F5E)
 
-**Settled card styling:**
-
-- All text becomes muted/gray (title, subtitle, amount)
-- Amount text color: gray instead of orange/black
-
-### 3. Update Dashboard Grouping Logic
-
-Currently groups expenses by date label only. New logic:
-
-1. Separate expenses into two lists: `unsettled` and `settled`
-2. Group `unsettled` by `formatRelativeDate(expense.date)` (returns "TODAY", "YESTERDAY", etc.)
-3. Render unsettled groups first, then a "SETTLED" section at the bottom
-4. The "SETTLED" section uses a collapsible wrapper (Radix Collapsible) -- starts collapsed
-5. Pass `groupMembers` to each `ExpenseCard`
-
-**Date header styling:**
-
-- Uppercase text (handled by `formatRelativeDate` returning uppercase)
-- `text-xs font-medium text-muted-foreground tracking-wider`
-- Thin top border separator between sections (except first)
-
-### 4. Edge Cases
-
-- **Single-member expense (no other splits):** Show only "Paid by You", no owes text
-- **3+ person split:** Show the largest non-payer split holder's name and share, plus "[count]-way" indicator (3+ people, it SHOULD show:
-  - If you paid: "[Person] owes $[their share]" (pick one person, maybe largest or first)
-  - If they paid: "You owe $[your share]")
-- **Settled expenses:** Gray text, green accent bar, "Settled" with checkmark, in SETTLED section
-- **Placeholder members (no user_id):** Match by `member_name` and `is_placeholder` for color lookup; use member `id` for `getAvatarColor()`
+**Color picking logic:**
+1. Get all `avatar_color` values from active members in the same group
+2. Filter palette to unused colors
+3. Pick randomly from unused colors
+4. If all 10 are taken, pick randomly from full palette
