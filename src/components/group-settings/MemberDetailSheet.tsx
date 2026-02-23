@@ -40,7 +40,7 @@ export default function MemberDetailSheet({
   if (!member) return null;
 
   const isPlaceholder = member.is_placeholder;
-  const avatarColor = isPlaceholder ? undefined : getAvatarColor(member.id);
+  const avatarColor = getAvatarColor(member);
   const balance = getMemberBalance(
     member.id,
     member.user_id,
@@ -75,7 +75,7 @@ export default function MemberDetailSheet({
           <div className="flex items-center gap-3">
             <div
               className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
-              style={isPlaceholder ? { backgroundColor: "hsl(var(--muted))" } : { backgroundColor: avatarColor }}
+              style={{ backgroundColor: avatarColor }}
             >
               {isPlaceholder ? (
                 <span className="text-xl">👻</span>

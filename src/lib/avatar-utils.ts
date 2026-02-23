@@ -1,6 +1,6 @@
-import { Expense, ExpenseSplit } from "@/types";
+import { Expense, ExpenseSplit, GroupMember } from "@/types";
 
-// 6-color avatar palette
+// 10-color avatar palette
 const AVATAR_COLORS = [
   "#3B82F6", // Blue
   "#EC4899", // Pink
@@ -8,18 +8,36 @@ const AVATAR_COLORS = [
   "#F97316", // Orange
   "#8B5CF6", // Purple
   "#14B8A6", // Teal
+  "#EF4444", // Red
+  "#F59E0B", // Amber
+  "#6366F1", // Indigo
+  "#F43F5E", // Rose
 ];
 
 /**
- * Deterministic color assignment based on member ID hash.
- * Same member always gets the same color.
+ * Returns the member's stored avatar_color, falling back to hash-based for un-migrated rows.
  */
-export function getAvatarColor(memberId: string): string {
+export function getAvatarColor(member: GroupMember): string {
+  if (member.avatar_color) return member.avatar_color;
+  // Fallback: hash-based for old rows without avatar_color
   let hash = 0;
-  for (let i = 0; i < memberId.length; i++) {
-    hash = memberId.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < member.id.length; i++) {
+    hash = member.id.charCodeAt(i) + ((hash << 5) - hash);
   }
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+/**
+ * Pick a color not yet used by existing group members.
+ * Falls back to random if all 10 are taken.
+ */
+export function pickAvailableColor(existingColors: string[]): string {
+  const used = new Set(existingColors);
+  const available = AVATAR_COLORS.filter((c) => !used.has(c));
+  if (available.length > 0) {
+    return available[Math.floor(Math.random() * available.length)];
+  }
+  return AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
 }
 
 export interface MemberBalance {

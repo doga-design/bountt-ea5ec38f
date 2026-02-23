@@ -10,6 +10,7 @@ import { User, Session, RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Group, GroupMember, Expense, ExpenseSplit, Profile, AppContextValue, BalanceSummary } from "@/types";
 import { generateInviteCode, calculateBalances as calcBalances } from "@/lib/bountt-utils";
+import { pickAvailableColor } from "@/lib/avatar-utils";
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
@@ -170,6 +171,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const group = groupData as Group;
 
+      const creatorColor = pickAvailableColor([]);
       const { error: memberError } = await supabase
         .from("group_members")
         .insert({
@@ -178,6 +180,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           name: profile?.display_name ?? user.email?.split("@")[0] ?? "You",
           is_placeholder: false,
           role: "admin",
+          avatar_color: creatorColor,
         });
 
       if (memberError) throw memberError;
@@ -231,9 +234,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   ): Promise<GroupMember | null> => {
     if (!user) return null;
     try {
+      const existingColors = groupMembers
+        .filter((m) => m.group_id === groupId && m.status === "active" && m.avatar_color)
+        .map((m) => m.avatar_color!);
+      const newColor = pickAvailableColor(existingColors);
+
       const { data, error: insertError } = await supabase
         .from("group_members")
-        .insert({ group_id: groupId, user_id: null, name, is_placeholder: true })
+        .insert({ group_id: groupId, user_id: null, name, is_placeholder: true, avatar_color: newColor })
         .select()
         .single();
 

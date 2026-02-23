@@ -20,7 +20,7 @@ export default function ExpenseCard({ expense, splits, groupMembers }: ExpenseCa
       (expense.paid_by_user_id && m.user_id === expense.paid_by_user_id) ||
       (!expense.paid_by_user_id && m.name === expense.paid_by_name && m.is_placeholder)
   );
-  const payerColor = payerMember ? getAvatarColor(payerMember.id) : "#8B5CF6";
+  const payerColor = payerMember ? getAvatarColor(payerMember) : "#8B5CF6";
 
   // --- Color logic ---
   const ORANGE = "#E8480A";
