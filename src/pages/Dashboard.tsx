@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
+import { ChevronDown } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import EmptyState from "@/components/dashboard/EmptyState";
@@ -11,6 +12,7 @@ import BottomNav from "@/components/BottomNav";
 import { formatRelativeDate } from "@/lib/bountt-utils";
 import { GroupMember } from "@/types";
 import MemberDetailSheet from "@/components/group-settings/MemberDetailSheet";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export default function Dashboard() {
   const { groupId } = useParams<{ groupId: string }>();
@@ -45,10 +47,13 @@ export default function Dashboard() {
   const isLoading = membersLoading || expensesLoading;
   const isAdmin = currentGroup?.created_by === user?.id;
 
-  const groupedExpenses = useMemo(() => {
+  const { unsettledGroups, settledExpenses } = useMemo(() => {
+    const unsettled = expenses.filter((e) => !e.is_settled);
+    const settled = expenses.filter((e) => e.is_settled);
+
     const groups: { label: string; items: typeof expenses }[] = [];
     let currentLabel = "";
-    for (const expense of expenses) {
+    for (const expense of unsettled) {
       const label = formatRelativeDate(expense.date);
       if (label !== currentLabel) {
         currentLabel = label;
@@ -56,7 +61,7 @@ export default function Dashboard() {
       }
       groups[groups.length - 1].items.push(expense);
     }
-    return groups;
+    return { unsettledGroups: groups, settledExpenses: settled };
   }, [expenses]);
 
   if (isLoading && !hasOtherMembers && !hasExpenses) {
@@ -106,9 +111,10 @@ export default function Dashboard() {
           </div>
 
           <div className="flex-1 px-4 py-4 space-y-4 pb-24">
-            {groupedExpenses.map((group) => (
+            {unsettledGroups.map((group, idx) => (
               <div key={group.label}>
-                <p className="text-xs font-medium text-muted-foreground mb-2 px-1">
+                {idx > 0 && <div className="border-t border-border mb-3" />}
+                <p className="text-xs font-medium text-muted-foreground tracking-wider mb-2 px-1">
                   {group.label}
                 </p>
                 <div className="space-y-3">
@@ -117,11 +123,34 @@ export default function Dashboard() {
                       key={expense.id}
                       expense={expense}
                       splits={expenseSplits.filter((s) => s.expense_id === expense.id)}
+                      groupMembers={groupMembers}
                     />
                   ))}
                 </div>
               </div>
             ))}
+
+            {settledExpenses.length > 0 && (
+              <Collapsible>
+                <div className="border-t border-border mb-3" />
+                <CollapsibleTrigger className="flex items-center gap-1 text-xs font-medium text-muted-foreground tracking-wider px-1 mb-2 w-full">
+                  SETTLED
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="space-y-3">
+                    {settledExpenses.map((expense) => (
+                      <ExpenseCard
+                        key={expense.id}
+                        expense={expense}
+                        splits={expenseSplits.filter((s) => s.expense_id === expense.id)}
+                        groupMembers={groupMembers}
+                      />
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
           </div>
 
           <BottomNav onFabPress={() => setSheetOpen(true)} />

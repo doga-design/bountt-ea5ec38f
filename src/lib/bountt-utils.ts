@@ -44,12 +44,12 @@ export function formatRelativeDate(dateStr: string): string {
   const diffMs = today.getTime() - target.getTime();
   const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays <= 7) return "Last Week";
-  if (diffDays <= 14) return "2 Weeks Ago";
+  if (diffDays === 0) return "TODAY";
+  if (diffDays === 1) return "YESTERDAY";
+  if (diffDays <= 7) return "LAST WEEK";
+  if (diffDays <= 14) return "2 WEEKS AGO";
 
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase();
 }
 
 // =====================================================
