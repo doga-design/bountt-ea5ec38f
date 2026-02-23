@@ -33,6 +33,7 @@ export interface GroupMember {
   is_placeholder: boolean;
   status: string;
   role: string;
+  avatar_color: string | null;
   left_at: string | null;
   joined_at: string;
 }

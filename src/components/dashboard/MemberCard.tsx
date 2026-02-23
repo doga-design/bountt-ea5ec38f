@@ -12,7 +12,7 @@ interface MemberCardProps {
 
 export default function MemberCard({ member, balance, isCurrentUser, onClick }: MemberCardProps) {
   const isPlaceholder = member.is_placeholder;
-  const avatarColor = isPlaceholder ? undefined : getAvatarColor(member.id);
+  const avatarColor = getAvatarColor(member);
 
   const balanceText = (() => {
     if (balance.direction === "settled") return "All settled ✓";
@@ -37,7 +37,7 @@ export default function MemberCard({ member, balance, isCurrentUser, onClick }: 
       {/* Avatar */}
       <div
         className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-        style={isPlaceholder ? undefined : { backgroundColor: avatarColor }}
+        style={{ backgroundColor: avatarColor }}
       >
         {isPlaceholder ? (
           <span className="text-lg">👻</span>

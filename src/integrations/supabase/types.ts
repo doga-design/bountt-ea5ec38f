@@ -101,6 +101,7 @@ export type Database = {
       }
       group_members: {
         Row: {
+          avatar_color: string | null
           group_id: string
           id: string
           is_placeholder: boolean
@@ -112,6 +113,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          avatar_color?: string | null
           group_id: string
           id?: string
           is_placeholder?: boolean
@@ -123,6 +125,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          avatar_color?: string | null
           group_id?: string
           id?: string
           is_placeholder?: boolean
