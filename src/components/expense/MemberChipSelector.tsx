@@ -17,7 +17,7 @@ export default function MemberChipSelector({
   onAddPress,
 }: MemberChipSelectorProps) {
   return (
-    <div className="flex flex-nowrap gap-2 px-5 pt-5 pb-2 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
+    <div className="flex flex-nowrap gap-2 px-5 pt-5 pb-2 overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
       {members.map((m) => {
         const isSelf = m.user_id === currentUserId;
         const isActive = activeIds.has(m.id);

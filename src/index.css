@@ -55,8 +55,15 @@
 }
 
 @layer base {
+  /* Hide all scrollbars globally - mobile app */
+  *::-webkit-scrollbar {
+    display: none;
+  }
+
   * {
     @apply border-border;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
 
   body {
