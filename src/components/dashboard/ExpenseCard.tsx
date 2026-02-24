@@ -92,9 +92,11 @@ export default function ExpenseCard({ expense, splits, groupMembers }: ExpenseCa
       </span>
     );
   } else if (splits.length === 2) {
-    splitIndicator = <span className="text-xs text-muted-foreground">50 / 50</span>;
+    const isEqual = splits.every((s) => Number(s.share_amount) === Number(splits[0].share_amount));
+    splitIndicator = <span className="text-xs text-muted-foreground">{isEqual ? "50 / 50" : "custom split"}</span>;
   } else if (splits.length > 2) {
-    splitIndicator = <span className="text-xs text-muted-foreground">{splits.length}-way</span>;
+    const isEqual = splits.every((s) => Number(s.share_amount) === Number(splits[0].share_amount));
+    splitIndicator = <span className="text-xs text-muted-foreground">{isEqual ? `${splits.length}-way` : "custom split"}</span>;
   } else {
     splitIndicator = null;
   }
