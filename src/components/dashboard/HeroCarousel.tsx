@@ -54,6 +54,7 @@ export default function HeroCarousel() {
       totalOwedToYou={heroData.totalOwedToYou}
       totalYouOwe={heroData.totalYouOwe}
       debtsYouOwe={heroData.debtsYouOwe}
+      groupId={currentGroup.id}
     />,
   ];
 

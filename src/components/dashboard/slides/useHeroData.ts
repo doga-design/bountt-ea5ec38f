@@ -8,7 +8,12 @@ export interface DebtItem {
   expenseName: string;
   amount: number;
   expenseId: string;
+  createdAt: string;
+  direction: "you_owe" | "owed_to_you";
 }
+
+const MAX_CHIP_AMOUNT = 30;
+const MIN_AGE_DAYS = 7;
 
 export interface AgingDebt {
   daysWaiting: number;
@@ -68,6 +73,21 @@ export function useHeroData(): HeroData {
         );
         for (const s of otherSplits) {
           totalOwedToYou += s.share_amount;
+          // Add as "owed_to_you" debt for hero chip
+          if (
+            daysSince(expense.created_at) >= MIN_AGE_DAYS &&
+            s.share_amount <= MAX_CHIP_AMOUNT
+          ) {
+            debtsYouOwe.push({
+              payerName: s.member_name,
+              payerUserId: s.user_id,
+              expenseName: expense.description,
+              amount: s.share_amount,
+              expenseId: expense.id,
+              createdAt: expense.created_at,
+              direction: "owed_to_you",
+            });
+          }
         }
       } else {
         // Someone else paid → I owe my split
@@ -76,16 +96,27 @@ export function useHeroData(): HeroData {
         );
         if (mySplit) {
           totalYouOwe += mySplit.share_amount;
-          debtsYouOwe.push({
-            payerName: expense.paid_by_name,
-            payerUserId: expense.paid_by_user_id,
-            expenseName: expense.description,
-            amount: mySplit.share_amount,
-            expenseId: expense.id,
-          });
+          // Add as "you_owe" debt for hero chip
+          if (
+            daysSince(expense.created_at) >= MIN_AGE_DAYS &&
+            mySplit.share_amount <= MAX_CHIP_AMOUNT
+          ) {
+            debtsYouOwe.push({
+              payerName: expense.paid_by_name,
+              payerUserId: expense.paid_by_user_id,
+              expenseName: expense.description,
+              amount: mySplit.share_amount,
+              expenseId: expense.id,
+              createdAt: expense.created_at,
+              direction: "you_owe",
+            });
+          }
         }
       }
     }
+
+    // Sort smallest first
+    debtsYouOwe.sort((a, b) => a.amount - b.amount);
 
     const netBalance = totalOwedToYou - totalYouOwe;
 

@@ -1,17 +1,28 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { formatCurrency } from "@/lib/bountt-utils";
 import type { DebtItem } from "./useHeroData";
+
+const MAX_DISMISSALS = 4;
+const COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 interface Props {
   netBalance: number;
   totalOwedToYou: number;
   totalYouOwe: number;
   debtsYouOwe: DebtItem[];
+  groupId: string;
 }
 
-export default function NetBalanceSlide({ netBalance, totalOwedToYou, totalYouOwe, debtsYouOwe }: Props) {
+function isCoolingDown(groupId: string): boolean {
+  const raw = localStorage.getItem(`bountt_hero_cooldown_${groupId}`);
+  if (!raw) return false;
+  return Date.now() < Number(raw);
+}
+
+export default function NetBalanceSlide({ netBalance, totalOwedToYou, totalYouOwe, debtsYouOwe, groupId }: Props) {
   const [debtIndex, setDebtIndex] = useState(0);
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState(() => isCoolingDown(groupId));
+  const dismissCount = useRef(0);
 
   const badge =
     netBalance > 0 ? "You're up" : netBalance === 0 ? "You're even" : "You're behind";
@@ -23,12 +34,31 @@ export default function NetBalanceSlide({ netBalance, totalOwedToYou, totalYouOw
   const currentDebt = showActionRow ? debtsYouOwe[debtIndex] : null;
 
   const handleNotYet = () => {
-    if (debtIndex + 1 >= debtsYouOwe.length) {
+    dismissCount.current += 1;
+
+    if (dismissCount.current >= MAX_DISMISSALS || debtIndex + 1 >= debtsYouOwe.length) {
       setDismissed(true);
+      if (dismissCount.current >= MAX_DISMISSALS) {
+        localStorage.setItem(
+          `bountt_hero_cooldown_${groupId}`,
+          String(Date.now() + COOLDOWN_MS)
+        );
+      }
     } else {
       setDebtIndex((i) => i + 1);
     }
   };
+
+  // Directional CTA
+  const isOwed = currentDebt?.direction === "owed_to_you";
+  const ctaLabel = isOwed
+    ? `Settle Up`
+    : `Pay ${currentDebt?.payerName.split(" ")[0] ?? ""}`;
+  const microCopy = currentDebt
+    ? isOwed
+      ? `${currentDebt.payerName} owes ${formatCurrency(currentDebt.amount)} to you`
+      : `${formatCurrency(currentDebt.amount)} owed to ${currentDebt.payerName}`
+    : "";
 
   return (
     <div className="flex flex-col justify-center px-6 py-4 min-h-[200px]">
@@ -65,15 +95,15 @@ export default function NetBalanceSlide({ netBalance, totalOwedToYou, totalYouOw
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-white truncate">
-                {currentDebt.payerName} · {currentDebt.expenseName}
+                {currentDebt.expenseName}
               </p>
               <p className="text-xs text-white/60">
-                {formatCurrency(currentDebt.amount)} to settle
+                {microCopy}
               </p>
             </div>
             <div className="flex gap-2 ml-3 shrink-0">
               <button className="bg-white text-[hsl(18,89%,47%)] font-bold text-xs rounded-full px-4 py-2">
-                Pay {currentDebt.payerName.split(" ")[0]}
+                {ctaLabel}
               </button>
               <button
                 onClick={handleNotYet}
