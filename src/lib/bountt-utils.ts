@@ -36,10 +36,15 @@ export function formatCurrency(amount: number, currency = "USD"): string {
 // =====================================================
 
 export function formatRelativeDate(dateStr: string): string {
-  const date = new Date(dateStr);
+  // Parse as local date to avoid UTC timezone shift
+  const parts = dateStr.split("-");
+  const target = new Date(
+    parseInt(parts[0]),
+    parseInt(parts[1]) - 1,
+    parseInt(parts[2])
+  );
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
   const diffMs = today.getTime() - target.getTime();
   const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
@@ -49,7 +54,7 @@ export function formatRelativeDate(dateStr: string): string {
   if (diffDays <= 7) return "LAST WEEK";
   if (diffDays <= 14) return "2 WEEKS AGO";
 
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase();
+  return target.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase();
 }
 
 // =====================================================

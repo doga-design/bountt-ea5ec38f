@@ -269,7 +269,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .from("expenses")
         .select("*")
         .eq("group_id", groupId)
-        .order("date", { ascending: false });
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false });
 
       if (fetchError) throw fetchError;
       setExpenses((data as Expense[]) ?? []);
