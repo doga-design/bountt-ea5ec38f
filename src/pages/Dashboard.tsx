@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import HeroCarousel from "@/components/dashboard/HeroCarousel";
 import EmptyState from "@/components/dashboard/EmptyState";
 import AddExpensePrompt from "@/components/dashboard/AddExpensePrompt";
 import ExpenseSheet from "@/components/dashboard/ExpenseSheet";
@@ -76,10 +77,11 @@ export default function Dashboard() {
 
   return (
     <div className="screen-container">
-      <DashboardHeader
-        onAddMember={undefined}
-        showBalance={mode === "normal"}
-      />
+      {mode === "normal" ? (
+        <HeroCarousel />
+      ) : (
+        <DashboardHeader onAddMember={undefined} showBalance={false} />
+      )}
 
       {mode === "empty" && <EmptyState />}
 
