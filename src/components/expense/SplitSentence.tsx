@@ -6,6 +6,7 @@ interface SplitSentenceProps {
   activeMembers: GroupMember[];
   currentUserId: string | undefined;
   disabled: boolean;
+  isSingleUser?: boolean;
 }
 
 export default function SplitSentence({
@@ -14,8 +15,18 @@ export default function SplitSentence({
   activeMembers,
   currentUserId,
   disabled,
+  isSingleUser = false,
 }: SplitSentenceProps) {
+  if (isSingleUser) {
+    return (
+      <p className="text-center text-sm font-semibold text-muted-foreground px-6 opacity-40">
+        assigning a split
+      </p>
+    );
+  }
+
   const others = activeMembers.filter((m) => m.user_id !== currentUserId);
+  const selfIncluded = activeMembers.some((m) => m.user_id === currentUserId);
   const onlySelf = others.length === 0;
 
   let namesDisplay: React.ReactNode;
@@ -68,6 +79,12 @@ export default function SplitSentence({
         {isEqual ? "equally" : "custom"}
       </button>{" "}
       with {namesDisplay}
+      {selfIncluded && !onlySelf && (
+        <>
+          {" & "}
+          <span className="font-bold text-blue-500">you</span>
+        </>
+      )}
     </p>
   );
 }

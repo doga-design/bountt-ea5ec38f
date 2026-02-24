@@ -34,18 +34,17 @@ export default function NumpadGrid({ onKey }: NumpadGridProps) {
           <button
             key={key}
             onClick={() => onKey(key)}
-            className="flex flex-col items-center justify-center font-sora transition-colors active:bg-[#EAEAE6]"
+            className="flex flex-col items-center justify-center font-sora transition-colors active:bg-[#EAEAE6] min-h-[72px]"
             style={{
               backgroundColor: isFunction ? "#EEEEE9" : "#F5F5F1",
-              minHeight: 0,
             }}
             aria-label={key === "del" ? "Delete" : key}
           >
             {key === "del" ? (
-              <Delete className="w-6 h-6 text-foreground" />
+              <Delete className="w-7 h-7 text-foreground" />
             ) : (
               <>
-                <span className="text-2xl font-semibold text-foreground leading-tight">
+                <span className="text-[36px] font-semibold text-foreground leading-tight">
                   {key}
                 </span>
                 {SUB_LETTERS[key] && (
