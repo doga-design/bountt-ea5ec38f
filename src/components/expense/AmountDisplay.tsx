@@ -34,7 +34,7 @@ export default function AmountDisplay({
     }
 
     return (
-      <div className="flex flex-col items-center py-3 transition-all">
+      <div className="flex flex-col items-center py-2 transition-all">
         <span
           className="font-sora text-xs font-bold uppercase text-muted-foreground"
           style={{ letterSpacing: "0.1em" }}
@@ -46,7 +46,7 @@ export default function AmountDisplay({
             $
           </span>
           <span
-            className="font-sora text-5xl font-extrabold text-foreground"
+            className="font-sora text-[52px] font-extrabold text-foreground"
             style={{ letterSpacing: "-0.07em" }}
           >
             {display}
@@ -60,7 +60,7 @@ export default function AmountDisplay({
   }
 
   return (
-    <div className="flex items-baseline justify-center py-6 transition-all">
+    <div className="flex items-baseline justify-center py-4 transition-all">
       <span className="font-sora text-[34px] font-bold text-muted-foreground mr-1">
         $
       </span>

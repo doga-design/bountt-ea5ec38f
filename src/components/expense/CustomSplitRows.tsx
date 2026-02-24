@@ -57,14 +57,6 @@ export default function CustomSplitRows({
                   : "none",
               }}
             >
-              {/* Avatar */}
-              <span
-                className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                style={{ backgroundColor: color }}
-              >
-                {getInitials(m.name)}
-              </span>
-
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <p className="text-[15px] font-extrabold text-foreground truncate">

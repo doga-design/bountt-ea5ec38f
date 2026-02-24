@@ -37,9 +37,7 @@ export default function ExpenseScreen({
   const [customAmounts, setCustomAmounts] = useState<Map<string, string>>(new Map());
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  // Track whether the user is editing the total while in custom mode
   const [editingTotal, setEditingTotal] = useState(false);
-  // freshFocus: when true, first numpad key replaces the custom field entirely
   const [freshFocus, setFreshFocus] = useState(false);
 
   // Active members sorted: "You" first
@@ -53,12 +51,10 @@ export default function ExpenseScreen({
       });
   }, [groupMembers, user?.id]);
 
-  // Init activeIds when members change
   useEffect(() => {
     setActiveIds(new Set(activeMembers.map((m) => m.id)));
   }, [activeMembers.length]);
 
-  // Reset state when opening
   useEffect(() => {
     if (open) {
       setAmount("0");
@@ -120,7 +116,6 @@ export default function ExpenseScreen({
       };
 
       if (isCustomFocused) {
-        // freshFocus: replace entire field on first key
         if (freshFocus) {
           setFreshFocus(false);
           setCustomAmounts((prev) => {
@@ -140,7 +135,6 @@ export default function ExpenseScreen({
           const next = new Map(prev);
           const current = next.get(focusedMemberId!) ?? "0";
           const newVal = updateField(current);
-          // Clamp to >= 0
           if (parseFloat(newVal) < 0) return prev;
           next.set(focusedMemberId!, newVal);
           return next;
@@ -148,7 +142,6 @@ export default function ExpenseScreen({
       } else {
         setAmount((prev) => {
           const newAmount = updateField(prev);
-          // If in custom mode and editing total, redistribute
           if (splitMode === "custom") {
             const total = parseFloat(newAmount) || 0;
             setCustomAmounts(distributeEqually(total, selectedMembers));
@@ -182,18 +175,16 @@ export default function ExpenseScreen({
       setActiveIds((prev) => {
         const next = new Set(prev);
         if (next.has(memberId)) {
-          if (next.size <= 1) return prev; // must keep at least 1
+          if (next.size <= 1) return prev;
           next.delete(memberId);
         } else {
           next.add(memberId);
         }
 
-        // Redistribute in custom mode
         if (splitMode === "custom") {
           const newMembers = activeMembers.filter((m) => next.has(m.id));
           const total = parseFloat(amount) || 0;
           setCustomAmounts(distributeEqually(total, newMembers));
-          // Reset focus to first member
           setFocusedMemberId(newMembers[0]?.id ?? null);
         }
 
@@ -216,12 +207,10 @@ export default function ExpenseScreen({
     const numAmount = parseFloat(amount);
     if (!numAmount || numAmount <= 0) return;
 
-    // In custom mode, must be balanced
     if (splitMode === "custom" && !isBalanced) return;
 
     setLoading(true);
     try {
-      // "You" is always the payer
       const selfMember = activeMembers.find((m) => m.user_id === user.id);
       const payerName = selfMember?.name ?? user.email?.split("@")[0] ?? "You";
 
@@ -290,9 +279,7 @@ export default function ExpenseScreen({
         next.add(newMember.id);
         return next;
       });
-      // Redistribute in custom mode
       if (splitMode === "custom") {
-        // Need to wait for state to settle, use timeout
         setTimeout(() => {
           const total = parseFloat(amount) || 0;
           const allActive = [...activeMembers, newMember].filter(
@@ -311,9 +298,9 @@ export default function ExpenseScreen({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background max-w-[430px] mx-auto">
+    <div className="fixed inset-0 z-50 flex flex-col bg-background max-w-[430px] mx-auto" style={{ height: '100dvh' }}>
       {/* Top bar */}
-      <div className="flex items-center justify-between px-5 pt-4 pb-1">
+      <div className="flex items-center justify-between px-5 pt-4 pb-1 flex-shrink-0">
         <h2 className="font-sora text-lg font-bold text-foreground">Adding cost</h2>
         <button
           onClick={() => onOpenChange(false)}
@@ -323,68 +310,74 @@ export default function ExpenseScreen({
         </button>
       </div>
 
-      {/* Description input */}
-      <div className="px-5 pt-3">
+      {/* Scrollable middle section */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {/* Member chips */}
+        <MemberChipSelector
+          members={activeMembers}
+          activeIds={activeIds}
+          currentUserId={user?.id}
+          onToggle={handleToggleChip}
+          onAddPress={() => setAddMemberOpen(true)}
+        />
+
+        {/* Amount display */}
+        <AmountDisplay
+          amount={amount}
+          splitMode={splitMode}
+          remaining={remaining}
+          isBalanced={isBalanced}
+        />
+
+        {/* Split sentence */}
+        <SplitSentence
+          splitMode={splitMode}
+          onToggleMode={toggleMode}
+          activeMembers={selectedMembers}
+          currentUserId={user?.id}
+          disabled={amount === "0"}
+          isSingleUser={isSingleUser}
+        />
+
+        {/* Custom split rows */}
+        <CustomSplitRows
+          members={selectedMembers}
+          currentUserId={user?.id}
+          customAmounts={customAmounts}
+          focusedMemberId={focusedMemberId}
+          onFocus={handleFocusRow}
+          visible={splitMode === "custom"}
+        />
+      </div>
+
+      {/* Description input - above save */}
+      <div className="px-5 pt-2 pb-1 flex-shrink-0">
         <input
           type="text"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="e.g., Pizza, Rent, Groceries"
           maxLength={50}
-          className="w-full text-center text-sm font-medium rounded-xl px-4 py-3 bg-muted text-foreground placeholder:text-muted-foreground outline-none border-none font-sora"
+          className="w-full text-center text-base font-medium rounded-xl px-4 py-3.5 bg-muted text-foreground placeholder:text-muted-foreground outline-none border-none font-sora"
         />
       </div>
 
-      {/* Member chips */}
-      <MemberChipSelector
-        members={activeMembers}
-        activeIds={activeIds}
-        currentUserId={user?.id}
-        onToggle={handleToggleChip}
-        onAddPress={() => setAddMemberOpen(true)}
-      />
-
-      {/* Amount display */}
-      <AmountDisplay
-        amount={amount}
-        splitMode={splitMode}
-        remaining={remaining}
-        isBalanced={isBalanced}
-      />
-
-      {/* Split sentence */}
-      <SplitSentence
-        splitMode={splitMode}
-        onToggleMode={toggleMode}
-        activeMembers={selectedMembers}
-        currentUserId={user?.id}
-        disabled={amount === "0"}
-        isSingleUser={isSingleUser}
-      />
-
-      {/* Custom split rows */}
-      <CustomSplitRows
-        members={selectedMembers}
-        currentUserId={user?.id}
-        customAmounts={customAmounts}
-        focusedMemberId={focusedMemberId}
-        onFocus={handleFocusRow}
-        visible={splitMode === "custom"}
-      />
-
-
       {/* Save button */}
-      <SaveButton
-        splitMode={splitMode}
-        canSave={canSave}
-        isBalanced={isBalanced}
-        loading={loading}
-        onClick={handleSave}
-        isSingleUser={isSingleUser}
-      />
+      <div className="flex-shrink-0">
+        <SaveButton
+          splitMode={splitMode}
+          canSave={canSave}
+          isBalanced={isBalanced}
+          loading={loading}
+          onClick={handleSave}
+          isSingleUser={isSingleUser}
+        />
+      </div>
 
-      {/* Numpad */}
-      <NumpadGrid onKey={handleKey} />
+      {/* Numpad - fixed height */}
+      <div className="flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <NumpadGrid onKey={handleKey} />
+      </div>
 
       {/* Add member sheet */}
       <AddMemberSheet
