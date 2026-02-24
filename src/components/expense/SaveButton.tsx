@@ -20,7 +20,7 @@ export default function SaveButton({
   const enabled = isCustomReady || isDefaultReady;
 
   return (
-    <div className="px-5 pb-5 pt-2">
+    <div className="px-4 pb-2 pt-3">
       <button
         onClick={onClick}
         disabled={!enabled || loading}

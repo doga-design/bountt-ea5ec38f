@@ -30,6 +30,7 @@ export default function ExpenseScreen({
   const { toast } = useToast();
 
   const [amount, setAmount] = useState("0");
+  const [description, setDescription] = useState("");
   const [splitMode, setSplitMode] = useState<"equal" | "custom">("equal");
   const [activeIds, setActiveIds] = useState<Set<string>>(new Set());
   const [focusedMemberId, setFocusedMemberId] = useState<string | null>(null);
@@ -61,6 +62,7 @@ export default function ExpenseScreen({
   useEffect(() => {
     if (open) {
       setAmount("0");
+      setDescription("");
       setSplitMode("equal");
       setActiveIds(new Set(activeMembers.map((m) => m.id)));
       setFocusedMemberId(null);
@@ -243,7 +245,7 @@ export default function ExpenseScreen({
       const { error: rpcError } = await supabase.rpc("create_expense_with_splits", {
         p_group_id: currentGroup.id,
         p_amount: numAmount,
-        p_description: "Quick Expense",
+        p_description: description.trim() || "Quick Expense",
         p_paid_by_user_id: user.id,
         p_paid_by_name: payerName,
         p_created_by: user.id,
@@ -321,6 +323,18 @@ export default function ExpenseScreen({
         </button>
       </div>
 
+      {/* Description input */}
+      <div className="px-5 pt-3">
+        <input
+          type="text"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="e.g., Pizza, Rent, Groceries"
+          maxLength={50}
+          className="w-full text-center text-sm font-medium rounded-xl px-4 py-3 bg-muted text-foreground placeholder:text-muted-foreground outline-none border-none font-sora"
+        />
+      </div>
+
       {/* Member chips */}
       <MemberChipSelector
         members={activeMembers}
@@ -358,8 +372,6 @@ export default function ExpenseScreen({
         visible={splitMode === "custom"}
       />
 
-      {/* Spacer pushes numpad + save to bottom */}
-      <div className="flex-1 min-h-0" />
 
       {/* Save button */}
       <SaveButton

@@ -26,7 +26,7 @@ export default function NumpadGrid({ onKey }: NumpadGridProps) {
   return (
     <div
       className="grid grid-cols-3 flex-1"
-      style={{ gap: "1px", backgroundColor: "#DDDDD9" }}
+      style={{ gap: "1px", backgroundColor: "#DDDDD9", borderTop: "1px solid #DDDDD9", marginTop: "4px" }}
     >
       {keys.flat().map((key) => {
         const isFunction = key === "." || key === "del";
