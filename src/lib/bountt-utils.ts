@@ -107,6 +107,10 @@ export function calculateNetBalance(
   return balance;
 }
 
+/**
+ * @deprecated This function only sums paid amounts without accounting for splits.
+ * Use the split-based balance logic in useHeroData instead for accurate net balances.
+ */
 export function calculateBalances(expenses: Expense[]): BalanceSummary[] {
   const balanceMap = new Map<string, BalanceSummary>();
 

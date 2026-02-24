@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Group, GroupMember, Expense, ExpenseSplit, Profile, AppContextValue, BalanceSummary } from "@/types";
 import { generateInviteCode, calculateBalances as calcBalances } from "@/lib/bountt-utils";
 import { pickAvailableColor } from "@/lib/avatar-utils";
+import { toast } from "@/hooks/use-toast";
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
@@ -46,6 +47,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Track if we already fetched groups for a given user to avoid double-fetch
   const groupsFetchedForRef = useRef<string | null>(null);
 
+  // Ref to track current group for realtime handler closures
+  const currentGroupRef = useRef<Group | null>(null);
+  useEffect(() => { currentGroupRef.current = currentGroup; }, [currentGroup]);
+
   // =====================================================
   // GROUPS (defined before AUTH so it can be called there)
   // =====================================================
@@ -56,7 +61,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setError(null);
 
     try {
-      // Get groups where user is an active member
       const { data: memberRows, error: memberErr } = await supabase
         .from("group_members")
         .select("group_id")
@@ -82,7 +86,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (fetchError) throw fetchError;
       setUserGroups((data as Group[]) ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch groups");
+      toast({ title: err instanceof Error ? err.message : "Failed to fetch groups", variant: "destructive" });
     } finally {
       setGroupsLoading(false);
     }
@@ -100,7 +104,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
         if (newSession?.user) {
           setTimeout(() => fetchProfile(newSession.user.id), 0);
-          // Auto-fetch groups on sign-in
           if (groupsFetchedForRef.current !== newSession.user.id) {
             groupsFetchedForRef.current = newSession.user.id;
             setTimeout(() => fetchGroups(newSession.user.id), 0);
@@ -189,7 +192,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCurrentGroupState(group);
       return group;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create group");
+      toast({ title: err instanceof Error ? err.message : "Failed to create group", variant: "destructive" });
       return null;
     }
   }, [user, profile]);
@@ -222,7 +225,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (fetchError) throw fetchError;
       setGroupMembers((data as GroupMember[]) ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch members");
+      toast({ title: err instanceof Error ? err.message : "Failed to fetch members", variant: "destructive" });
     } finally {
       setMembersLoading(false);
     }
@@ -234,13 +237,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   ): Promise<GroupMember | null> => {
     if (!user) return null;
 
-    // Bug 2 fix: Prevent duplicate placeholder names
+    // Bug 2 fix: Prevent duplicate placeholder names (client-side UX check; DB index is source of truth)
     const duplicate = groupMembers.find(
       (m) => m.group_id === groupId && m.status === "active"
         && m.name.toLowerCase() === name.trim().toLowerCase()
     );
     if (duplicate) {
-      setError("A member with that name already exists");
+      toast({ title: "A member with that name already exists", variant: "destructive" });
       return null;
     }
 
@@ -261,10 +264,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setGroupMembers((prev) => [...prev, member]);
       return member;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add member");
+      toast({ title: err instanceof Error ? err.message : "Failed to add member", variant: "destructive" });
       return null;
     }
-  }, [user]);
+  }, [user, groupMembers]);
 
   // =====================================================
   // EXPENSES
@@ -281,30 +284,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (fetchError) throw fetchError;
       setExpenses((data as Expense[]) ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch expenses");
+      toast({ title: err instanceof Error ? err.message : "Failed to fetch expenses", variant: "destructive" });
     } finally {
       setExpensesLoading(false);
     }
   }, []);
 
+  // Fix 9: Use RPC for efficient group splits fetching
   const fetchExpenseSplits = useCallback(async (groupId: string) => {
     try {
-      // Get expense IDs for this group first
-      const { data: expenseRows } = await supabase
-        .from("expenses")
-        .select("id")
-        .eq("group_id", groupId);
-
-      if (!expenseRows || expenseRows.length === 0) {
-        setExpenseSplits([]);
-        return;
-      }
-
-      const expenseIds = expenseRows.map((e) => e.id);
       const { data, error: fetchError } = await supabase
-        .from("expense_splits")
-        .select("*")
-        .in("expense_id", expenseIds);
+        .rpc("get_group_splits", { p_group_id: groupId });
 
       if (fetchError) throw fetchError;
       setExpenseSplits((data as ExpenseSplit[]) ?? []);
@@ -326,10 +316,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (insertError) throw insertError;
       const newExpense = data as Expense;
-      setExpenses((prev) => [newExpense, ...prev]);
+      // Fix 10: Dedup check
+      setExpenses((prev) => prev.some((e) => e.id === newExpense.id) ? prev : [newExpense, ...prev]);
       return newExpense;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add expense");
+      toast({ title: err instanceof Error ? err.message : "Failed to add expense", variant: "destructive" });
       return null;
     }
   }, [user]);
@@ -349,7 +340,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setCurrentGroupState((prev) => prev ? { ...prev, ...updates } : prev);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update group");
+      toast({ title: err instanceof Error ? err.message : "Failed to update group", variant: "destructive" });
     }
   }, [currentGroup]);
 
@@ -365,7 +356,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setCurrentGroupState(null);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete group");
+      toast({ title: err instanceof Error ? err.message : "Failed to delete group", variant: "destructive" });
     }
   }, [currentGroup]);
 
@@ -378,7 +369,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (updateError) throw updateError;
       setGroupMembers((prev) => prev.map((m) => m.id === memberId ? { ...m, status: "left", left_at: new Date().toISOString() } : m));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove member");
+      toast({ title: err instanceof Error ? err.message : "Failed to remove member", variant: "destructive" });
     }
   }, []);
 
@@ -394,7 +385,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           (m) => m.group_id === groupId && m.role === "admin" && m.status === "active" && m.id !== member.id
         );
         if (otherAdmins.length === 0) {
-          setError("You're the only admin. Promote another member before leaving.");
+          toast({ title: "You're the only admin. Promote another member before leaving.", variant: "destructive" });
           return;
         }
       }
@@ -409,9 +400,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setCurrentGroupState(null);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to leave group");
+      toast({ title: err instanceof Error ? err.message : "Failed to leave group", variant: "destructive" });
     }
   }, [user, groupMembers, currentGroup]);
+
   const calculateBalances = useCallback((): BalanceSummary[] => {
     return calcBalances(expenses);
   }, [expenses]);
@@ -444,6 +436,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             );
           } else if (payload.eventType === "DELETE") {
             setExpenses((prev) => prev.filter((e) => e.id !== (payload.old as Expense).id));
+          }
+          // Fix 2: Re-fetch splits whenever expenses change to keep them in sync
+          const groupId = currentGroupRef.current?.id;
+          if (groupId) {
+            fetchExpenseSplits(groupId);
           }
         }
       )
