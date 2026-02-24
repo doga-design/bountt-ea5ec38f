@@ -233,6 +233,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     name: string
   ): Promise<GroupMember | null> => {
     if (!user) return null;
+
+    // Bug 2 fix: Prevent duplicate placeholder names
+    const duplicate = groupMembers.find(
+      (m) => m.group_id === groupId && m.status === "active"
+        && m.name.toLowerCase() === name.trim().toLowerCase()
+    );
+    if (duplicate) {
+      setError("A member with that name already exists");
+      return null;
+    }
+
     try {
       const existingColors = groupMembers
         .filter((m) => m.group_id === groupId && m.status === "active" && m.avatar_color)
@@ -376,6 +387,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const member = groupMembers.find((m) => m.user_id === user.id && m.group_id === groupId);
       if (!member) return;
+
+      // Bug 3 fix: Prevent sole admin from leaving
+      if (member.role === "admin") {
+        const otherAdmins = groupMembers.filter(
+          (m) => m.group_id === groupId && m.role === "admin" && m.status === "active" && m.id !== member.id
+        );
+        if (otherAdmins.length === 0) {
+          setError("You're the only admin. Promote another member before leaving.");
+          return;
+        }
+      }
+
       const { error: updateError } = await supabase
         .from("group_members")
         .update({ status: "left", left_at: new Date().toISOString() })

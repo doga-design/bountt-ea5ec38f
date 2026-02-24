@@ -42,6 +42,22 @@ export default function GroupSettings() {
     if (groupId) fetchMembers(groupId);
   }, [groupId]);
 
+  // Bug 7 fix: Redirect if user is no longer a member of this group
+  useEffect(() => {
+    if (groupId && userGroups.length >= 0) {
+      const found = userGroups.find((g) => g.id === groupId);
+      if (!found) {
+        const timer = setTimeout(() => {
+          if (!userGroups.find((g) => g.id === groupId)) {
+            navigate("/");
+            toast({ title: "Group not found or you're no longer a member" });
+          }
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [groupId, userGroups]);
+
   if (!currentGroup || !groupId) return null;
 
   const isAdmin = currentGroup.created_by === user?.id;

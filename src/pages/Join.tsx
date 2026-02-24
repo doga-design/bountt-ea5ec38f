@@ -64,9 +64,33 @@ export default function Join() {
 
       // If user was previously in group but left, rejoin
       if (existing && existing.status === "left") {
+        // Bug 5 fix: Check for color collision on rejoin
+        const { data: activeColorRows } = await supabase
+          .from("group_members")
+          .select("avatar_color")
+          .eq("group_id", group.id)
+          .eq("status", "active");
+        const activeColors = activeColorRows?.filter((m) => m.avatar_color).map((m) => m.avatar_color!) ?? [];
+
+        // Get the member's current color
+        const { data: memberRow } = await supabase
+          .from("group_members")
+          .select("avatar_color")
+          .eq("id", existing.id)
+          .single();
+
+        let updateFields: Record<string, unknown> = { status: "active", left_at: null };
+        if (memberRow?.avatar_color && activeColors.includes(memberRow.avatar_color)) {
+          const { pickAvailableColor } = await import("@/lib/avatar-utils");
+          updateFields.avatar_color = pickAvailableColor(activeColors);
+        } else if (!memberRow?.avatar_color) {
+          const { pickAvailableColor } = await import("@/lib/avatar-utils");
+          updateFields.avatar_color = pickAvailableColor(activeColors);
+        }
+
         await supabase
           .from("group_members")
-          .update({ status: "active", left_at: null })
+          .update(updateFields)
           .eq("id", existing.id);
 
         await fetchGroups();
@@ -129,6 +153,18 @@ export default function Join() {
   };
 
   const joinAsNewMember = async (groupId: string, groupName: string) => {
+    // Bug 4 fix: Assign avatar_color on join
+    const { data: existingMembers } = await supabase
+      .from("group_members")
+      .select("avatar_color")
+      .eq("group_id", groupId)
+      .eq("status", "active");
+    const existingColors = existingMembers?.filter((m) => m.avatar_color).map((m) => m.avatar_color!) ?? [];
+
+    // Import pickAvailableColor
+    const { pickAvailableColor } = await import("@/lib/avatar-utils");
+    const newColor = pickAvailableColor(existingColors);
+
     const { error: joinError } = await supabase
       .from("group_members")
       .insert({
@@ -136,6 +172,7 @@ export default function Join() {
         user_id: user!.id,
         name: profile?.display_name ?? user!.email?.split("@")[0] ?? "Member",
         is_placeholder: false,
+        avatar_color: newColor,
       });
 
     if (joinError) throw joinError;

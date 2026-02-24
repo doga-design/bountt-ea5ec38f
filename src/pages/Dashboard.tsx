@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { useApp } from "@/contexts/AppContext";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import HeroCarousel from "@/components/dashboard/HeroCarousel";
@@ -17,6 +18,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 
 export default function Dashboard() {
   const { groupId } = useParams<{ groupId: string }>();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const {
     setCurrentGroup,
     userGroups,
@@ -27,6 +30,7 @@ export default function Dashboard() {
     user,
     membersLoading,
     expensesLoading,
+    groupsLoading,
     removeMember,
   } = useApp();
 
@@ -39,6 +43,23 @@ export default function Dashboard() {
       if (group) setCurrentGroup(group);
     }
   }, [groupId, userGroups]);
+
+  // Bug 7 fix: Redirect if user is no longer a member
+  useEffect(() => {
+    if (groupId && !groupsLoading && userGroups.length >= 0) {
+      const found = userGroups.find((g) => g.id === groupId);
+      if (!found && !groupsLoading) {
+        // Only redirect after groups have loaded and group is not found
+        const timer = setTimeout(() => {
+          if (!userGroups.find((g) => g.id === groupId)) {
+            navigate("/");
+            toast({ title: "Group not found or you're no longer a member" });
+          }
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [groupId, userGroups, groupsLoading]);
 
   const otherMembers = groupMembers.filter((m) => m.user_id !== user?.id);
   const hasOtherMembers = otherMembers.length > 0;
