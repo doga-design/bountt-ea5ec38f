@@ -1,40 +1,62 @@
+# Hero Action Row: Anti-Nagging Fixes
 
+## What Changes
 
-# Fix: Group Creation RLS Failure
+Three filtering rules for the debt action chips in the Net Balance slide:
 
-## Root Cause
+1. **7-day age gate** -- Only show debts from expenses older than 7 days
+2. **Cooldown after 4 dismissals** -- After the user taps "Not yet" through ~4 debts, hide the chip for 24 hours (persisted in localStorage)
+3. **Amount cap at $30, smallest first** -- Only show debts <= $30, sorted smallest first
+4. **BTN & cta change;** When the user is owed by other users display the "settle up" button, when user ows money to other users show "pay now" (these buttons will serve different purposes in the future of this product) AND the context-microcopy should switch accordingly under as well (e.g"$X owed to [user]" or "[user] owes $X to you" etc...)
 
-The `createGroup` function inserts a group row then calls `.select().single()` to get it back. The SELECT RLS policy on `groups` requires `is_group_member(id, auth.uid())`, but the group_members row for the creator hasn't been inserted yet -- that happens AFTER the group insert. So the SELECT fails with an RLS violation.
+## Understanding for 2 action types (owe and owed):
 
-This is a chicken-and-egg problem: you can't read the group until you're a member, but you can't become a member until the group exists.
+**The filtering works for BOTH directions:**
 
-## Solution
+```
+Get all debts (you owe + owed to you)
+Filter:
+  - 7+ days old
+  - ≤$30
+  - Sort smallest first
+  
+For each debt:
+  if (you owe):
+    show "Pay Now"
+  else (owed to you):
+    show "Settle Up"
+```
 
-Create a database RPC `create_group_with_creator` that atomically:
-1. Inserts the group
-2. Inserts the creator as an admin member
-3. Returns the group row
+**Both buttons mark expense as settled**, just different:
 
-This runs as SECURITY DEFINER so it bypasses RLS internally, and validates `auth.uid()` at the start.
+- "Pay Now" = I'm paying this (future: opens paypal/e-transfer deeplink)
+- "Settle Up" = I'm forgiving this/we settled offline
 
-## Changes
+## File Changes
 
-### 1. New database migration
-- Create RPC `create_group_with_creator(p_name, p_emoji, p_invite_code, p_display_name, p_avatar_color)`
-- Inserts group with `created_by = auth.uid()`
-- Inserts group_member with role='admin', is_placeholder=false
-- Returns the group as JSONB
+### 1. `src/components/dashboard/slides/useHeroData.ts`
 
-### 2. Update `src/contexts/AppContext.tsx`
-- Replace the two-step insert in `createGroup` with a single `supabase.rpc("create_group_with_creator", {...})` call
-- Parse the returned JSONB as the Group object
-- Remove the separate member insert
+- Add `createdAt: string` to the `DebtItem` interface (needed for the 7-day filter)
+- When building `debtsYouOwe`, include `createdAt: expense.created_at`
+- Filter debts: only include items where `daysSince(expense.created_at) >= 7` AND `amount <= 30`
+- Sort `debtsYouOwe` by amount ascending (always the smallest first)
 
-### 3. Update `src/integrations/supabase/types.ts`
-- Will auto-update when the migration runs
+### 2. `src/components/dashboard/slides/NetBalanceSlide.tsx`
 
-## Why this is production-ready
-- Atomic: group + member created in one transaction (no orphaned groups)
-- Secure: validates auth.uid() inside the function
-- Consistent: follows the same pattern as `create_expense_with_splits`
+- Add `MAX_DISMISSALS = 4` and `COOLDOWN_MS = 24 * 60 * 60 * 1000` constants
+- On mount, read `hero_cooldown_until` from localStorage; if it's in the future, start with `dismissed = true`
+- In `handleNotYet`, track a running dismiss count; when it reaches `MAX_DISMISSALS`, set `dismissed = true` and write `hero_cooldown_until = Date.now() + COOLDOWN_MS` to localStorage
+- Add `currentGroup.id` as part of the localStorage key so cooldowns are per-group
 
+### 3. `src/components/dashboard/HeroCarousel.tsx`
+
+- Pass `currentGroup.id` as a new prop to `NetBalanceSlide` (needed for the per-group cooldown key)
+
+## Technical Detail
+
+**localStorage key format:** `bountt_hero_cooldown_{groupId}`
+**Value:** ISO timestamp string of when cooldown expires
+
+The cooldown resets naturally after 24 hours. If new qualifying debts appear (e.g., a debt ages past 7 days), they'll show after the cooldown expires.
+
+The $30 cap is defined as a constant `MAX_CHIP_AMOUNT = 30` in `useHeroData.ts` for easy adjustment later.
