@@ -311,7 +311,7 @@ export default function ExpenseScreen({
       </div>
 
       {/* Scrollable middle section */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="flex-1 overflow-y-auto min-h-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {/* Member chips */}
         <MemberChipSelector
           members={activeMembers}
