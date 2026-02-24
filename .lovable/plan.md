@@ -1,47 +1,66 @@
 
 
-# Remove All Scrollbars Globally
+# Fix Expense Feed Sorting and Date Grouping
 
-## Problem
+## Bugs Found
 
-Scrollbars are still visible because:
-- `scrollbarWidth: 'none'` only works in Firefox
-- `msOverflowStyle: 'none'` only works in IE/Edge legacy
-- **WebKit browsers (Chrome, Safari -- the ones your users actually use) require `::-webkit-scrollbar { display: none }` which cannot be set via inline styles**
+### Bug A: "TODAY" expenses showing as "YESTERDAY"
+The `formatRelativeDate` function in `src/lib/bountt-utils.ts` parses date-only strings (e.g., "2026-02-24") using `new Date()`, which interprets them as UTC midnight. For users in timezones behind UTC (all of the Americas), this shifts the date back by one day, causing "today" expenses to appear under "YESTERDAY".
 
-## Solution
+**Fix:** Parse the date string manually as a local date by splitting the year/month/day components.
 
-### 1. Add a global CSS rule in `src/index.css`
+### Bug B: Oldest expenses appearing at top within same date
+The Supabase query in `AppContext.tsx` sorts only by `date DESC` but not by `created_at DESC`. Within the same date, expenses appear in database insertion order (oldest first) instead of newest first.
 
-Add a universal scrollbar-hiding rule that applies to ALL scrollable elements across the entire app:
+**Fix:** Add a secondary sort by `created_at` descending.
 
-```css
-/* Hide all scrollbars globally - mobile app */
-*::-webkit-scrollbar {
-  display: none;
-}
-* {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+## Changes
+
+### 1. `src/lib/bountt-utils.ts` -- Fix date parsing (lines 38-53)
+
+Change the `formatRelativeDate` function to parse the date string as local time instead of UTC:
+
+```typescript
+export function formatRelativeDate(dateStr: string): string {
+  // Parse as local date to avoid UTC timezone shift
+  const parts = dateStr.split("-");
+  const target = new Date(
+    parseInt(parts[0]),
+    parseInt(parts[1]) - 1,
+    parseInt(parts[2])
+  );
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const diffMs = today.getTime() - target.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return "TODAY";
+  if (diffDays === 1) return "YESTERDAY";
+  if (diffDays <= 7) return "LAST WEEK";
+  if (diffDays <= 14) return "2 WEEKS AGO";
+
+  return target.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase();
 }
 ```
 
-This single rule eliminates scrollbars everywhere -- no per-component fixes needed.
+### 2. `src/contexts/AppContext.tsx` -- Add secondary sort (line 272)
 
-### 2. Clean up inline scrollbar-hiding styles
+Add `.order("created_at", { ascending: false })` after the date sort so newest expenses within the same day appear first:
 
-Remove now-redundant inline `scrollbarWidth`/`msOverflowStyle` styles from:
-
-- **`ExpenseScreen.tsx`** (line 314): Remove `style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}`
-- **`MemberChipSelector.tsx`** (line 20): Remove `scrollbarWidth: 'none', msOverflowStyle: 'none'` from style prop (keep `WebkitOverflowScrolling: 'touch'`)
-
-The existing `.chip-scroll` utility class in `index.css` also becomes redundant but can stay for safety.
+```typescript
+const { data, error: fetchError } = await supabase
+  .from("expenses")
+  .select("*")
+  .eq("group_id", groupId)
+  .order("date", { ascending: false })
+  .order("created_at", { ascending: false });
+```
 
 ## Files Modified
 
 | File | Change |
 |------|--------|
-| `src/index.css` | Add global `*::-webkit-scrollbar { display: none }` and `* { scrollbar-width: none }` rules |
-| `src/components/expense/ExpenseScreen.tsx` | Remove inline scrollbar-hiding style from scrollable div |
-| `src/components/expense/MemberChipSelector.tsx` | Remove inline scrollbar-hiding styles |
+| `src/lib/bountt-utils.ts` | Parse date-only string as local time to fix TODAY/YESTERDAY labels |
+| `src/contexts/AppContext.tsx` | Add secondary sort by `created_at` descending for correct ordering within same date |
 
