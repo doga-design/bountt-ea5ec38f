@@ -163,30 +163,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const inviteCode = generateInviteCode();
-
-      const { data: groupData, error: groupError } = await supabase
-        .from("groups")
-        .insert({ name, emoji, invite_code: inviteCode, created_by: user.id })
-        .select()
-        .single();
-
-      if (groupError) throw groupError;
-
-      const group = groupData as Group;
-
+      const displayName = profile?.display_name ?? user.email?.split("@")[0] ?? "You";
       const creatorColor = pickAvailableColor([]);
-      const { error: memberError } = await supabase
-        .from("group_members")
-        .insert({
-          group_id: group.id,
-          user_id: user.id,
-          name: profile?.display_name ?? user.email?.split("@")[0] ?? "You",
-          is_placeholder: false,
-          role: "admin",
-          avatar_color: creatorColor,
-        });
 
-      if (memberError) throw memberError;
+      const { data, error: rpcError } = await supabase.rpc("create_group_with_creator", {
+        p_name: name,
+        p_emoji: emoji,
+        p_invite_code: inviteCode,
+        p_display_name: displayName,
+        p_avatar_color: creatorColor,
+      });
+
+      if (rpcError) throw rpcError;
+
+      const group = data as unknown as Group;
 
       setUserGroups((prev) => [group, ...prev]);
       setCurrentGroupState(group);
