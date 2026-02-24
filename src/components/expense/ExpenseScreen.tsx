@@ -38,6 +38,8 @@ export default function ExpenseScreen({
   const [loading, setLoading] = useState(false);
   // Track whether the user is editing the total while in custom mode
   const [editingTotal, setEditingTotal] = useState(false);
+  // freshFocus: when true, first numpad key replaces the custom field entirely
+  const [freshFocus, setFreshFocus] = useState(false);
 
   // Active members sorted: "You" first
   const activeMembers = useMemo(() => {
@@ -116,6 +118,22 @@ export default function ExpenseScreen({
       };
 
       if (isCustomFocused) {
+        // freshFocus: replace entire field on first key
+        if (freshFocus) {
+          setFreshFocus(false);
+          setCustomAmounts((prev) => {
+            const next = new Map(prev);
+            if (key === "del") {
+              next.set(focusedMemberId!, "0");
+            } else if (key === ".") {
+              next.set(focusedMemberId!, "0.");
+            } else {
+              next.set(focusedMemberId!, key);
+            }
+            return next;
+          });
+          return;
+        }
         setCustomAmounts((prev) => {
           const next = new Map(prev);
           const current = next.get(focusedMemberId!) ?? "0";
@@ -137,7 +155,7 @@ export default function ExpenseScreen({
         });
       }
     },
-    [splitMode, focusedMemberId, editingTotal, selectedMembers, distributeEqually]
+    [splitMode, focusedMemberId, editingTotal, freshFocus, selectedMembers, distributeEqually]
   );
 
   // Toggle split mode
@@ -187,6 +205,7 @@ export default function ExpenseScreen({
   const handleFocusRow = useCallback((memberId: string) => {
     setFocusedMemberId(memberId);
     setEditingTotal(false);
+    setFreshFocus(true);
   }, []);
 
   // Save
@@ -285,6 +304,7 @@ export default function ExpenseScreen({
   };
 
   const canSave = totalNum > 0;
+  const isSingleUser = selectedMembers.length <= 1;
 
   if (!open) return null;
 
@@ -325,6 +345,7 @@ export default function ExpenseScreen({
         activeMembers={selectedMembers}
         currentUserId={user?.id}
         disabled={amount === "0"}
+        isSingleUser={isSingleUser}
       />
 
       {/* Custom split rows */}
@@ -347,6 +368,7 @@ export default function ExpenseScreen({
         isBalanced={isBalanced}
         loading={loading}
         onClick={handleSave}
+        isSingleUser={isSingleUser}
       />
 
       {/* Numpad */}
