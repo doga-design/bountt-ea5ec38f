@@ -31,15 +31,15 @@ export default function SplitSentence({
 
   let namesDisplay: React.ReactNode;
   if (onlySelf) {
-    namesDisplay = <span className="font-bold text-blue-500">yourself</span>;
+    namesDisplay = <span className="font-bold text-foreground">yourself</span>;
   } else if (others.length === 1) {
-    namesDisplay = <span className="font-bold text-blue-500">{others[0].name}</span>;
+    namesDisplay = <span className="font-bold text-foreground">{others[0].name}</span>;
   } else if (others.length === 2) {
     namesDisplay = (
       <>
-        <span className="font-bold text-blue-500">{others[0].name}</span>
+        <span className="font-bold text-foreground">{others[0].name}</span>
         {" & "}
-        <span className="font-bold text-blue-500">{others[1].name}</span>
+        <span className="font-bold text-foreground">{others[1].name}</span>
       </>
     );
   } else {
@@ -47,12 +47,12 @@ export default function SplitSentence({
       <>
         {others.slice(0, -1).map((m, i) => (
           <span key={m.id}>
-            <span className="font-bold text-blue-500">{m.name}</span>
+            <span className="font-bold text-foreground">{m.name}</span>
             {i < others.length - 2 ? ", " : ""}
           </span>
         ))}
         {" & "}
-        <span className="font-bold text-blue-500">
+        <span className="font-bold text-foreground">
           {others[others.length - 1].name}
         </span>
       </>
@@ -82,7 +82,7 @@ export default function SplitSentence({
       {selfIncluded && !onlySelf && (
         <>
           {" & "}
-          <span className="font-bold text-blue-500">you</span>
+          <span className="font-bold text-foreground">you</span>
         </>
       )}
     </p>
