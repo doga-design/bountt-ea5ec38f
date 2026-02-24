@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Group } from "@/types";
 import { useApp } from "@/contexts/AppContext";
 import { LogOut, Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +24,10 @@ export default function DangerZone({ group, isAdmin }: DangerZoneProps) {
   const [showLeave, setShowLeave] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [confirmName, setConfirmName] = useState("");
-  const { leaveGroup, deleteGroup, groupMembers, user, error } = useApp();
+  const [leaveLoading, setLeaveLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const { leaveGroup, deleteGroup, groupMembers, user } = useApp();
+  const { toast } = useToast();
   const navigate = useNavigate();
 
   // Bug 3 fix: Check if user is sole admin
@@ -32,15 +36,22 @@ export default function DangerZone({ group, isAdmin }: DangerZoneProps) {
   ).length <= 1;
 
   const handleLeave = async () => {
+    if (isSoleAdmin) {
+      toast({ title: "You're the only admin. Promote another member before leaving.", variant: "destructive" });
+      setShowLeave(false);
+      return;
+    }
+    setLeaveLoading(true);
     await leaveGroup(group.id);
-    // If error was set (sole admin), don't navigate
-    if (isSoleAdmin) return;
+    setLeaveLoading(false);
     navigate("/");
   };
 
   const handleDelete = async () => {
     if (confirmName !== group.name) return;
+    setDeleteLoading(true);
     await deleteGroup(group.id);
+    setDeleteLoading(false);
     navigate("/");
   };
 
@@ -82,13 +93,19 @@ export default function DangerZone({ group, isAdmin }: DangerZoneProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Leave {group.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              You'll lose access to all shared expenses in this group.
+              {isSoleAdmin
+                ? "You're the only admin. Promote another member to admin before leaving."
+                : "You'll lose access to all shared expenses in this group."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleLeave} className="bg-destructive text-destructive-foreground">
-              Leave
+            <AlertDialogAction
+              onClick={handleLeave}
+              disabled={isSoleAdmin || leaveLoading}
+              className="bg-destructive text-destructive-foreground disabled:opacity-50"
+            >
+              {leaveLoading ? "Leaving…" : "Leave"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -113,10 +130,10 @@ export default function DangerZone({ group, isAdmin }: DangerZoneProps) {
             <AlertDialogCancel onClick={() => setConfirmName("")}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              disabled={confirmName !== group.name}
+              disabled={confirmName !== group.name || deleteLoading}
               className="bg-destructive text-destructive-foreground disabled:opacity-50"
             >
-              Delete Group
+              {deleteLoading ? "Deleting…" : "Delete Group"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

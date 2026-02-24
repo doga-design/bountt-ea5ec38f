@@ -264,6 +264,35 @@ export type Database = {
     }
     Functions: {
       claim_placeholder: { Args: { p_placeholder_id: string }; Returns: string }
+      create_expense_with_splits: {
+        Args: {
+          p_amount: number
+          p_created_by: string
+          p_description: string
+          p_group_id: string
+          p_paid_by_name: string
+          p_paid_by_user_id: string
+          p_splits: Json
+        }
+        Returns: Json
+      }
+      get_group_splits: {
+        Args: { p_group_id: string }
+        Returns: {
+          created_at: string
+          expense_id: string
+          id: string
+          member_name: string
+          share_amount: number
+          user_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "expense_splits"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       is_group_member: {
         Args: { p_group_id: string; p_user_id: string }
         Returns: boolean

