@@ -7,7 +7,7 @@ import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import HeroCarousel from "@/components/dashboard/HeroCarousel";
 import EmptyState from "@/components/dashboard/EmptyState";
 import AddExpensePrompt from "@/components/dashboard/AddExpensePrompt";
-import ExpenseSheet from "@/components/dashboard/ExpenseSheet";
+import ExpenseScreen from "@/components/expense/ExpenseScreen";
 import ExpenseCard from "@/components/dashboard/ExpenseCard";
 import MemberCardScroll from "@/components/dashboard/MemberCardScroll";
 import BottomNav from "@/components/BottomNav";
@@ -112,7 +112,7 @@ export default function Dashboard() {
             memberName={latestMemberName}
             onAddExpense={() => setSheetOpen(true)}
           />
-          <ExpenseSheet
+          <ExpenseScreen
             open={sheetOpen}
             onOpenChange={setSheetOpen}
             isFirstExpense
@@ -177,7 +177,7 @@ export default function Dashboard() {
           </div>
 
           <BottomNav onFabPress={() => setSheetOpen(true)} />
-          <ExpenseSheet
+          <ExpenseScreen
             open={sheetOpen}
             onOpenChange={setSheetOpen}
           />
