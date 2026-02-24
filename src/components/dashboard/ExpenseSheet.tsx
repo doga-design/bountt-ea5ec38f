@@ -32,8 +32,9 @@ export default function ExpenseSheet({
   const { currentGroup, user, groupMembers, addExpense, fetchExpenseSplits } = useApp();
   const { toast } = useToast();
 
-  // Sort members so current user is first
-  const sortedMembers = [...groupMembers].sort((a, b) => {
+  // Bug 1 fix: Only show active members in numpad
+  const activeMembers = groupMembers.filter((m) => m.status === "active");
+  const sortedMembers = [...activeMembers].sort((a, b) => {
     if (a.user_id === user?.id) return -1;
     if (b.user_id === user?.id) return 1;
     return 0;

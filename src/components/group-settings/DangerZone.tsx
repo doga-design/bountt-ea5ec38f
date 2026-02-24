@@ -23,11 +23,18 @@ export default function DangerZone({ group, isAdmin }: DangerZoneProps) {
   const [showLeave, setShowLeave] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [confirmName, setConfirmName] = useState("");
-  const { leaveGroup, deleteGroup } = useApp();
+  const { leaveGroup, deleteGroup, groupMembers, user, error } = useApp();
   const navigate = useNavigate();
+
+  // Bug 3 fix: Check if user is sole admin
+  const isSoleAdmin = isAdmin && groupMembers.filter(
+    (m) => m.group_id === group.id && m.role === "admin" && m.status === "active"
+  ).length <= 1;
 
   const handleLeave = async () => {
     await leaveGroup(group.id);
+    // If error was set (sole admin), don't navigate
+    if (isSoleAdmin) return;
     navigate("/");
   };
 
@@ -48,7 +55,11 @@ export default function DangerZone({ group, isAdmin }: DangerZoneProps) {
         <LogOut className="w-5 h-5 text-destructive" />
         <div>
           <p className="text-sm font-medium text-foreground">Leave Group</p>
-          <p className="text-xs text-muted-foreground">You'll lose access to expenses</p>
+          <p className="text-xs text-muted-foreground">
+            {isSoleAdmin
+              ? "Promote another admin before leaving"
+              : "You'll lose access to expenses"}
+          </p>
         </div>
       </button>
 
