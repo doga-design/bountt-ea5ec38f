@@ -61,7 +61,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
 
@@ -76,6 +76,10 @@
 }
 
 @layer utilities {
+  .font-sora {
+    font-family: 'Sora', sans-serif;
+  }
+
   .bountt-wordmark {
     font-family: Georgia, 'Times New Roman', serif;
     font-weight: 700;
@@ -96,5 +100,14 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+}
+
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.animate-blink {
+  animation: blink-cursor 1s step-end infinite;
 }
 
