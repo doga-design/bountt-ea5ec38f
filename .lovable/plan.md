@@ -1,174 +1,108 @@
 
 
-# Full User & Member Management Audit -- Findings & Fix Plan
+# Production Readiness Fix Plan
 
-## Summary of Findings
+## Overview
+Fix the 5 critical and 6 high-priority issues identified in the audit. The fixes are ordered by severity and dependency.
 
-After a thorough code audit, I identified **9 bugs/issues** ranging from critical to minor. Below is the full analysis and a fix plan.
+## Phase 1: Data Integrity (Critical)
 
----
+### Fix 1: Atomic Expense + Splits via Database RPC
+Create a new database function `create_expense_with_splits` that wraps both inserts in a single transaction.
 
-## BUG 1 (CRITICAL): Removed/left members still appear in expense numpad
+**New migration:**
+- Create RPC `create_expense_with_splits(p_group_id, p_amount, p_description, p_paid_by_user_id, p_paid_by_name, p_created_by, p_splits jsonb)` 
+- Inserts expense, then inserts all splits from the JSON array, all within one transaction
+- Returns the created expense row
 
-**Location:** `src/components/dashboard/ExpenseSheet.tsx`, line 36  
-**Problem:** `sortedMembers` is built from `groupMembers` with no status filter. Removed members (`status='left'`) and former placeholders still appear in the "Who paid?" picker and are included in the split calculation.  
-**Impact:** Users can create new expenses assigned to removed members, creating orphaned data.
+**Update `ExpenseSheet.tsx`:**
+- Replace the two separate `supabase.from("expenses").insert(...)` and `supabase.from("expense_splits").insert(...)` calls with a single `supabase.rpc("create_expense_with_splits", {...})` call
 
-**Fix:** Filter `groupMembers` to only `status === 'active'` before sorting:
-```
-const activeMembers = groupMembers.filter(m => m.status === 'active');
-const sortedMembers = [...activeMembers].sort(...)
-```
-Also update the split count on line 86 and member name list on line 141 to use this filtered list.
-
----
-
-## BUG 2 (HIGH): No duplicate placeholder name prevention
-
-**Location:** `src/contexts/AppContext.tsx`, `addPlaceholderMember` (line 231)  
-**Problem:** No check for existing active members with the same name. Two placeholders named "Kyle" can be created, causing ambiguity in the merge flow and expense display.  
-**Impact:** `claim_placeholder` RPC matches by `member_name` for expense splits -- duplicate names would cause incorrect split reassignment.
-
-**Fix:** Before inserting, check if an active member with the same name (case-insensitive) already exists in the group:
-```
-const duplicate = groupMembers.find(
-  m => m.group_id === groupId && m.status === 'active' 
-    && m.name.toLowerCase() === name.toLowerCase()
-);
-if (duplicate) {
-  toast({ title: "A member with that name already exists" });
-  return null;
-}
-```
-
----
-
-## BUG 3 (HIGH): Admin can leave group with no successor
-
-**Location:** `src/contexts/AppContext.tsx`, `leaveGroup` (line 374) and `src/components/group-settings/DangerZone.tsx`  
-**Problem:** No check for whether the user is the only admin. If the sole admin leaves, the group has no admin and no one can manage it (remove members, delete group).  
-**Impact:** Orphaned groups with no administrative control.
-
-**Fix:** In `leaveGroup`, check if user is the only admin among active members. If so, block the action with a toast: "You're the only admin. Promote another member before leaving." Alternatively, auto-promote the longest-standing active member. Also update `DangerZone.tsx` to show a warning or disable the leave button when the user is the sole admin.
-
----
-
-## BUG 4 (MEDIUM): New member joining doesn't get assigned an avatar_color
-
-**Location:** `src/pages/Join.tsx`, `joinAsNewMember` (line 131)  
-**Problem:** When a real user joins via invite code (not claiming a placeholder), the insert does not include `avatar_color`. The member row gets `null` for their color.  
-**Impact:** The member renders with a fallback hash color instead of a unique persistent color.
-
-**Fix:** Before inserting, fetch existing member colors for the group and pick an available one:
-```
-const { data: existingMembers } = await supabase
-  .from('group_members')
-  .select('avatar_color')
-  .eq('group_id', groupId)
-  .eq('status', 'active');
-const existingColors = existingMembers?.filter(m => m.avatar_color).map(m => m.avatar_color!) ?? [];
-const newColor = pickAvailableColor(existingColors);
-// Include avatar_color: newColor in the insert
-```
-
----
-
-## BUG 5 (MEDIUM): Rejoining user doesn't restore avatar_color
-
-**Location:** `src/pages/Join.tsx`, line 66-76  
-**Problem:** When a user who previously left rejoins (status changed from 'left' back to 'active'), their old `avatar_color` is preserved, which may now collide with a color assigned to someone who joined after they left. No color reassignment happens.  
-**Impact:** Potential color collision after rejoin.
-
-**Fix:** On rejoin, fetch current active member colors and reassign if there's a collision:
-```
-// After updating status to 'active', check color
-const { data: activeColors } = await supabase
-  .from('group_members').select('avatar_color')
-  .eq('group_id', group.id).eq('status', 'active').neq('id', existing.id);
-// If collision, pick new color and update
-```
-
----
-
-## BUG 6 (MEDIUM): Balance calculations include left members' splits
-
-**Location:** `src/components/dashboard/slides/useHeroData.ts`, `src/components/dashboard/BalancePill.tsx`  
-**Problem:** The hero data hook and balance pill iterate over ALL expense splits regardless of whether the split belongs to an active or left member. If a member leaves, their unpaid debts still show in the current user's balance.  
-**Analysis:** This is actually **correct behavior** per the requirements ("Balances preserved" after leaving). However, the hero slide action row (debtsYouOwe) shows debts to members who have left, offering a "Pay [Name]" button for someone no longer in the group.  
-**Impact:** Users see "Pay Kyle" for a member who left. Clicking it would try to settle an expense but there's no settlement flow implemented yet, so it's cosmetic for now.
-
-**Fix (minor):** Add a visual indicator on the action row when the payer has left (e.g., gray out the "Pay" button or show "(left)" next to name). No balance logic change needed -- debts should persist.
-
----
-
-## BUG 7 (MEDIUM): No protection against accessing group after being removed
-
-**Location:** `src/pages/Dashboard.tsx`, `src/pages/GroupSettings.tsx`  
-**Problem:** If a user navigates directly to `/dashboard/[groupId]` after being removed, the page relies on `userGroups.find()` to set the current group. Since the removed user's `fetchGroups` filters by `status='active'`, the group won't be in `userGroups`, so `setCurrentGroup` is never called. The page renders with stale data or shows a loading spinner forever.  
-**Impact:** No explicit error message. User sees a blank/loading state instead of a clear "You're no longer a member" message.
-
-**Fix:** In Dashboard and GroupSettings, after the `useEffect` that looks up the group, add a fallback: if `groupId` is set but group isn't found in `userGroups` (and groups are done loading), show an error state or redirect:
-```
-if (groupId && !groupsLoading && !userGroups.find(g => g.id === groupId)) {
-  navigate('/');
-  toast({ title: "Group not found or you're no longer a member" });
-}
-```
-
----
-
-## BUG 8 (LOW): `claim_placeholder` doesn't transfer `paid_by_user_id` on expenses
-
-**Location:** Database function `claim_placeholder`  
-**Problem:** The function updates `expense_splits.user_id` and `group_members` fields, but does NOT update `expenses.paid_by_user_id` for expenses where the placeholder was the payer. The `expenses` table still has `paid_by_user_id = NULL` for expenses the placeholder originally paid.  
-**Impact:** After claiming, the merged user's expenses show as paid by someone with `null` user_id. Balance calculations that check `paid_by_user_id === userId` will miss these expenses, causing incorrect balances.
-
-**Fix:** Add to the `claim_placeholder` function:
+### Fix 2: Real-Time Sync for Expense Splits
+**New migration:**
 ```sql
-UPDATE expenses
-SET paid_by_user_id = v_user_id,
-    paid_by_name = COALESCE(v_display_name, v_placeholder_name)
-WHERE group_id = v_group_id
-  AND paid_by_name = v_placeholder_name
-  AND paid_by_user_id IS NULL;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.expense_splits;
 ```
 
----
+**Update `AppContext.tsx`:**
+- Add a third real-time channel ref (`splitsChannelRef`)
+- Subscribe to `expense_splits` changes filtered by expense IDs in the current group
+- Since we can't filter splits by group_id directly (no group_id column on splits), re-fetch all splits whenever an expense INSERT/UPDATE/DELETE event arrives instead
 
-## BUG 9 (LOW): No cascade handling on account deletion
+Alternative simpler approach: In the expenses real-time handler, after any INSERT/UPDATE/DELETE, call `fetchExpenseSplits(currentGroup.id)`. This avoids a third subscription and keeps splits always in sync with expenses.
 
-**Location:** Database schema  
-**Problem:** The `group_members.user_id` has no ON DELETE behavior defined for when a user account is deleted from `auth.users`. The `profiles` table has `ON DELETE CASCADE` via the trigger, but `group_members`, `expenses.paid_by_user_id`, and `expenses.created_by` reference user IDs without foreign keys to `auth.users`.  
-**Analysis:** Since there are no foreign keys from these tables to `auth.users`, Postgres won't cascade. If a user deletes their account, their group memberships and expenses remain with dangling `user_id` references. This is actually acceptable (data preservation), but the member status should be set to 'left'.  
-**Impact:** Ghost member entries that appear active but link to a deleted user.
+### Fix 3: Enforce Unique Placeholder Names in Database
+**New migration:**
+```sql
+CREATE UNIQUE INDEX idx_unique_active_member_name 
+ON group_members (group_id, lower(name)) 
+WHERE status = 'active';
+```
+This prevents duplicate names at the database level regardless of race conditions. The frontend check in `addPlaceholderMember` becomes a nice UX addition but the database is the source of truth.
 
-**Fix:** Create a database trigger on `auth.users` DELETE that sets all `group_members` records for that user to `status = 'left'`.
+### Fix 4: Verify/Fix User Deletion Trigger
+**New migration:**
+- Check if trigger exists on `auth.users`; if not, re-create it
+- If the reserved schema prevents it, create an edge function webhook on `auth.users` DELETE events instead
 
----
+## Phase 2: Error Handling & UX (High Priority)
 
-## Implementation Plan
+### Fix 5: Replace `setError` with Toasts Everywhere
+**Update `AppContext.tsx`:**
+- Import `toast` from `@/hooks/use-toast` (the standalone function, not the hook)
+- Replace every `setError(msg)` call with `toast({ title: msg, variant: "destructive" })` 
+- Remove the `error` state entirely (or keep for programmatic consumers)
+- This ensures users always see feedback when operations fail
 
-### File Changes
+### Fix 6: Fix DangerZone Sole-Admin UX
+**Update `DangerZone.tsx`:**
+- When `isSoleAdmin` is true, disable the Leave confirm button in the AlertDialog (not just the Leave row)
+- Show a toast explaining why they can't leave
+- Add loading state to both Leave and Delete operations
+
+### Fix 7: Fix ExpenseSheet Payer Index Stability
+**Update `ExpenseSheet.tsx`:**
+- Add a `useEffect` that resets `selectedPayerIdx` to 0 when `sortedMembers.length` changes
+- Add dedup check in the local `setExpenses` call
+
+### Fix 8: Fix GroupSettings Redirect Race
+**Update `GroupSettings.tsx`:**
+- Add `groupsLoading` to the dependency check, matching the Dashboard pattern:
+```
+if (groupId && !groupsLoading && !userGroups.find(g => g.id === groupId))
+```
+
+### Fix 9: Add Pagination Guard for Splits
+**Update `AppContext.tsx` `fetchExpenseSplits`:**
+- Instead of fetching expense IDs then splits in two queries, use a single approach:
+  - Option A: Create an RPC `get_group_splits(p_group_id)` that joins expenses and splits server-side
+  - Option B: Add `.limit(5000)` to the splits query as a safety net
+- Option A is preferred for correctness and performance
+
+### Fix 10: Dedup in addExpense
+**Update `AppContext.tsx` `addExpense`:**
+- Change `setExpenses((prev) => [newExpense, ...prev])` to `setExpenses((prev) => prev.some(e => e.id === newExpense.id) ? prev : [newExpense, ...prev])`
+
+## Phase 3: Cleanup (Medium Priority)
+
+### Fix 11: Remove or Fix `calculateBalances` in bountt-utils
+- The function is semantically wrong (sums paid amounts, not net balances accounting for splits)
+- Either remove it and the `calculateBalances` context method, or rewrite to use splits like `useHeroData` does
+
+## Files Changed Summary
 
 | File | Action | Fixes |
 |------|--------|-------|
-| `src/components/dashboard/ExpenseSheet.tsx` | Update | Bug 1 |
-| `src/contexts/AppContext.tsx` | Update | Bugs 2, 3 |
-| `src/pages/Join.tsx` | Update | Bugs 4, 5 |
-| `src/pages/Dashboard.tsx` | Update | Bug 7 |
-| `src/pages/GroupSettings.tsx` | Update | Bug 7 |
-| `src/components/group-settings/DangerZone.tsx` | Update | Bug 3 |
-| Database migration | Create | Bugs 8, 9 |
+| New DB migration | Create | Fixes 1, 2, 3, 4 |
+| `src/contexts/AppContext.tsx` | Update | Fixes 2, 5, 9, 10 |
+| `src/components/dashboard/ExpenseSheet.tsx` | Update | Fixes 1, 7 |
+| `src/components/group-settings/DangerZone.tsx` | Update | Fix 6 |
+| `src/pages/GroupSettings.tsx` | Update | Fix 8 |
+| `src/lib/bountt-utils.ts` | Update | Fix 11 |
 
-### Priority Order
+## Technical Notes
 
-1. **Bug 1** -- Numpad showing removed members (data corruption risk)
-2. **Bug 8** -- claim_placeholder not transferring paid_by_user_id (incorrect balances)
-3. **Bug 3** -- Admin can leave without successor (orphaned groups)
-4. **Bug 2** -- Duplicate placeholder names (data ambiguity)
-5. **Bug 4** -- Missing avatar_color on join (visual inconsistency)
-6. **Bug 7** -- No error state for removed user accessing group (UX gap)
-7. **Bug 5** -- Rejoin color collision (minor visual issue)
-8. **Bug 9** -- Account deletion cascade (edge case)
-9. **Bug 6** -- Left member in action row (cosmetic)
-
+- The atomic RPC for expense creation is the highest-value fix -- it prevents the most dangerous failure mode (orphaned expenses with no splits)
+- Re-fetching splits on expense real-time events is simpler and more reliable than maintaining a third subscription channel, since splits don't have a `group_id` column for filtering
+- The unique index on member names is a database-level safeguard that works regardless of client-side race conditions
+- Error surfacing via toasts is a one-time sweep through AppContext that immediately improves UX for all failure paths
