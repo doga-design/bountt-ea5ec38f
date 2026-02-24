@@ -1,45 +1,76 @@
-# Fix: Add Description Input + Numpad Layout Alignment
+
+# Fix Expense Screen Layout, Chips, and Styling
+
+## Overview
+
+Restructure the expense screen layout to be fully responsive, fix chip scrolling, remove avatar icons from chips, fix name colors, and ensure nothing gets cropped by the numpad.
 
 ## Changes
 
-### 1. Add Description Input Back (`ExpenseScreen.tsx`)
+### 1. MemberChipSelector -- Horizontal scroll, no wrapping, remove avatars (`MemberChipSelector.tsx`)
 
-The old `ExpenseSheet` had a description input (`"e.g., Pizza, Rent, Groceries"`) that was removed in the rewrite. Add it back (in a consistent style to the updated numpad component):
+- Change container from `flex flex-wrap` to `flex flex-nowrap overflow-x-auto` with hidden scrollbar
+- **Remove** the colored square avatar/initials element from each chip (Bug 6)
+- Change inactive chip text color from `#A0A0A0` to foreground/black (Bug 4 -- names showing blue comes from the `text-blue-500` in SplitSentence, handled separately)
+- Keep the `+ Add` chip inline in the same scrollable row
 
-- Add `description` state (string, default empty)
-- Place a centered text input between the top bar and the chip selector
-- Styling: `text-center text-sm bg-muted rounded-xl px-4 py-3`, max 50 chars
-- Placeholder: `"e.g., Pizza, Rent, Groceries"`
-- Use `description.trim() || "Quick Expense"` in the save RPC call (already the fallback)
+### 2. SplitSentence -- Fix blue name colors (`SplitSentence.tsx`)
 
-### 2. Fix Numpad Vertical Alignment (`ExpenseScreen.tsx`)
+- Change all `text-blue-500` classes on member names to `text-foreground` (black) so names display in black, not blue (Bug 4)
 
-The problem is the spacer div on line 362: `<div className="flex-1 min-h-0" />`. This pushes the numpad to the very bottom, creating a gap between the amount/split area and the numpad.
+### 3. ExpenseScreen -- Scrollable middle, fixed numpad layout (`ExpenseScreen.tsx`)
 
-Per the CSS reference, the correct layout is:
+Current layout is a simple flex column where all children stack. The numpad (`flex-1`) fills remaining space but can overlap content when custom rows are visible.
 
-- The **numpad** itself gets `flex: 1` and fills all remaining vertical space
-- There is **no spacer** between the content and the save/numpad area
-- The numpad keys stretch taller to fill the available space
+New layout structure:
+```text
+Fixed container (100dvh)
+  +-- Top bar (flex-shrink-0)
+  +-- Description input (flex-shrink-0)
+  +-- Scrollable middle (flex-1, overflow-y-auto)
+  |     +-- Member chips (horizontal scroll)
+  |     +-- Amount display
+  |     +-- Split sentence
+  |     +-- Custom split rows (when visible)
+  +-- Save button (flex-shrink-0)
+  +-- Numpad (flex-shrink-0, fixed height)
+```
 
-Fix:
+Key changes:
+- Use `h-[100dvh]` on the container instead of `inset-0` to handle mobile browser chrome
+- Wrap chips through custom rows in a `flex-1 overflow-y-auto min-h-0` scrollable div
+- Give numpad a **fixed height** instead of `flex-1` (4 rows x 72px + gaps = ~290px) so it never overlaps content
+- The scrollable middle section gets `flex-1` to take remaining space
+- Add `pb-[env(safe-area-inset-bottom)]` for iPhone home indicator
 
-- **Remove** the spacer div (`<div className="flex-1 min-h-0" />`) from `ExpenseScreen.tsx`
-- The `NumpadGrid` already has `flex-1` on the grid container, so it will naturally expand upward to fill all remaining space
-- Add `border-top: 1px solid #DDDDD9` and `margin-top: 4px` to the numpad grid (matching the CSS reference)
-- The save button sits between content and numpad with compact padding (`12px 16px 8px` per the CSS reference)
+### 4. AmountDisplay -- Increase custom mode size (`AmountDisplay.tsx`)
 
-### 3. Save Button Padding Adjustment (`SaveButton.tsx`)
+- Increase custom mode total from `text-5xl` to `text-[52px]` (Bug 3 -- total too small)
+- Reduce padding from `py-3` to `py-2` in custom mode (Bug 3 -- too much space)
+- Reduce padding from `py-6` to `py-4` in equal mode for tighter layout
 
-Per the CSS reference, save wrap uses `padding: 12px 16px 8px`. Update the padding from `px-5 pb-5 pt-2` to `px-4 pb-2 pt-3`.  
-  
-4.(OPTIONAL) if you have the time, fix this: whenever a number is added with all the customizations, it still logs & adds that number to dashboard as a "generic, default" cost card showing the default value 50/50 (even though it was "custom split") fix that so evertyhing about the "customized" cost is entered to dashboard CORRECTLY.
+### 5. NumpadGrid -- Fixed height instead of flex-1 (`NumpadGrid.tsx`)
+
+- Remove `flex-1` from the grid container
+- Set explicit grid row height so numpad has a consistent fixed size
+- Keep `min-h-[72px]` on keys but don't let the grid expand unbounded
+
+### 6. Description input position (`ExpenseScreen.tsx`)
+
+Per Bug 5, move the description input to sit directly above the Save button instead of below the top bar. Increase its size slightly for prominence.
+
+### 7. CustomSplitRows -- Remove avatars (`CustomSplitRows.tsx`)
+
+- Remove the colored square avatar/initials element from each row to match the chip change (Bug 6)
 
 ## Files Modified
 
-
-| File                                       | Changes                                                                     |
-| ------------------------------------------ | --------------------------------------------------------------------------- |
-| `src/components/expense/ExpenseScreen.tsx` | Add `description` state + input, remove spacer div, pass description to RPC |
-| `src/components/expense/NumpadGrid.tsx`    | Add border-top + margin-top styling                                         |
-| `src/components/expense/SaveButton.tsx`    | Adjust padding to match CSS reference                                       |
+| File | Changes |
+|------|---------|
+| `src/components/expense/ExpenseScreen.tsx` | Restructure layout: scrollable middle + fixed numpad; move description input above Save; use `dvh` units |
+| `src/components/expense/MemberChipSelector.tsx` | Horizontal scroll with `flex-nowrap overflow-x-auto`; remove avatar squares from chips |
+| `src/components/expense/SplitSentence.tsx` | Change `text-blue-500` to `text-foreground` on all name spans |
+| `src/components/expense/AmountDisplay.tsx` | Increase custom total size; reduce vertical padding |
+| `src/components/expense/NumpadGrid.tsx` | Remove `flex-1`; use fixed height grid |
+| `src/components/expense/CustomSplitRows.tsx` | Remove avatar squares from member rows |
+| `src/components/expense/SaveButton.tsx` | No changes needed (already correct) |
