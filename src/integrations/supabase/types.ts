@@ -276,6 +276,16 @@ export type Database = {
         }
         Returns: Json
       }
+      create_group_with_creator: {
+        Args: {
+          p_avatar_color: string
+          p_display_name: string
+          p_emoji: string
+          p_invite_code: string
+          p_name: string
+        }
+        Returns: Json
+      }
       get_group_splits: {
         Args: { p_group_id: string }
         Returns: {
