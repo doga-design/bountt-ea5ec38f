@@ -177,6 +177,13 @@ export default function Join() {
 
     if (joinError) throw joinError;
 
+    // Log member joined activity
+    const memberName = profile?.display_name ?? user!.email?.split("@")[0] ?? "Member";
+    await supabase.rpc("log_member_joined", {
+      p_group_id: groupId,
+      p_actor_name: memberName,
+    } as any);
+
     await fetchGroups();
     toast({ title: `Joined ${groupName}!`, description: "Welcome to the group 🎉" });
     navigate(`/dashboard/${groupId}`);
@@ -197,6 +204,14 @@ export default function Join() {
 
         const selected = placeholders.find((p) => p.id === placeholderId);
         await fetchGroups();
+
+        // Log member joined activity (placeholder claim)
+        const memberName = profile?.display_name ?? user!.email?.split("@")[0] ?? "Member";
+        await supabase.rpc("log_member_joined", {
+          p_group_id: pendingGroup.id,
+          p_actor_name: memberName,
+        } as any);
+
         toast({
           title: `Joined ${pendingGroup.name}!`,
           description: `Merged with ${selected?.name}'s expenses 🎉`,

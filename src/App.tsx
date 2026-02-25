@@ -17,6 +17,7 @@ import Join from "./pages/Join";
 import Dashboard from "./pages/Dashboard";
 import ComingSoon from "./pages/ComingSoon";
 import GroupSettings from "./pages/GroupSettings";
+import ActivityLog from "./pages/ActivityLog";
 import NotFound from "./pages/NotFound";
 import EmptyGroups from "./pages/EmptyGroups";
 
@@ -54,6 +55,7 @@ const App = () => (
               <Route path="/groups" element={<AuthGuard><ComingSoon title="All Groups — Phase 2" /></AuthGuard>} />
               <Route path="/groups/:groupId/members" element={<AuthGuard><ComingSoon title="Members — Phase 2" /></AuthGuard>} />
               <Route path="/groups/:groupId/settings" element={<AuthGuard><GroupSettings /></AuthGuard>} />
+              <Route path="/groups/:groupId/activity" element={<AuthGuard><ActivityLog /></AuthGuard>} />
 
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />

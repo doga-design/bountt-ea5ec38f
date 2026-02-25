@@ -8,9 +8,10 @@ interface ExpenseCardProps {
   expense: Expense;
   splits: ExpenseSplit[];
   groupMembers: GroupMember[];
+  onClick?: () => void;
 }
 
-export default function ExpenseCard({ expense, splits, groupMembers }: ExpenseCardProps) {
+export default function ExpenseCard({ expense, splits, groupMembers, onClick }: ExpenseCardProps) {
   const { user } = useApp();
   const isPayer = expense.paid_by_user_id === user?.id;
 
@@ -105,7 +106,8 @@ export default function ExpenseCard({ expense, splits, groupMembers }: ExpenseCa
 
   return (
     <div
-      className="bg-card rounded-2xl p-4 border-l-4 flex items-start justify-between"
+      onClick={onClick}
+      className="bg-card rounded-2xl p-4 border-l-4 flex items-start justify-between cursor-pointer active:opacity-80 transition-opacity"
       style={{ borderColor: accentColor }}
     >
       {/* Left: title + subtitle */}

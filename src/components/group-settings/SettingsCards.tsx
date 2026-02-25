@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Group } from "@/types";
-import { Copy, Share2, Pencil } from "lucide-react";
+import { Copy, Share2, Pencil, FileText, ChevronRight } from "lucide-react";
 import { generateJoinUrl } from "@/lib/bountt-utils";
 import { useApp } from "@/contexts/AppContext";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +15,7 @@ export default function SettingsCards({ group }: SettingsCardsProps) {
   const [name, setName] = useState(group.name);
   const { updateGroup } = useApp();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const joinUrl = generateJoinUrl(group.invite_code);
 
   const handleNameSave = async () => {
@@ -87,6 +89,22 @@ export default function SettingsCards({ group }: SettingsCardsProps) {
           </button>
         </div>
       </div>
+
+      {/* Transparency section */}
+      <h2 className="text-lg font-bold text-foreground mt-6">Transparency</h2>
+      <button
+        onClick={() => navigate(`/groups/${group.id}/activity`)}
+        className="bg-card rounded-xl p-4 flex items-center gap-3 w-full text-left"
+      >
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#FFF0E8" }}>
+          <FileText className="w-5 h-5" style={{ color: "#D94F00" }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-foreground">Activity log</p>
+          <p className="text-xs text-muted-foreground">Every change, visible to all members</p>
+        </div>
+        <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+      </button>
     </div>
   );
 }

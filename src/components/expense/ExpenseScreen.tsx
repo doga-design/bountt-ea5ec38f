@@ -1,11 +1,11 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { X } from "lucide-react";
+import { X, Lock } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { distributeCents } from "@/lib/bountt-utils";
 import confetti from "canvas-confetti";
-import { GroupMember } from "@/types";
+import { GroupMember, Expense, ExpenseSplit } from "@/types";
 
 import AmountDisplay from "./AmountDisplay";
 import SplitSentence from "./SplitSentence";
@@ -18,14 +18,18 @@ interface ExpenseScreenProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   isFirstExpense?: boolean;
+  editExpense?: Expense;
+  editSplits?: ExpenseSplit[];
 }
 
 export default function ExpenseScreen({
   open,
   onOpenChange,
   isFirstExpense = false,
+  editExpense,
+  editSplits,
 }: ExpenseScreenProps) {
-  const { currentGroup, user, groupMembers, fetchExpenseSplits, addPlaceholderMember } = useApp();
+  const { currentGroup, user, profile, groupMembers, fetchExpenses, fetchExpenseSplits, addPlaceholderMember } = useApp();
   const { toast } = useToast();
 
   const [amount, setAmount] = useState("0");
@@ -52,22 +56,54 @@ export default function ExpenseScreen({
       });
   }, [groupMembers, user?.id]);
 
+  const isEditMode = !!editExpense;
+
   useEffect(() => {
     setActiveIds(new Set(activeMembers.map((m) => m.id)));
   }, [activeMembers.length]);
 
   useEffect(() => {
     if (open) {
-      setAmount("0");
-      setDescription("");
-      setSplitMode("equal");
-      setActiveIds(new Set(activeMembers.map((m) => m.id)));
-      setFocusedMemberId(null);
-      setCustomAmounts(new Map());
-      setEditingTotal(false);
-      // Default payer to current user's member record
-      const selfMember = activeMembers.find((m) => m.user_id === user?.id);
-      setPayerId(selfMember?.id ?? null);
+      if (isEditMode && editExpense && editSplits) {
+        // Pre-fill from edit data
+        setAmount(String(editExpense.amount));
+        setDescription(editExpense.description);
+        setSplitMode("equal");
+        // Match split member IDs to current group members
+        const splitMemberIds = new Set<string>();
+        editSplits.forEach((s) => {
+          const member = activeMembers.find(
+            (m) => (s.user_id && m.user_id === s.user_id) ||
+              (!s.user_id && m.name === s.member_name && m.is_placeholder)
+          );
+          if (member) splitMemberIds.add(member.id);
+        });
+        if (splitMemberIds.size > 0) {
+          setActiveIds(splitMemberIds);
+        } else {
+          setActiveIds(new Set(activeMembers.map((m) => m.id)));
+        }
+        // Find the payer member
+        const payerM = activeMembers.find(
+          (m) => (editExpense.paid_by_user_id && m.user_id === editExpense.paid_by_user_id) ||
+            (!editExpense.paid_by_user_id && m.name === editExpense.paid_by_name && m.is_placeholder)
+        );
+        setPayerId(payerM?.id ?? null);
+        setFocusedMemberId(null);
+        setCustomAmounts(new Map());
+        setEditingTotal(false);
+      } else {
+        setAmount("0");
+        setDescription("");
+        setSplitMode("equal");
+        setActiveIds(new Set(activeMembers.map((m) => m.id)));
+        setFocusedMemberId(null);
+        setCustomAmounts(new Map());
+        setEditingTotal(false);
+        // Default payer to current user's member record
+        const selfMember = activeMembers.find((m) => m.user_id === user?.id);
+        setPayerId(selfMember?.id ?? null);
+      }
     }
   }, [open]);
 
@@ -305,6 +341,26 @@ export default function ExpenseScreen({
 
     if (splitMode === "custom" && !isBalanced) return;
 
+    // Edit mode: check for settled
+    if (isEditMode && editExpense?.is_settled) {
+      toast({ title: "This expense has been settled and can't be edited.", variant: "destructive" });
+      return;
+    }
+
+    // Edit mode: no-change detection
+    if (isEditMode && editExpense && editSplits) {
+      const amountChanged = Math.abs(editExpense.amount - numAmount) > 0.001;
+      const descChanged = editExpense.description !== (description.trim() || "Quick Expense");
+      const oldMemberNames = editSplits.map((s) => s.member_name).sort();
+      const newMemberNames = selectedMembers.map((m) => m.name).sort();
+      const membersChanged = JSON.stringify(oldMemberNames) !== JSON.stringify(newMemberNames);
+
+      if (!amountChanged && !descChanged && !membersChanged) {
+        onOpenChange(false);
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const selectedPayer = payerMember ?? activeMembers.find((m) => m.user_id === user.id);
@@ -332,36 +388,58 @@ export default function ExpenseScreen({
           .filter((s) => s.share_amount > 0);
       }
 
-      const { error: rpcError } = await supabase.rpc("create_expense_with_splits", {
-        p_group_id: currentGroup.id,
-        p_amount: numAmount,
-        p_description: description.trim() || "Quick Expense",
-        p_paid_by_user_id: paidByUserId as string,
-        p_paid_by_name: paidByName,
-        p_created_by: user.id,
-        p_splits: splits,
-      });
+      if (isEditMode && editExpense) {
+        // Edit mode: call edit_expense RPC
+        const actorName = profile?.display_name ?? user.email?.split("@")[0] ?? "Unknown";
+        const { error: rpcError } = await supabase.rpc("edit_expense", {
+          p_expense_id: editExpense.id,
+          p_amount: numAmount,
+          p_description: description.trim() || "Quick Expense",
+          p_splits: splits,
+          p_actor_name: actorName,
+        } as any);
 
-      if (rpcError) throw rpcError;
+        if (rpcError) throw rpcError;
 
-      await fetchExpenseSplits(currentGroup.id);
+        await Promise.all([
+          fetchExpenses(currentGroup.id),
+          fetchExpenseSplits(currentGroup.id),
+        ]);
 
-      if (isFirstExpense) {
-        confetti({
-          particleCount: 120,
-          spread: 100,
-          origin: { y: 0.5 },
-          colors: ["#E8480A", "#FFFFFF", "#D4D4D4"],
-        });
-        toast({ title: "First expense logged! 🎉" });
+        toast({ title: "Changes saved" });
       } else {
-        toast({ title: "Expense added ✓" });
+        // Create mode
+        const { error: rpcError } = await supabase.rpc("create_expense_with_splits", {
+          p_group_id: currentGroup.id,
+          p_amount: numAmount,
+          p_description: description.trim() || "Quick Expense",
+          p_paid_by_user_id: paidByUserId as string,
+          p_paid_by_name: paidByName,
+          p_created_by: user.id,
+          p_splits: splits,
+        });
+
+        if (rpcError) throw rpcError;
+
+        await fetchExpenseSplits(currentGroup.id);
+
+        if (isFirstExpense) {
+          confetti({
+            particleCount: 120,
+            spread: 100,
+            origin: { y: 0.5 },
+            colors: ["#E8480A", "#FFFFFF", "#D4D4D4"],
+          });
+          toast({ title: "First expense logged! 🎉" });
+        } else {
+          toast({ title: "Expense added ✓" });
+        }
       }
 
       onOpenChange(false);
     } catch (err) {
       toast({
-        title: "Failed to add expense",
+        title: isEditMode ? "Failed to update expense" : "Failed to add expense",
         description: err instanceof Error ? err.message : "Unknown error",
         variant: "destructive",
       });
@@ -380,7 +458,7 @@ export default function ExpenseScreen({
     <div className="fixed inset-0 z-50 flex flex-col bg-background max-w-[430px] mx-auto" style={{ height: '100dvh' }}>
       {/* Top bar */}
       <div className="flex items-center justify-between px-5 pt-4 pb-1 flex-shrink-0">
-        <h2 className="font-sora text-lg font-bold text-foreground">Adding cost</h2>
+        <h2 className="font-sora text-lg font-bold text-foreground">{isEditMode ? "Editing cost" : "Adding cost"}</h2>
         <button
           onClick={() => onOpenChange(false)}
           className="w-9 h-9 flex items-center justify-center rounded-full bg-card"
@@ -401,6 +479,19 @@ export default function ExpenseScreen({
           canDistribute={canDistribute}
         />
 
+        {/* Locked payer label (edit mode) */}
+        {isEditMode && editExpense && (
+          <button
+            onClick={() => toast({ title: "To change the payer, delete this expense and log a new one" })}
+            className="flex items-center justify-center gap-1.5 mx-auto mb-1 px-3 py-1"
+          >
+            <Lock className="w-3 h-3 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground font-medium">
+              Paid by {editExpense.paid_by_user_id === user?.id ? "You" : editExpense.paid_by_name}
+            </span>
+          </button>
+        )}
+
         {/* Split sentence */}
         <SplitSentence
           splitMode={splitMode}
@@ -410,11 +501,11 @@ export default function ExpenseScreen({
           disabled={amount === "0"}
           isSingleUser={isSingleUser}
           payerMember={payerMember}
-          onSetPayer={handleSetPayer}
+          onSetPayer={isEditMode ? () => toast({ title: "To change the payer, delete this expense and log a new one" }) : handleSetPayer}
           allActiveMembers={activeMembers}
           activeIds={activeIds}
           onToggleMember={handleToggleChip}
-          
+          hidePayerDrawer={isEditMode}
         />
 
         {/* Custom split rows */}
@@ -450,6 +541,7 @@ export default function ExpenseScreen({
           loading={loading}
           onClick={handleSave}
           isSingleUser={isSingleUser}
+          label={isEditMode ? "Save changes" : "Save"}
         />
       </div>
 
