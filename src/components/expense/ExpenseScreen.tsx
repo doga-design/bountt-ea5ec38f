@@ -40,6 +40,7 @@ export default function ExpenseScreen({
   const [editingTotal, setEditingTotal] = useState(false);
   const [freshFocus, setFreshFocus] = useState(false);
   const [shakeMemberId, setShakeMemberId] = useState<string | null>(null);
+  const [payerId, setPayerId] = useState<string | null>(null);
 
   // Active members sorted: "You" first
   const activeMembers = useMemo(() => {
@@ -65,8 +66,25 @@ export default function ExpenseScreen({
       setFocusedMemberId(null);
       setCustomAmounts(new Map());
       setEditingTotal(false);
+      // Default payer to current user's member record
+      const selfMember = activeMembers.find((m) => m.user_id === user?.id);
+      setPayerId(selfMember?.id ?? null);
     }
   }, [open]);
+
+  // Resolve current payer member; fallback to self if removed
+  const payerMember = useMemo(() => {
+    const found = activeMembers.find((m) => m.id === payerId);
+    if (found) return found;
+    return activeMembers.find((m) => m.user_id === user?.id);
+  }, [activeMembers, payerId, user?.id]);
+
+  // Cycle through active members as payer
+  const cyclePayer = useCallback(() => {
+    const idx = activeMembers.findIndex((m) => m.id === payerMember?.id);
+    const nextIdx = (idx + 1) % activeMembers.length;
+    setPayerId(activeMembers[nextIdx].id);
+  }, [activeMembers, payerMember]);
 
   const selectedMembers = useMemo(
     () => activeMembers.filter((m) => activeIds.has(m.id)),
@@ -274,18 +292,21 @@ export default function ExpenseScreen({
 
     setLoading(true);
     try {
-      const selfMember = activeMembers.find((m) => m.user_id === user.id);
-      const payerName = selfMember?.name ?? user.email?.split("@")[0] ?? "You";
+      const selectedPayer = payerMember ?? activeMembers.find((m) => m.user_id === user.id);
+      const paidByUserId = selectedPayer?.user_id ?? null;
+      const paidByName = selectedPayer?.name ?? user.email?.split("@")[0] ?? "You";
 
       let splits: { user_id: string | null; member_name: string; share_amount: number }[];
 
       if (splitMode === "equal") {
         const shares = distributeCents(numAmount, selectedMembers.length);
-        splits = selectedMembers.map((m, i) => ({
-          user_id: m.user_id,
-          member_name: m.name,
-          share_amount: shares[i],
-        }));
+        splits = selectedMembers
+          .map((m, i) => ({
+            user_id: m.user_id,
+            member_name: m.name,
+            share_amount: shares[i],
+          }))
+          .filter((s) => s.share_amount > 0);
       } else {
         splits = selectedMembers
           .map((m) => ({
@@ -293,15 +314,15 @@ export default function ExpenseScreen({
             member_name: m.name,
             share_amount: parseFloat(customAmounts.get(m.id) || "0") || 0,
           }))
-          .filter((s) => s.share_amount > 0); // Filter out $0 splits
+          .filter((s) => s.share_amount > 0);
       }
 
       const { error: rpcError } = await supabase.rpc("create_expense_with_splits", {
         p_group_id: currentGroup.id,
         p_amount: numAmount,
         p_description: description.trim() || "Quick Expense",
-        p_paid_by_user_id: user.id,
-        p_paid_by_name: payerName,
+        p_paid_by_user_id: paidByUserId as string,
+        p_paid_by_name: paidByName,
         p_created_by: user.id,
         p_splits: splits,
       });
@@ -404,6 +425,8 @@ export default function ExpenseScreen({
           currentUserId={user?.id}
           disabled={amount === "0"}
           isSingleUser={isSingleUser}
+          payerMember={payerMember}
+          onCyclePayer={cyclePayer}
         />
 
         {/* Custom split rows */}

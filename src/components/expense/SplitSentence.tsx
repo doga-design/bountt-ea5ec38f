@@ -7,6 +7,8 @@ interface SplitSentenceProps {
   currentUserId: string | undefined;
   disabled: boolean;
   isSingleUser?: boolean;
+  payerMember: GroupMember | undefined;
+  onCyclePayer: () => void;
 }
 
 export default function SplitSentence({
@@ -16,6 +18,8 @@ export default function SplitSentence({
   currentUserId,
   disabled,
   isSingleUser = false,
+  payerMember,
+  onCyclePayer,
 }: SplitSentenceProps) {
   if (isSingleUser) {
     return (
@@ -25,21 +29,29 @@ export default function SplitSentence({
     );
   }
 
-  const others = activeMembers.filter((m) => m.user_id !== currentUserId);
-  const selfIncluded = activeMembers.some((m) => m.user_id === currentUserId);
-  const onlySelf = others.length === 0;
+  const payerIsYou = payerMember?.user_id === currentUserId;
+  const payerDisplay = payerIsYou ? "You" : payerMember?.name ?? "You";
+
+  // "with" list: everyone in the split except the payer
+  const others = activeMembers.filter((m) => m.id !== payerMember?.id);
+  const selfIncludedInSplit = activeMembers.some((m) => m.user_id === currentUserId && m.id !== payerMember?.id);
 
   let namesDisplay: React.ReactNode;
-  if (onlySelf) {
+  if (others.length === 0) {
     namesDisplay = <span className="font-bold text-foreground">yourself</span>;
   } else if (others.length === 1) {
-    namesDisplay = <span className="font-bold text-foreground">{others[0].name}</span>;
+    const label = others[0].user_id === currentUserId ? "you" : others[0].name;
+    namesDisplay = <span className="font-bold text-foreground">{label}</span>;
   } else if (others.length === 2) {
     namesDisplay = (
       <>
-        <span className="font-bold text-foreground">{others[0].name}</span>
+        <span className="font-bold text-foreground">
+          {others[0].user_id === currentUserId ? "you" : others[0].name}
+        </span>
         {" & "}
-        <span className="font-bold text-foreground">{others[1].name}</span>
+        <span className="font-bold text-foreground">
+          {others[1].user_id === currentUserId ? "you" : others[1].name}
+        </span>
       </>
     );
   } else {
@@ -47,13 +59,17 @@ export default function SplitSentence({
       <>
         {others.slice(0, -1).map((m, i) => (
           <span key={m.id}>
-            <span className="font-bold text-foreground">{m.name}</span>
+            <span className="font-bold text-foreground">
+              {m.user_id === currentUserId ? "you" : m.name}
+            </span>
             {i < others.length - 2 ? ", " : ""}
           </span>
         ))}
         {" & "}
         <span className="font-bold text-foreground">
-          {others[others.length - 1].name}
+          {others[others.length - 1].user_id === currentUserId
+            ? "you"
+            : others[others.length - 1].name}
         </span>
       </>
     );
@@ -67,7 +83,14 @@ export default function SplitSentence({
         disabled ? "opacity-40 pointer-events-none" : ""
       }`}
     >
-      Splitting{" "}
+      <button
+        onClick={onCyclePayer}
+        className="font-extrabold underline decoration-dotted underline-offset-4 text-foreground"
+        disabled={disabled}
+      >
+        {payerDisplay}
+      </button>
+      {" paid, splitting "}
       <button
         onClick={onToggleMode}
         className="font-extrabold underline decoration-dotted underline-offset-4"
@@ -79,12 +102,6 @@ export default function SplitSentence({
         {isEqual ? "equally" : "custom"}
       </button>{" "}
       with {namesDisplay}
-      {selfIncluded && !onlySelf && (
-        <>
-          {" & "}
-          <span className="font-bold text-foreground">you</span>
-        </>
-      )}
     </p>
   );
 }
