@@ -1,297 +1,175 @@
-# Bountt Cost Management System
+
+
+# Bountt Settlement System
 
 ## Overview
 
-Build three interconnected features: expense editing, expense deletion, and a group-wide activity log. This involves database schema changes, three new RPCs, UI for editing/deleting expenses, an activity log screen, and wiring it all together.
+Build per-split settlement with two RPCs (`settle_my_share`, `settle_all`), update balance calculations to exclude settled splits, add settlement UI to the expense detail sheet, implement a PayPal return confirmation flow in the hero, and extend the activity log with the `settled` action type.
 
 ---
 
-## Phase 1: Database Changes
+## Phase 1: Database Migration
 
-### 1a. CASCADE foreign key on expense_splits
+A single migration that:
 
-Add a foreign key constraint so deleting an expense automatically removes its splits:
+1. **Add columns to `expense_splits`:**
+   - `is_settled BOOLEAN NOT NULL DEFAULT false`
+   - `settled_at TIMESTAMPTZ`
 
-```sql
-ALTER TABLE expense_splits
-ADD CONSTRAINT expense_splits_expense_id_fkey
-FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE;
-```
+2. **Update `activity_log` CHECK constraint** to include `'settled'`:
+   ```sql
+   ALTER TABLE activity_log DROP CONSTRAINT IF EXISTS activity_log_action_type_check;
+   ALTER TABLE activity_log ADD CONSTRAINT activity_log_action_type_check
+   CHECK (action_type IN ('added', 'edited', 'deleted', 'joined', 'settled'));
+   ```
 
-### 1b. Create activity_log table
+3. **Create `settle_my_share` RPC:**
+   - Derives `actor_id` from `auth.uid()` (never trusts client)
+   - Finds split where `expense_id = p_expense_id AND user_id = auth.uid()`
+   - Validates: not found -> error, already settled -> error
+   - Sets `is_settled = true, settled_at = now()` on that split
+   - Checks if ALL splits for this expense are now settled; if so, sets `expenses.is_settled = true`
+   - Fetches actor display name from `profiles`
+   - Inserts `activity_log` entry with `action_type = 'settled'`, snapshot, and `change_detail = [{ field: 'settled_by', old_value: '', new_value: actor_name }]`
 
-```sql
-CREATE TABLE activity_log (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  group_id        uuid NOT NULL,
-  actor_id        uuid NOT NULL,
-  actor_name      text NOT NULL,
-  action_type     text NOT NULL CHECK (action_type IN ('added', 'edited', 'deleted', 'joined')),
-  expense_snapshot jsonb,
-  change_detail   jsonb,
-  created_at      timestamptz NOT NULL DEFAULT now()
-);
+4. **Create `settle_all` RPC:**
+   - Derives `actor_id` from `auth.uid()`
+   - Verifies `paid_by_user_id = auth.uid()` (only payer can settle all)
+   - Validates: already fully settled -> error
+   - Sets `is_settled = true, settled_at = now()` on ALL splits for this expense
+   - Sets `expenses.is_settled = true, updated_at = now()`
+   - Inserts `activity_log` entry with `action_type = 'settled'`, snapshot, and `change_detail = [{ field: 'settled_all', ... }]`
 
-ALTER TABLE activity_log ENABLE ROW LEVEL SECURITY;
-
--- SELECT: group members only
-CREATE POLICY "Group members can view activity log"
-ON activity_log FOR SELECT
-USING (is_group_member(group_id, auth.uid()));
-
--- No direct INSERT/UPDATE/DELETE from clients -- handled via RPCs
-```
-
-Enable realtime on activity_log:
-
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE public.activity_log;
-```
-
-### 1c. Update create_expense_with_splits to log "added"
-
-Modify the existing RPC to also insert an activity_log row with action_type = 'added' and a snapshot of the expense + member names after creating the expense.
+Both RPCs run inside implicit PL/pgSQL transactions (atomic).
 
 ---
 
-## Phase 2: New RPCs
+## Phase 2: Balance Recalculation
 
-### 2a. edit_expense RPC
+### `src/components/dashboard/slides/useHeroData.ts`
 
-**Parameters:** `p_expense_id`, `p_amount`, `p_description`, `p_splits` (jsonb), `p_actor_id`, `p_actor_name`  
-  
-**In all RPCs, derive `actor_id` from `auth.uid()` server-side. Do not trust `p_actor_id` from the client.**
+The current code filters expenses by `!e.is_settled` (expense-level), but now settlement is per-split. Update the balance logic to filter at the **split level** using `is_settled` on each split row:
 
-**Logic (single transaction):**
-
-1. Verify `created_by = p_actor_id` on the expense (throw if not)
-2. Check `is_settled = false` (throw if settled)
-3. Fetch old expense row + old splits for change detection
-4. `UPDATE expenses SET amount, description, updated_at`
-5. `DELETE FROM expense_splits WHERE expense_id = p_expense_id`
-6. `INSERT` new splits from `p_splits`
-7. Compare old vs new: amount (abs diff > 0.001), description (string compare), members (sorted name arrays)
-8. For each changed field, insert one `activity_log` row with action_type = 'edited' and the appropriate `change_detail`
-9. Return the updated expense as JSONB
-
-### 2b. delete_expense RPC
-
-**Parameters:** `p_expense_id`, `p_actor_id`, `p_actor_name`
-
-**Logic (single transaction):**
-
-1. Verify `created_by = p_actor_id` (throw if not)
-2. Fetch expense + split member names BEFORE delete
-3. Insert `activity_log` row: action_type = 'deleted', full expense_snapshot with member_names
-4. `DELETE FROM expenses WHERE id = p_expense_id` (splits cascade)
-5. Return success
-
-### 2c. log_member_joined RPC
-
-**Parameters:** `p_group_id`, `p_actor_id`, `p_actor_name`
-
-**Logic:**
-
-1. Insert `activity_log` row: action_type = 'joined', expense_snapshot = null, change_detail = null
-
----
-
-## Phase 3: TypeScript Types
+- When iterating unsettled expenses, for each split, additionally check `s.is_settled !== true` before adding to `totalOwedToYou` / `totalYouOwe` / `debtsYouOwe` / `agingDebts`
+- Keep the expense-level `!e.is_settled` filter for the outer loop (settled expenses are fully done), but within partially-settled expenses, skip individual settled splits
+- This requires updating the `ExpenseSplit` type first
 
 ### `src/types/index.ts`
 
-Add `ActivityLog` interface:
-
+Add to `ExpenseSplit`:
 ```typescript
-export interface ActivityLog {
-  id: string;
-  group_id: string;
-  actor_id: string;
-  actor_name: string;
-  action_type: 'added' | 'edited' | 'deleted' | 'joined';
-  expense_snapshot: {
-    expense_id: string;
-    description: string;
-    amount: number;
-    paid_by_name: string;
-    member_names: string[];
-  } | null;
-  change_detail: Array<{
-    field: string;
-    old_value: string;
-    new_value: string;
-  }> | null;
-  created_at: string;
-}
+is_settled: boolean;
+settled_at: string | null;
 ```
 
----
-
-## Phase 4: Expense Detail Bottom Sheet
-
-### New component: `src/components/dashboard/ExpenseDetailSheet.tsx`
-
-Currently `ExpenseCard` has no tap action. Add an `onClick` to each `ExpenseCard` that opens a new bottom sheet (Drawer) showing expense details.
-
-**Sheet contents:**
-
-- Expense description (title)
-- Amount
-- "Paid by [Name]" label
-- Split breakdown (list of members + amounts)
-- Date
-- **If `expense.created_by === currentUser.id`:**
-  - "Edit expense" button (navigates to edit screen)
-  - Trash icon button (triggers delete confirmation)
-- **If not creator:**
-  - "Logged by [Name]" badge (read-only)
-
-**Delete confirmation (within the sheet):**
-
-- Slides up within the bottom sheet
-- Shows: "Delete this expense?" + expense name + warning text
-- "Yes, delete it" (red) and "Keep it" (gray) buttons
-- On confirm: calls `delete_expense` RPC, closes sheet, refreshes feed, shows toast "Expense deleted"
-- On error: shows error message within confirmation layer
+Update `ActivityLog.action_type` to include `'settled'`.
 
 ---
 
-## Phase 5: Edit Expense Screen
+## Phase 3: Expense Detail Sheet Updates
 
-### Modified: `src/components/expense/ExpenseScreen.tsx`
+### `src/components/dashboard/ExpenseDetailSheet.tsx`
 
-Add an `editExpense` prop to reuse the existing screen in edit mode:
+Major additions to the existing sheet:
 
-```typescript
-interface ExpenseScreenProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  isFirstExpense?: boolean;
-  editExpense?: Expense;       // NEW
-  editSplits?: ExpenseSplit[]; // NEW
-}
-```
+**State derivations:**
+- `isPayer = expense.paid_by_user_id === user?.id`
+- `mySplit = expenseSplits.find(s => s.user_id === user?.id)`
+- `iAlreadySettled = mySplit?.is_settled === true`
+- `expenseFullySettled = expense.is_settled === true`
 
-**When `editExpense` is provided:**
+**Rendering changes:**
 
-- Title changes to "Editing cost"
-- Pre-fill amount from `editExpense.amount` *(This the right tradeoff given split mode isn't stored — just make sure the UI makes it obvious the split was reset, maybe a small notice: "Split recalculated equally — adjust if needed.")*
-- Pre-fill description from `editExpense.description`
-- Pre-fill `activeIds` from `editSplits` member IDs (matched to current groupMembers)
-- Split mode opens as "equal" (redistributed from current amount)
-- Payer display: non-interactive "Paid by [Name]" label with lock icon below the amount. Tapping shows a toast: "To change the payer, delete this expense and log a new one"
-- Payer selection drawer is hidden
-- `handleSetPayer` is disabled
-- SaveButton label: "Save changes"
-- On save: call `edit_expense` RPC instead of `create_expense_with_splits`
-- On success: close screen, refresh feed + splits, show toast "Changes saved"
-- On error: show inline error, stay on screen
-- If `is_settled === true`: block edit, show message "This expense has been settled and can't be edited"
-- No-change detection: compare old vs new before calling RPC; if nothing changed, just close without RPC call
+1. If `expenseFullySettled`: show green "Settled" badge below title. Hide edit/delete buttons entirely. Sheet is read-only.
+
+2. In split breakdown rows: if a split's `is_settled`, show a muted "Settled" label next to the amount. For the current user's row specifically, show "Your share settled" in green if settled.
+
+3. **Settlement action buttons** (below the split breakdown, only if not fully settled):
+   - If `mySplit` exists and `!iAlreadySettled`: "Settle my share" button (dark, full width). On tap, show inline confirmation:
+     - "Did you send $[amount] to [paid_by_name]?"
+     - "Yes, I sent it" (orange) -> calls `settle_my_share` RPC
+     - "I'll do it later" (muted text) -> dismiss
+   - If `isPayer` and `!expenseFullySettled`: "Settle all" button (outlined). One tap, no confirmation -> calls `settle_all` RPC
+
+4. On RPC success: refresh expenses + splits, close or update sheet, show toast
+5. On RPC error: show inline error, keep sheet open
 
 ---
 
-## Phase 6: Activity Log Screen
+## Phase 4: PayPal Return Confirmation
 
-### New page: `src/pages/ActivityLog.tsx`
+### `src/components/dashboard/slides/NetBalanceSlide.tsx`
 
-**Route:** `/groups/:groupId/activity` (add to App.tsx)
+The "Pay [name]" / "Settle Up" button currently does nothing (no onClick handler). Add:
 
-**Screen structure:**
+1. **State:** `pendingDebt: { expenseId, amount, payeeName } | null` and `showPayConfirm: boolean`
 
-- Back chevron + title "Activity log"
-- Subtitle: "Every change, visible to all members"
-- Feed: query `activity_log WHERE group_id = currentGroup.id ORDER BY created_at DESC LIMIT 100`
-- Grouped by date (TODAY, YESTERDAY, etc.) using existing `formatRelativeDate`
-- Empty state: icon + "Nothing yet. Activity will appear here when expenses are added, edited, or deleted."
+2. **On CTA click:**
+   - For "you_owe" debts: store `pendingDebt` with the debt details, then open PayPal deeplink (`https://paypal.me/...` or just a generic payment prompt). Set a `paypalTriggered` flag.
+   - For "owed_to_you" debts: call `settle_my_share` directly (since you're the payer settling someone else's debt -- actually no, `settle_all` would be more appropriate here). Actually per the spec, "Settle Up" for owed_to_you should call `settle_all`. "Pay [name]" for you_owe should deeplink to PayPal.
 
-**Each entry card:**
+3. **Visibility change detection:** Add a `visibilitychange` / `focus` listener. When app regains focus AND `paypalTriggered` is true, show the confirmation prompt.
 
-- Left: colored icon square (36x36, rounded)
-  - added = green + plus icon
-  - edited = blue + pencil icon
-  - deleted = red + trash icon
-  - joined = orange + person icon
-- Body: "[Actor] [action] "[description]" -- [amount]"
-  - Actor name: bold, #D94F00
-  - Expense name: bold black
-  - Amount: bold black
-- Detail pills:
-  - edited: blue bg, "amount $X -> $Y" or "removed [Name] from split" etc.
-  - deleted: red pill, "split between [names]"
-  - added: green pill, "split with [names]"
-  - joined: no pill, just "[Name] joined the group"
-- Right: relative timestamp ("2h ago", "Yesterday")
+4. **Confirmation prompt** (rendered as a fixed bottom overlay or inline in the hero):
+   - "Did you send $[amount] to [name]?"
+   - "Yes, I sent it" -> calls `settle_my_share(expenseId)` -> dismiss + recalculate
+   - "Not yet" -> dismiss, clear flag
 
-**Realtime:** Subscribe to `activity_log` changes for the current group so new entries appear at top without refresh.
+5. For "Settle Up" (owed_to_you): call `settle_all` RPC directly on tap, show toast. No PayPal flow needed.
 
 ---
 
-## Phase 7: Settings Integration
+## Phase 5: Activity Log Updates
 
-### Modified: `src/components/group-settings/SettingsCards.tsx`
+### `src/pages/ActivityLog.tsx`
 
-Add a "Transparency" section between the current Settings cards and DangerZone:
+1. Add `'settled'` to `ActivityLogEntry.action_type` union
+2. Add to `ACTION_CONFIG`:
+   ```
+   settled: { icon: Check, bg: "bg-emerald-100", pillBg: "bg-emerald-50", pillText: "text-emerald-700" }
+   ```
+   (green tint icon bg `#F0FFF7`, green icon color `#00A857`)
 
-```text
-[icon] Activity log
-       Every change, visible to all members     >
-```
-
-- Icon: document icon, orange bg (#FFF0E8), orange stroke (#D94F00)
-- Tapping navigates to `/groups/:groupId/activity`
-
----
-
-## Phase 8: Join Flow -- Log Member Joined
-
-### Modified: `src/pages/Join.tsx`
-
-After successful join (both `joinAsNewMember` and `handlePlaceholderSelection`), call the `log_member_joined` RPC with the user's ID and display name.
+3. In `ActivityCard`, handle the settled action type:
+   - Check `change_detail[0].field`:
+     - `'settled_by'` -> "[Actor] settled their share of "[description]" -- $[share amount]"
+     - `'settled_all'` -> "[Actor] settled "[description]" for everyone -- $[total amount]"
+   - Green pill with appropriate text
 
 ---
 
-## Phase 9: Wiring & State
+## Phase 6: Realtime Wiring
 
-### Modified: `src/contexts/AppContext.tsx`
+The existing `AppContext` already:
+- Subscribes to `expenses` realtime changes and re-fetches splits on any expense change
+- `expense_splits` is already in the realtime publication
 
-No major changes needed -- the existing realtime subscription on `expenses` already handles UPDATE and DELETE events. The `fetchExpenses` and `fetchExpenseSplits` functions will be called after edit/delete RPCs to refresh state.
-
-### Dashboard changes
-
-- `ExpenseCard` gets an `onClick` prop to open the detail sheet
-- `Dashboard.tsx` manages state for the selected expense and the detail sheet
+Add a realtime subscription for `expense_splits` changes in `AppContext.tsx` so that when splits are updated (settlement), the local state refreshes without needing an expense change event. This ensures balance recalculation is instant.
 
 ---
 
 ## File Summary
 
-
-| File                                              | Action                                                                                     |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Database migration                                | CASCADE FK, activity_log table, RLS, realtime                                              |
-| Database RPCs                                     | `edit_expense`, `delete_expense`, `log_member_joined`, update `create_expense_with_splits` |
-| `src/types/index.ts`                              | Add `ActivityLog` type                                                                     |
-| `src/components/dashboard/ExpenseDetailSheet.tsx` | New -- expense detail bottom sheet with edit/delete                                        |
-| `src/components/expense/ExpenseScreen.tsx`        | Add edit mode (editExpense prop, locked payer, save changes)                               |
-| `src/components/expense/SaveButton.tsx`           | Accept optional `label` prop for "Save changes"                                            |
-| `src/pages/ActivityLog.tsx`                       | New -- full activity log page                                                              |
-| `src/pages/Dashboard.tsx`                         | Wire ExpenseCard onClick to detail sheet                                                   |
-| `src/components/dashboard/ExpenseCard.tsx`        | Add onClick prop                                                                           |
-| `src/components/group-settings/SettingsCards.tsx` | Add Activity log row                                                                       |
-| `src/App.tsx`                                     | Add `/groups/:groupId/activity` route                                                      |
-| `src/pages/Join.tsx`                              | Call `log_member_joined` after join                                                        |
-
+| File | Change |
+|------|--------|
+| Migration SQL | Add columns, update constraint, create 2 RPCs |
+| `src/types/index.ts` | Add `is_settled`, `settled_at` to ExpenseSplit; add `'settled'` to ActivityLog |
+| `src/components/dashboard/slides/useHeroData.ts` | Filter settled splits from balance calculations |
+| `src/components/dashboard/ExpenseDetailSheet.tsx` | Settlement UI: badges, inline confirm, RPC calls |
+| `src/components/dashboard/slides/NetBalanceSlide.tsx` | PayPal deeplink, return confirmation prompt |
+| `src/pages/ActivityLog.tsx` | Add settled action type config + rendering |
+| `src/contexts/AppContext.tsx` | Add expense_splits realtime subscription |
 
 ---
 
-## Edge Cases Handled
+## Edge Cases
 
-- **Non-creator views expense**: Edit/delete hidden, "Logged by [Name]" badge shown
-- **Settled expense edit blocked**: Check `is_settled` before allowing edit
-- **No changes on edit**: Detect diff client-side, skip RPC if nothing changed
-- **Network errors**: Keep UI open, show error inline
-- **Activity log empty**: Show empty state message
-- **Multiple fields changed**: One activity_log row per changed field, same timestamp
-- **Member added/removed from split**: Logged as "added [Name] to split" / "removed [Name] from split"
-- **Actor name snapshot**: Always stored at write time, not referenced from live profiles
+- Non-payer calls `settle_all` -> RPC throws, UI shows error toast
+- Already-settled split -> RPC throws "Already settled"
+- All splits individually settled -> `expenses.is_settled` auto-flips, `settle_all` would throw "Already fully settled"
+- Settled expense -> edit/delete hidden, sheet read-only
+- User has no split on expense -> no settlement buttons shown
+- PayPal prompt dismissed with "Not yet" -> no RPC, flag cleared
+- PayPal prompt RPC failure -> error shown in prompt, stays open for retry
+- Balance recalculation -> driven by realtime on both expenses and expense_splits tables
+
