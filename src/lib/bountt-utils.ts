@@ -50,8 +50,7 @@ export function formatRelativeDate(dateStr: string): string {
   const diffMs = today.getTime() - target.getTime();
   const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
-  if (diffDays < 0) return "UPCOMING";
-  if (diffDays === 0) return "TODAY";
+  if (diffDays <= 0) return "TODAY";
   if (diffDays === 1) return "YESTERDAY";
   if (diffDays <= 7) return "LAST WEEK";
   if (diffDays <= 28) return Math.ceil(diffDays / 7) + " WEEKS AGO";
