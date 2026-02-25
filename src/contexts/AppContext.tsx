@@ -43,6 +43,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Realtime subscription refs
   const expensesChannelRef = useRef<RealtimeChannel | null>(null);
   const membersChannelRef = useRef<RealtimeChannel | null>(null);
+  const splitsChannelRef = useRef<RealtimeChannel | null>(null);
 
   // Track if we already fetched groups for a given user to avoid double-fetch
   const groupsFetchedForRef = useRef<string | null>(null);
@@ -411,6 +412,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!currentGroup) {
       expensesChannelRef.current?.unsubscribe();
       membersChannelRef.current?.unsubscribe();
+      splitsChannelRef.current?.unsubscribe();
       return;
     }
 
@@ -465,9 +467,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       )
       .subscribe();
 
+    // Realtime subscription for expense_splits (settlement updates)
+    splitsChannelRef.current = supabase
+      .channel(`splits:${currentGroup.id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "expense_splits" },
+        () => {
+          const groupId = currentGroupRef.current?.id;
+          if (groupId) {
+            fetchExpenseSplits(groupId);
+            fetchExpenses(groupId);
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       expensesChannelRef.current?.unsubscribe();
       membersChannelRef.current?.unsubscribe();
+      splitsChannelRef.current?.unsubscribe();
     };
   }, [currentGroup?.id]);
 

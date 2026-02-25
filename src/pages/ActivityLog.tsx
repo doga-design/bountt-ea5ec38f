@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Pencil, Trash2, UserPlus, FileText } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, UserPlus, FileText, Check } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/bountt-utils";
@@ -10,7 +10,7 @@ interface ActivityLogEntry {
   group_id: string;
   actor_id: string;
   actor_name: string;
-  action_type: "added" | "edited" | "deleted" | "joined";
+  action_type: "added" | "edited" | "deleted" | "joined" | "settled";
   expense_snapshot: {
     expense_id: string;
     description: string;
@@ -59,6 +59,7 @@ const ACTION_CONFIG = {
   edited: { icon: Pencil, bg: "bg-blue-500", pillBg: "bg-blue-50", pillText: "text-blue-700" },
   deleted: { icon: Trash2, bg: "bg-red-500", pillBg: "bg-red-50", pillText: "text-red-700" },
   joined: { icon: UserPlus, bg: "bg-orange-500", pillBg: "", pillText: "" },
+  settled: { icon: Check, bg: "bg-emerald-500", pillBg: "bg-emerald-50", pillText: "text-emerald-700" },
 };
 
 function ActivityCard({ entry, currentUserId }: { entry: ActivityLogEntry; currentUserId: string | undefined }) {
@@ -115,6 +116,18 @@ function ActivityCard({ entry, currentUserId }: { entry: ActivityLogEntry; curre
     });
   }
 
+  if (entry.action_type === "settled" && entry.change_detail) {
+    const isSettleAll = entry.change_detail[0]?.field === "settled_all";
+    const text = isSettleAll
+      ? `settled for everyone`
+      : `settled their share`;
+    pills.push(
+      <span key="settled" className={`inline-block text-xs px-2 py-0.5 rounded-full ${config.pillBg} ${config.pillText} font-medium`}>
+        {text}
+      </span>
+    );
+  }
+
   return (
     <div className="flex items-start gap-3 py-3">
       {/* Icon */}
@@ -129,6 +142,28 @@ function ActivityCard({ entry, currentUserId }: { entry: ActivityLogEntry; curre
           {" "}
           {entry.action_type === "joined" ? (
             <span className="text-muted-foreground">joined the group</span>
+          ) : entry.action_type === "settled" ? (
+            <>
+              <span className="text-muted-foreground">
+                {entry.change_detail?.[0]?.field === "settled_all"
+                  ? "settled "
+                  : "settled their share of "}
+              </span>
+              {entry.expense_snapshot && (
+                <>
+                  <span className="font-bold text-foreground">"{entry.expense_snapshot.description}"</span>
+                  {entry.change_detail?.[0]?.field === "settled_all" && (
+                    <>
+                      <span className="text-muted-foreground"> for everyone</span>
+                    </>
+                  )}
+                  <span className="text-muted-foreground"> — </span>
+                  <span className="font-bold text-foreground">
+                    {formatCurrency(entry.expense_snapshot.amount)}
+                  </span>
+                </>
+              )}
+            </>
           ) : (
             <>
               <span className="text-muted-foreground">{entry.action_type} </span>

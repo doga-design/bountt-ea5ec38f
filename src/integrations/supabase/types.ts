@@ -60,7 +60,9 @@ export type Database = {
           created_at: string
           expense_id: string
           id: string
+          is_settled: boolean
           member_name: string
+          settled_at: string | null
           share_amount: number
           user_id: string | null
         }
@@ -68,7 +70,9 @@ export type Database = {
           created_at?: string
           expense_id: string
           id?: string
+          is_settled?: boolean
           member_name: string
+          settled_at?: string | null
           share_amount: number
           user_id?: string | null
         }
@@ -76,7 +80,9 @@ export type Database = {
           created_at?: string
           expense_id?: string
           id?: string
+          is_settled?: boolean
           member_name?: string
+          settled_at?: string | null
           share_amount?: number
           user_id?: string | null
         }
@@ -347,7 +353,9 @@ export type Database = {
           created_at: string
           expense_id: string
           id: string
+          is_settled: boolean
           member_name: string
+          settled_at: string | null
           share_amount: number
           user_id: string | null
         }[]
@@ -375,6 +383,8 @@ export type Database = {
           name: string
         }[]
       }
+      settle_all: { Args: { p_expense_id: string }; Returns: Json }
+      settle_my_share: { Args: { p_expense_id: string }; Returns: Json }
     }
     Enums: {
       [_ in never]: never

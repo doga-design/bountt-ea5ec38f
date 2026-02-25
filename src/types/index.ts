@@ -58,6 +58,8 @@ export interface ExpenseSplit {
   user_id: string | null;
   member_name: string;
   share_amount: number;
+  is_settled: boolean;
+  settled_at: string | null;
   created_at: string;
 }
 
@@ -75,7 +77,7 @@ export interface ActivityLog {
   group_id: string;
   actor_id: string;
   actor_name: string;
-  action_type: 'added' | 'edited' | 'deleted' | 'joined';
+  action_type: 'added' | 'edited' | 'deleted' | 'joined' | 'settled';
   expense_snapshot: {
     expense_id: string;
     description: string;
