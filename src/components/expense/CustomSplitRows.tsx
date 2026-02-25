@@ -6,6 +6,7 @@ interface CustomSplitRowsProps {
   currentUserId: string | undefined;
   customAmounts: Map<string, string>;
   focusedMemberId: string | null;
+  shakeMemberId: string | null;
   onFocus: (memberId: string) => void;
   visible: boolean;
 }
@@ -19,6 +20,7 @@ export default function CustomSplitRows({
   currentUserId,
   customAmounts,
   focusedMemberId,
+  shakeMemberId,
   onFocus,
   visible,
 }: CustomSplitRowsProps) {
@@ -34,6 +36,7 @@ export default function CustomSplitRows({
         {members.map((m) => {
           const isSelf = m.user_id === currentUserId;
           const isFocused = focusedMemberId === m.id;
+          const isShaking = shakeMemberId === m.id;
           const color = getAvatarColor(m);
           const amountStr = customAmounts.get(m.id) ?? "0";
           const displayAmount = amountStr === "0" ? "0" : amountStr;
@@ -44,7 +47,7 @@ export default function CustomSplitRows({
             <button
               key={m.id}
               onClick={() => onFocus(m.id)}
-              className="w-full flex items-center gap-3 rounded-2xl px-4 py-3 transition-all text-left"
+              className={`w-full flex items-center gap-3 rounded-2xl px-4 py-3 transition-all text-left ${isShaking ? "animate-shake-x" : ""}`}
               style={{
                 backgroundColor: isFocused
                   ? isSelf
