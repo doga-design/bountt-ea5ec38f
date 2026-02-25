@@ -17,7 +17,14 @@ export default function MemberChipSelector({
   onAddPress,
 }: MemberChipSelectorProps) {
   return (
-    <div className="flex flex-nowrap gap-2 px-5 pt-5 pb-2 overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+    <div className="px-5 pt-5 pb-2">
+      <span
+        className="font-sora text-xs font-bold uppercase text-muted-foreground mb-2 block"
+        style={{ letterSpacing: "0.1em" }}
+      >
+        Split between
+      </span>
+      <div className="flex flex-nowrap gap-2 overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
       {members.map((m) => {
         const isSelf = m.user_id === currentUserId;
         const isActive = activeIds.has(m.id);
@@ -50,6 +57,7 @@ export default function MemberChipSelector({
         <Plus className="w-3.5 h-3.5" />
         Add
       </button>
+      </div>
     </div>
   );
 }
