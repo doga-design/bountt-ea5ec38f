@@ -98,35 +98,38 @@ export default function ExpenseScreen({
   const remaining = totalNum - customSum;
   const isBalanced = Math.abs(remaining) < 0.01 && totalNum > 0;
 
-  // Distribute remaining across non-focused members
+  // Distribute: add remaining to focused member; Remove: subtract excess from others
   const handleDistribute = useCallback(() => {
     if (!focusedMemberId || Math.abs(remaining) < 0.01) return;
-    const others = selectedMembers.filter((m) => m.id !== focusedMemberId);
-    if (others.length === 0) return;
-
-    const perMember = remaining / others.length;
     const newAmounts = new Map(customAmounts);
-    let unclaimed = 0;
 
-    others.forEach((m, i) => {
-      const current = parseFloat(newAmounts.get(m.id) || "0") || 0;
-      let newVal = current + perMember;
-      if (newVal < 0) {
-        unclaimed += newVal; // negative leftover
-        newVal = 0;
-      }
-      // Rounding: give remainder penny to last member
-      if (i === others.length - 1) {
-        // Recalculate to absorb rounding
-        let sumOthers = 0;
-        others.slice(0, -1).forEach((om) => {
-          sumOthers += parseFloat(newAmounts.get(om.id) || "0") || 0;
-        });
-        const focusedVal = parseFloat(newAmounts.get(focusedMemberId) || "0") || 0;
-        newVal = Math.max(0, totalNum - sumOthers - focusedVal);
-      }
-      newAmounts.set(m.id, newVal.toFixed(2));
-    });
+    if (remaining > 0.01) {
+      // Positive remaining: add all to the focused member
+      const current = parseFloat(newAmounts.get(focusedMemberId) || "0") || 0;
+      const newVal = current + remaining;
+      newAmounts.set(focusedMemberId, newVal.toFixed(2));
+    } else {
+      // Negative remaining (over-total): remove excess from others
+      const others = selectedMembers.filter((m) => m.id !== focusedMemberId);
+      if (others.length === 0) return;
+      const excess = Math.abs(remaining);
+      const perMember = excess / others.length;
+
+      others.forEach((m, i) => {
+        const current = parseFloat(newAmounts.get(m.id) || "0") || 0;
+        let newVal = current - perMember;
+        if (newVal < 0) newVal = 0;
+        if (i === others.length - 1) {
+          let sumOthers = 0;
+          others.slice(0, -1).forEach((om) => {
+            sumOthers += parseFloat(newAmounts.get(om.id) || "0") || 0;
+          });
+          const focusedVal = parseFloat(newAmounts.get(focusedMemberId) || "0") || 0;
+          newVal = Math.max(0, totalNum - sumOthers - focusedVal);
+        }
+        newAmounts.set(m.id, newVal.toFixed(2));
+      });
+    }
 
     setCustomAmounts(newAmounts);
   }, [focusedMemberId, remaining, selectedMembers, customAmounts, totalNum]);
