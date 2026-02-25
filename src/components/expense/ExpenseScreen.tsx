@@ -12,7 +12,7 @@ import SplitSentence from "./SplitSentence";
 import CustomSplitRows from "./CustomSplitRows";
 import NumpadGrid from "./NumpadGrid";
 import SaveButton from "./SaveButton";
-import AddMemberSheet from "@/components/group-settings/AddMemberSheet";
+
 
 interface ExpenseScreenProps {
   open: boolean;
@@ -34,7 +34,7 @@ export default function ExpenseScreen({
   const [activeIds, setActiveIds] = useState<Set<string>>(new Set());
   const [focusedMemberId, setFocusedMemberId] = useState<string | null>(null);
   const [customAmounts, setCustomAmounts] = useState<Map<string, string>>(new Map());
-  const [addMemberOpen, setAddMemberOpen] = useState(false);
+  
   const [loading, setLoading] = useState(false);
   const [editingTotal, setEditingTotal] = useState(false);
   const [freshFocus, setFreshFocus] = useState(false);
@@ -354,28 +354,6 @@ export default function ExpenseScreen({
     }
   };
 
-  // Handle add member
-  const handleAddMember = async (name: string) => {
-    if (!currentGroup) return;
-    const newMember = await addPlaceholderMember(currentGroup.id, name);
-    if (newMember) {
-      setActiveIds((prev) => {
-        const next = new Set(prev);
-        next.add(newMember.id);
-        return next;
-      });
-      if (splitMode === "custom") {
-        setTimeout(() => {
-          const total = parseFloat(amount) || 0;
-          const allActive = [...activeMembers, newMember].filter(
-            (m) => activeIds.has(m.id) || m.id === newMember.id
-          );
-          setCustomAmounts(distributeEqually(total, allActive));
-          setFocusedMemberId(newMember.id);
-        }, 100);
-      }
-    }
-  };
 
   const canSave = totalNum > 0;
   const isSingleUser = selectedMembers.length <= 1;
@@ -420,7 +398,7 @@ export default function ExpenseScreen({
           allActiveMembers={activeMembers}
           activeIds={activeIds}
           onToggleMember={handleToggleChip}
-          onAddPress={() => setAddMemberOpen(true)}
+          
         />
 
         {/* Custom split rows */}
@@ -464,13 +442,6 @@ export default function ExpenseScreen({
         <NumpadGrid onKey={handleKey} />
       </div>
 
-      {/* Add member sheet */}
-      <AddMemberSheet
-        open={addMemberOpen}
-        onOpenChange={setAddMemberOpen}
-        groupName={currentGroup?.name ?? "Group"}
-        onAdd={handleAddMember}
-      />
     </div>
   );
 }
