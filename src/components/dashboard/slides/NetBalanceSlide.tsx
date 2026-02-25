@@ -1,5 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { formatCurrency } from "@/lib/bountt-utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useApp } from "@/contexts/AppContext";
+import { useToast } from "@/hooks/use-toast";
 import type { DebtItem } from "./useHeroData";
 
 const MAX_DISMISSALS = 4;
@@ -20,9 +23,86 @@ function isCoolingDown(groupId: string): boolean {
 }
 
 export default function NetBalanceSlide({ netBalance, totalOwedToYou, totalYouOwe, debtsYouOwe, groupId }: Props) {
+  const { currentGroup, fetchExpenses, fetchExpenseSplits } = useApp();
+  const { toast } = useToast();
   const [debtIndex, setDebtIndex] = useState(0);
   const [dismissed, setDismissed] = useState(() => isCoolingDown(groupId));
   const dismissCount = useRef(0);
+
+  // PayPal return confirmation state
+  const [pendingDebt, setPendingDebt] = useState<{ expenseId: string; amount: number; payeeName: string } | null>(null);
+  const [showPayConfirm, setShowPayConfirm] = useState(false);
+  const [payConfirmLoading, setPayConfirmLoading] = useState(false);
+  const [payConfirmError, setPayConfirmError] = useState<string | null>(null);
+  const paypalTriggered = useRef(false);
+
+  // Visibility change listener for PayPal return
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && paypalTriggered.current && pendingDebt) {
+        paypalTriggered.current = false;
+        setShowPayConfirm(true);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleVisibility);
+    };
+  }, [pendingDebt]);
+
+  const handleSettleMyShare = useCallback(async (expenseId: string) => {
+    if (!currentGroup) return;
+    setPayConfirmLoading(true);
+    setPayConfirmError(null);
+
+    try {
+      const { error } = await supabase.rpc("settle_my_share", {
+        p_expense_id: expenseId,
+      } as any);
+
+      if (error) throw error;
+
+      await Promise.all([
+        fetchExpenses(currentGroup.id),
+        fetchExpenseSplits(currentGroup.id),
+      ]);
+
+      setShowPayConfirm(false);
+      setPendingDebt(null);
+      toast({ title: "Share settled ✓" });
+    } catch (err) {
+      setPayConfirmError(err instanceof Error ? err.message : "Something went wrong. Try again.");
+    } finally {
+      setPayConfirmLoading(false);
+    }
+  }, [currentGroup, fetchExpenses, fetchExpenseSplits, toast]);
+
+  const handleSettleAll = useCallback(async (expenseId: string) => {
+    if (!currentGroup) return;
+
+    try {
+      const { error } = await supabase.rpc("settle_all", {
+        p_expense_id: expenseId,
+      } as any);
+
+      if (error) throw error;
+
+      await Promise.all([
+        fetchExpenses(currentGroup.id),
+        fetchExpenseSplits(currentGroup.id),
+      ]);
+
+      toast({ title: "Expense fully settled" });
+    } catch (err) {
+      toast({
+        title: err instanceof Error ? err.message : "Something went wrong. Try again.",
+        variant: "destructive",
+      });
+    }
+  }, [currentGroup, fetchExpenses, fetchExpenseSplits, toast]);
 
   const badge =
     netBalance > 0 ? "You're up" : netBalance === 0 ? "You're even" : "You're behind";
@@ -49,6 +129,25 @@ export default function NetBalanceSlide({ netBalance, totalOwedToYou, totalYouOw
     }
   };
 
+  const handleCtaClick = () => {
+    if (!currentDebt) return;
+
+    if (currentDebt.direction === "owed_to_you") {
+      // Payer settling all
+      handleSettleAll(currentDebt.expenseId);
+    } else {
+      // User owes — trigger PayPal deeplink and set pending
+      setPendingDebt({
+        expenseId: currentDebt.expenseId,
+        amount: currentDebt.amount,
+        payeeName: currentDebt.payerName,
+      });
+      paypalTriggered.current = true;
+      // Open PayPal deeplink (generic — no specific PayPal.me link available)
+      window.open(`https://paypal.me`, "_blank");
+    }
+  };
+
   // Directional CTA
   const isOwed = currentDebt?.direction === "owed_to_you";
   const ctaLabel = isOwed
@@ -61,7 +160,7 @@ export default function NetBalanceSlide({ netBalance, totalOwedToYou, totalYouOw
     : "";
 
   return (
-    <div className="flex flex-col justify-center px-6 py-4 min-h-[200px]">
+    <div className="flex flex-col justify-center px-6 py-4 min-h-[200px] relative">
       {/* Badge */}
       <div className="mb-2">
         <span className="inline-block bg-white/20 text-white text-xs font-semibold rounded-full px-3 py-1">
@@ -102,7 +201,10 @@ export default function NetBalanceSlide({ netBalance, totalOwedToYou, totalYouOw
               </p>
             </div>
             <div className="flex gap-2 ml-3 shrink-0">
-              <button className="bg-white text-[hsl(18,89%,47%)] font-bold text-xs rounded-full px-4 py-2">
+              <button
+                onClick={handleCtaClick}
+                className="bg-white text-[hsl(18,89%,47%)] font-bold text-xs rounded-full px-4 py-2"
+              >
                 {ctaLabel}
               </button>
               <button
@@ -113,6 +215,35 @@ export default function NetBalanceSlide({ netBalance, totalOwedToYou, totalYouOw
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* PayPal return confirmation prompt */}
+      {showPayConfirm && pendingDebt && (
+        <div className="absolute inset-x-0 bottom-0 bg-background rounded-t-2xl p-4 shadow-lg z-10">
+          <p className="text-sm font-semibold text-foreground mb-3">
+            Did you send {formatCurrency(pendingDebt.amount)} to {pendingDebt.payeeName}?
+          </p>
+          {payConfirmError && (
+            <p className="text-xs text-destructive mb-2">{payConfirmError}</p>
+          )}
+          <button
+            onClick={() => handleSettleMyShare(pendingDebt.expenseId)}
+            disabled={payConfirmLoading}
+            className="w-full bg-primary text-primary-foreground rounded-xl py-3 text-sm font-bold mb-2"
+          >
+            {payConfirmLoading ? "Settling..." : "Yes, I sent it"}
+          </button>
+          <button
+            onClick={() => {
+              setShowPayConfirm(false);
+              setPendingDebt(null);
+              setPayConfirmError(null);
+            }}
+            className="w-full text-sm text-muted-foreground font-medium py-1"
+          >
+            Not yet
+          </button>
         </div>
       )}
     </div>

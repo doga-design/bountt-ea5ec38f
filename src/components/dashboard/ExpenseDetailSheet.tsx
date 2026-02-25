@@ -5,7 +5,7 @@ import { getAvatarColor } from "@/lib/avatar-utils";
 import { useApp } from "@/contexts/AppContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Pencil, Trash2, Lock, X } from "lucide-react";
+import { Pencil, Trash2, Lock, Check } from "lucide-react";
 import {
   Drawer,
   DrawerContent,
@@ -35,11 +35,19 @@ export default function ExpenseDetailSheet({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [settleConfirm, setSettleConfirm] = useState(false);
+  const [settleLoading, setSettleLoading] = useState(false);
+  const [settleError, setSettleError] = useState<string | null>(null);
+  const [settleAllLoading, setSettleAllLoading] = useState(false);
 
   if (!expense) return null;
 
   const isCreator = expense.created_by === user?.id;
+  const isPayer = expense.paid_by_user_id === user?.id;
   const expenseSplits = splits.filter((s) => s.expense_id === expense.id);
+  const mySplit = expenseSplits.find((s) => s.user_id === user?.id);
+  const iAlreadySettled = mySplit?.is_settled === true;
+  const expenseFullySettled = expense.is_settled === true;
 
   // Find creator member name
   const creatorMember = groupMembers.find(
@@ -76,10 +84,65 @@ export default function ExpenseDetailSheet({
     }
   };
 
+  const handleSettleMyShare = async () => {
+    if (!expense || !user || !currentGroup) return;
+    setSettleLoading(true);
+    setSettleError(null);
+
+    try {
+      const { error } = await supabase.rpc("settle_my_share", {
+        p_expense_id: expense.id,
+      } as any);
+
+      if (error) throw error;
+
+      await Promise.all([
+        fetchExpenses(currentGroup.id),
+        fetchExpenseSplits(currentGroup.id),
+      ]);
+
+      setSettleConfirm(false);
+      toast({ title: "Share settled ✓" });
+    } catch (err) {
+      setSettleError(err instanceof Error ? err.message : "Something went wrong. Try again.");
+    } finally {
+      setSettleLoading(false);
+    }
+  };
+
+  const handleSettleAll = async () => {
+    if (!expense || !user || !currentGroup) return;
+    setSettleAllLoading(true);
+
+    try {
+      const { error } = await supabase.rpc("settle_all", {
+        p_expense_id: expense.id,
+      } as any);
+
+      if (error) throw error;
+
+      await Promise.all([
+        fetchExpenses(currentGroup.id),
+        fetchExpenseSplits(currentGroup.id),
+      ]);
+
+      toast({ title: "Expense fully settled" });
+    } catch (err) {
+      toast({
+        title: err instanceof Error ? err.message : "Something went wrong. Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSettleAllLoading(false);
+    }
+  };
+
   const handleClose = (open: boolean) => {
     if (!open) {
       setConfirmDelete(false);
       setDeleteError(null);
+      setSettleConfirm(false);
+      setSettleError(null);
     }
     onOpenChange(open);
   };
@@ -89,7 +152,14 @@ export default function ExpenseDetailSheet({
       <DrawerContent>
         <DrawerHeader className="relative">
           <DrawerTitle className="font-sora text-lg">{expense.description}</DrawerTitle>
-          {isCreator && (
+          {/* Settled badge */}
+          {expenseFullySettled && (
+            <div className="flex items-center gap-1 mt-1">
+              <Check className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="text-xs font-semibold text-emerald-600">Settled</span>
+            </div>
+          )}
+          {isCreator && !expenseFullySettled && (
             <div className="absolute right-4 top-4 flex items-center gap-2">
               <button
                 onClick={() => {
@@ -137,7 +207,8 @@ export default function ExpenseDetailSheet({
                       (!split.user_id && m.name === split.member_name && m.is_placeholder)
                   );
                   const color = member ? getAvatarColor(member) : "#8B5CF6";
-                  const label = split.user_id === user?.id ? "You" : split.member_name;
+                  const isMe = split.user_id === user?.id;
+                  const label = isMe ? "You" : split.member_name;
 
                   return (
                     <div key={split.id} className="flex items-center justify-between">
@@ -148,9 +219,16 @@ export default function ExpenseDetailSheet({
                         />
                         <span className="text-sm text-foreground">{label}</span>
                       </div>
-                      <span className="text-sm font-medium text-foreground">
-                        {formatCurrency(Number(split.share_amount))}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-foreground">
+                          {formatCurrency(Number(split.share_amount))}
+                        </span>
+                        {split.is_settled && (
+                          <span className={`text-xs font-medium ${isMe ? "text-emerald-600" : "text-muted-foreground"}`}>
+                            {isMe ? "Your share settled ✓" : "Settled"}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -166,10 +244,65 @@ export default function ExpenseDetailSheet({
               </p>
 
               {/* Non-creator badge */}
-              {!isCreator && (
+              {!isCreator && !expenseFullySettled && (
                 <div className="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2 w-fit">
                   <Lock className="w-3 h-3" />
                   Logged by {creatorName}
+                </div>
+              )}
+
+              {/* Settlement actions */}
+              {!expenseFullySettled && (
+                <div className="mt-4 space-y-2">
+                  {/* Settle my share */}
+                  {mySplit && !iAlreadySettled && !isPayer && (
+                    <>
+                      {!settleConfirm ? (
+                        <button
+                          onClick={() => setSettleConfirm(true)}
+                          className="w-full bg-foreground text-background rounded-xl py-3 text-sm font-bold"
+                        >
+                          Settle my share
+                        </button>
+                      ) : (
+                        <div className="bg-muted rounded-xl p-4 space-y-3">
+                          <p className="text-sm font-semibold text-foreground">
+                            Did you send {formatCurrency(Number(mySplit.share_amount))} to {expense.paid_by_name}?
+                          </p>
+                          {settleError && (
+                            <p className="text-xs text-destructive">{settleError}</p>
+                          )}
+                          <button
+                            onClick={handleSettleMyShare}
+                            disabled={settleLoading}
+                            className="w-full bg-primary text-primary-foreground rounded-xl py-3 text-sm font-bold"
+                          >
+                            {settleLoading ? "Settling..." : "Yes, I sent it"}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSettleConfirm(false);
+                              setSettleError(null);
+                            }}
+                            className="w-full text-sm text-muted-foreground font-medium py-1"
+                          >
+                            I'll do it later
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* Settle all (payer only) */}
+                  {isPayer && (
+                    <button
+                      onClick={handleSettleAll}
+                      disabled={settleAllLoading}
+                      className="w-full border border-foreground/20 text-foreground rounded-xl py-3 text-sm font-bold"
+                    >
+                      {settleAllLoading ? "Settling..." : "Settle all"}
+                    </button>
+                  )}
                 </div>
               )}
             </>

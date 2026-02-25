@@ -69,7 +69,7 @@ export function useHeroData(): HeroData {
       if (expense.paid_by_user_id === userId) {
         // I paid → others owe me their splits
         const otherSplits = expenseSplits.filter(
-          (s) => s.expense_id === expense.id && s.user_id !== userId
+          (s) => s.expense_id === expense.id && s.user_id !== userId && !s.is_settled
         );
         for (const s of otherSplits) {
           totalOwedToYou += s.share_amount;
@@ -94,7 +94,7 @@ export function useHeroData(): HeroData {
         const mySplit = expenseSplits.find(
           (s) => s.expense_id === expense.id && s.user_id === userId
         );
-        if (mySplit) {
+        if (mySplit && !mySplit.is_settled) {
           totalYouOwe += mySplit.share_amount;
           // Add as "you_owe" debt for hero chip
           if (
@@ -129,7 +129,7 @@ export function useHeroData(): HeroData {
       if (expense.paid_by_user_id === userId) {
         // Others owe me
         const otherSplits = expenseSplits.filter(
-          (s) => s.expense_id === expense.id && s.user_id !== userId
+          (s) => s.expense_id === expense.id && s.user_id !== userId && !s.is_settled
         );
         for (const s of otherSplits) {
           agingDebts.push({
@@ -145,7 +145,7 @@ export function useHeroData(): HeroData {
         const mySplit = expenseSplits.find(
           (s) => s.expense_id === expense.id && s.user_id === userId
         );
-        if (mySplit) {
+        if (mySplit && !mySplit.is_settled) {
           agingDebts.push({
             daysWaiting: days,
             personName: expense.paid_by_name,
