@@ -78,13 +78,6 @@ export default function ExpenseScreen({
     return activeMembers.find((m) => m.user_id === user?.id);
   }, [activeMembers, payerId, user?.id]);
 
-  // Cycle through active members as payer
-  const cyclePayer = useCallback(() => {
-    const idx = activeMembers.findIndex((m) => m.id === payerMember?.id);
-    const nextIdx = (idx + 1) % activeMembers.length;
-    setPayerId(activeMembers[nextIdx].id);
-  }, [activeMembers, payerMember]);
-
   const selectedMembers = useMemo(
     () => activeMembers.filter((m) => activeIds.has(m.id)),
     [activeMembers, activeIds]
@@ -103,7 +96,27 @@ export default function ExpenseScreen({
     []
   );
 
-  // Custom mode math
+  // Set payer by member id; ensure new payer is always in activeIds
+  const handleSetPayer = useCallback(
+    (memberId: string) => {
+      setPayerId(memberId);
+      setActiveIds((prev) => {
+        if (prev.has(memberId)) return prev;
+        const next = new Set(prev);
+        next.add(memberId);
+        if (splitMode === "custom") {
+          const newMembers = activeMembers.filter((m) => next.has(m.id));
+          const total = parseFloat(amount) || 0;
+          setCustomAmounts(distributeEqually(total, newMembers));
+          setFocusedMemberId(newMembers[0]?.id ?? null);
+        }
+        return next;
+      });
+    },
+    [activeMembers, splitMode, amount, distributeEqually]
+  );
+
+
   const customSum = useMemo(() => {
     let sum = 0;
     for (const id of activeIds) {
@@ -249,9 +262,12 @@ export default function ExpenseScreen({
     }
   }, [splitMode, amount, selectedMembers, distributeEqually]);
 
-  // Toggle chip
+  // Toggle chip — payer cannot be unchecked
   const handleToggleChip = useCallback(
     (memberId: string) => {
+      // Prevent unchecking the payer
+      if (memberId === payerMember?.id) return;
+
       setActiveIds((prev) => {
         const next = new Set(prev);
         if (next.has(memberId)) {
@@ -394,7 +410,7 @@ export default function ExpenseScreen({
           disabled={amount === "0"}
           isSingleUser={isSingleUser}
           payerMember={payerMember}
-          onCyclePayer={cyclePayer}
+          onSetPayer={handleSetPayer}
           allActiveMembers={activeMembers}
           activeIds={activeIds}
           onToggleMember={handleToggleChip}

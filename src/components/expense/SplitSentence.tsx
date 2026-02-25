@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Lock } from "lucide-react";
 import { GroupMember } from "@/types";
 import {
   Drawer,
@@ -16,8 +16,8 @@ interface SplitSentenceProps {
   disabled: boolean;
   isSingleUser?: boolean;
   payerMember: GroupMember | undefined;
-  onCyclePayer: () => void;
-  // New props for member management
+  onSetPayer: (memberId: string) => void;
+  // Member management
   allActiveMembers: GroupMember[];
   activeIds: Set<string>;
   onToggleMember: (memberId: string) => void;
@@ -31,12 +31,13 @@ export default function SplitSentence({
   disabled,
   isSingleUser = false,
   payerMember,
-  onCyclePayer,
+  onSetPayer,
   allActiveMembers,
   activeIds,
   onToggleMember,
 }: SplitSentenceProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [payerSheetOpen, setPayerSheetOpen] = useState(false);
 
   if (isSingleUser) {
     return (
@@ -112,7 +113,7 @@ export default function SplitSentence({
         }`}
       >
         <button
-          onClick={onCyclePayer}
+          onClick={() => setPayerSheetOpen(true)}
           className="font-extrabold underline decoration-dotted underline-offset-4 text-foreground"
           disabled={disabled}
         >
@@ -142,21 +143,33 @@ export default function SplitSentence({
             {allActiveMembers.map((m) => {
               const isSelf = m.user_id === currentUserId;
               const label = isSelf ? "You" : m.name;
-              const isChecked = activeIds.has(m.id);
+              const isPayer = m.id === payerMember?.id;
+              const isChecked = activeIds.has(m.id) || isPayer;
 
               return (
                 <button
                   key={m.id}
-                  onClick={() => onToggleMember(m.id)}
-                  className="flex items-center justify-between w-full rounded-xl px-4 py-3 transition-colors active:bg-muted/50"
+                  onClick={() => !isPayer && onToggleMember(m.id)}
+                  disabled={isPayer}
+                  className={`flex items-center justify-between w-full rounded-xl px-4 py-3 transition-colors ${
+                    isPayer ? "opacity-60" : "active:bg-muted/50"
+                  }`}
                 >
-                  <span className="text-sm font-semibold text-foreground">
+                  <span className="text-sm font-semibold text-foreground flex items-center gap-2">
                     {label}
+                    {isPayer && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Lock className="w-3 h-3" />
+                        payer
+                      </span>
+                    )}
                   </span>
                   <div
                     className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${
                       isChecked
-                        ? "bg-primary"
+                        ? isPayer
+                          ? "bg-primary/50"
+                          : "bg-primary"
                         : "border-2 border-muted-foreground/30"
                     }`}
                   >
@@ -167,7 +180,42 @@ export default function SplitSentence({
                 </button>
               );
             })}
+          </div>
+        </DrawerContent>
+      </Drawer>
 
+      {/* Payer selection drawer */}
+      <Drawer open={payerSheetOpen} onOpenChange={setPayerSheetOpen}>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle className="font-sora">Who paid?</DrawerTitle>
+          </DrawerHeader>
+          <div className="px-4 pb-6 space-y-1">
+            {allActiveMembers.map((m) => {
+              const isSelf = m.user_id === currentUserId;
+              const label = isSelf ? "You" : m.name;
+              const isSelected = m.id === payerMember?.id;
+
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => {
+                    onSetPayer(m.id);
+                    setPayerSheetOpen(false);
+                  }}
+                  className="flex items-center justify-between w-full rounded-xl px-4 py-3 transition-colors active:bg-muted/50"
+                >
+                  <span className="text-sm font-semibold text-foreground">
+                    {label}
+                  </span>
+                  {isSelected && (
+                    <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                      <Check className="w-3 h-3 text-primary-foreground" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </DrawerContent>
       </Drawer>
