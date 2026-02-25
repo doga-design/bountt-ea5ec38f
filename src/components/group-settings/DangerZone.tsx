@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Group } from "@/types";
 import { useApp } from "@/contexts/AppContext";
@@ -26,9 +26,15 @@ export default function DangerZone({ group, isAdmin }: DangerZoneProps) {
   const [confirmName, setConfirmName] = useState("");
   const [leaveLoading, setLeaveLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const { leaveGroup, deleteGroup, groupMembers, user } = useApp();
+  const { leaveGroup, deleteGroup, groupMembers, user, expenses, expenseSplits } = useApp();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Check for unsettled balances
+  const hasUnsettledBalances = useMemo(() => {
+    const groupExpenses = expenses.filter((e) => e.group_id === group.id && !e.is_settled);
+    return groupExpenses.length > 0;
+  }, [expenses, group.id]);
 
   // Bug 3 fix: Check if user is sole admin
   const isSoleAdmin = isAdmin && groupMembers.filter(
@@ -117,7 +123,9 @@ export default function DangerZone({ group, isAdmin }: DangerZoneProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {group.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. Type the group name to confirm.
+              {hasUnsettledBalances
+                ? "⚠️ This group has unsettled balances. Deleting it means all debts will be lost. This action cannot be undone. Type the group name to confirm."
+                : "This action cannot be undone. Type the group name to confirm."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <input
