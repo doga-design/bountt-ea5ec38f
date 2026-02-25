@@ -1,51 +1,147 @@
 
 
-# Clean Up Expense Entry UI — Eliminate Confusion
+# Remove User Chips UI and Rewrite Split Selection Logic
 
-## Analysis: What's Actually Happening
+## Current State Analysis
 
-There is **no functional redundancy**. The two controls serve different purposes:
+### How the System Works Today
 
-| Control | Purpose | Location |
-|---------|---------|----------|
-| Member chips row | Select who is **included in the split** (recipients) | Top of screen |
-| Tappable payer name in sentence | Select who **paid** | Middle of screen |
-
-The confusion comes from **presentation**, not duplication:
-- The "You" chip looks like it might mean "You paid"
-- The sentence payer is tappable but doesn't look tappable at first glance
-- No labels explain what the chips row is for
-
-## Solution: Add Context Labels (Minimal, High-Impact)
-
-Rather than restructuring the entire UI (which works well functionally), add a small **section label** above the chips to clarify their purpose, and keep the sentence-based payer selector as-is (it already works and reads naturally).
-
-### Change 1: Add "Split between" label above chips
-
-In `MemberChipSelector.tsx`, add a subtle label above the chip row:
+The expense entry screen has **three** split-related UI layers:
 
 ```text
-SPLIT BETWEEN:
-[You] [Kyle] [Sarah] [+ Add]
++------------------------------------------+
+| SPLIT BETWEEN           (label)          |
+| [You] [Kyle] [Sarah]  [+ Add]  (chips)  |
++------------------------------------------+
+|            $50.00             (amount)    |
++------------------------------------------+
+| You paid, splitting equally              |
+|        with Kyle & Sarah     (sentence)  |
++------------------------------------------+
+| (Custom rows, if custom mode)            |
++------------------------------------------+
 ```
 
-This immediately communicates that the chips are for selecting split recipients, not the payer. Uses the same uppercase tracking style as "TOTAL" in AmountDisplay for visual consistency.
+**Chips (`MemberChipSelector.tsx`)** control:
+- `activeIds: Set<string>` -- which members are in the split
+- Tap chip = toggle member in/out of split
+- "+ Add" button = open AddMemberSheet for new placeholders
+- Visual states: filled (in split) vs outlined (out of split)
 
-### Change 2: No changes to SplitSentence
+**Sentence (`SplitSentence.tsx`)** controls:
+- Payer selection (tap name to cycle)
+- Split mode toggle (tap "equally"/"custom")
+- Displays who is in the split (read-only names)
 
-The sentence already works well: **"You paid, splitting equally with Kyle and Sarah"**. The dotted underline on "You" (payer) and "equally" (mode) is a clear enough affordance. Adding the "SPLIT BETWEEN" label above the chips removes the ambiguity about what the chips do, which was the source of confusion.
+**Custom rows (`CustomSplitRows.tsx`)** control:
+- Which member's amount the numpad edits (tap row to focus)
+- Display per-member custom amounts
 
-## Files Modified
+### State Variables Affected by Chips
+
+| Variable | Type | Set by chips? | Also used by |
+|----------|------|--------------|-------------|
+| `activeIds` | `Set<string>` | YES (primary control) | selectedMembers memo, split math |
+| `customAmounts` | `Map<string, string>` | Indirectly (redistributes on toggle) | Custom rows, save logic |
+| `focusedMemberId` | `string or null` | Indirectly (resets on toggle) | Custom rows, numpad |
+
+### What Breaks If Chips Are Removed
+
+1. No way to add/remove members from the split
+2. No way to add new placeholder members
+3. In custom mode, no impact (rows already handle focus)
+
+---
+
+## New Design: Sentence-Only Controls
+
+### Layout After Change
+
+```text
++------------------------------------------+
+|            $50.00              (amount)   |
++------------------------------------------+
+| You paid, splitting equally              |
+|   with Kyle & Sarah  [+]     (sentence)  |
++------------------------------------------+
+| (Custom rows, if custom mode)            |
++------------------------------------------+
+```
+
+The chips row is completely gone. The sentence is the single source of truth.
+
+### Interaction Model
+
+**Tap a member name in the sentence** -- removes them from the split (strikethrough flash, then name disappears from sentence). Minimum 1 member enforced (cannot remove last person).
+
+**Tap the [+] button at end of sentence** -- opens a bottom sheet with:
+- All active group members listed with checkboxes (checked = in split)
+- Toggle any member in/out
+- "Add new member" option at the bottom (opens existing AddMemberSheet)
+- Close sheet to apply changes
+
+**Tap payer name** -- cycles through active members (unchanged)
+
+**Tap "equally"/"custom"** -- toggles split mode (unchanged)
+
+**In custom mode** -- tap rows to focus (unchanged, CustomSplitRows already works)
+
+### Why This Design
+
+- **Tap-to-remove names** covers the most common action (excluding yourself or one person) with a single tap -- faster than chips
+- **[+] sheet** covers the less common action (adding someone back, adding a new member) without cluttering the main view
+- **No duplicate controls** -- one way to do each thing
+- **Works for all scenarios**: you pay, others pay, you excluded, placeholders, custom mode
+
+---
+
+## Implementation Plan
+
+### Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/expense/MemberChipSelector.tsx` | Add "SPLIT BETWEEN" label above the chips row |
+| `src/components/expense/SplitSentence.tsx` | Make names tappable (remove on tap), add [+] button, add member-selection sheet |
+| `src/components/expense/ExpenseScreen.tsx` | Remove MemberChipSelector import and rendering, move "+ Add" logic to SplitSentence props |
 
-## Why This Is the Right Fix
+### Files to Delete
 
-- **One line of UI** eliminates all confusion
-- No structural changes needed -- the current architecture is correct
-- Consistent with existing design language (matches "TOTAL" label in AmountDisplay)
-- The chips clearly mean "who shares this cost"
-- The sentence clearly means "who paid and how to divide"
-- Works for all scenarios: you pay, others pay, you excluded, placeholders, custom mode
+| File | Reason |
+|------|--------|
+| `src/components/expense/MemberChipSelector.tsx` | Entire component replaced by sentence controls |
+
+### Step-by-Step Changes
+
+**Step 1: Enhance SplitSentence component**
+
+New props added:
+- `allActiveMembers: GroupMember[]` -- all active group members (for the sheet)
+- `onToggleMember: (memberId: string) => void` -- toggle member in/out of split
+- `onAddPress: () => void` -- open AddMemberSheet for new placeholders
+- `activeIds: Set<string>` -- which members are currently in split (for sheet checkboxes)
+
+New behavior:
+- Each member name in the sentence gets an `onClick` that calls `onToggleMember(m.id)` to remove them
+- A small circular [+] button appears after the names
+- Tapping [+] opens a Drawer/Sheet listing all `allActiveMembers` with checkboxes
+- The sheet has a "New member" button at bottom that calls `onAddPress`
+
+**Step 2: Update ExpenseScreen**
+
+- Remove `<MemberChipSelector>` from the JSX (lines 401-408)
+- Remove the import of `MemberChipSelector` (line 10)
+- Pass new props to `<SplitSentence>`: `allActiveMembers`, `onToggleMember: handleToggleChip`, `onAddPress`, `activeIds`
+- The existing `handleToggleChip` function stays unchanged -- it already handles the toggle logic, custom mode redistribution, and minimum-1-member check
+
+**Step 3: Delete MemberChipSelector.tsx**
+
+The file is no longer imported anywhere and can be safely deleted.
+
+### Edge Cases Handled
+
+- **Remove last member**: `handleToggleChip` already prevents removing the last member (`if (next.size <= 1) return prev`)
+- **Custom mode redistribution**: `handleToggleChip` already redistributes equally when members change in custom mode
+- **Add new placeholder**: The `onAddPress` callback chains through to the existing `AddMemberSheet` and `handleAddMember` logic
+- **Payer removed from split**: Allowed -- payer doesn't need to be in the split
+- **All names removed except one**: That one name still shows, can't be tapped to remove (minimum enforced)
+
