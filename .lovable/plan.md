@@ -1,87 +1,44 @@
-# Fix Custom Split Input Bugs
 
-## Bug 1: Numpad allows exceeding total in custom mode
 
-**Root cause:** The `handleKey` function in `ExpenseScreen.tsx` has no upper-bound check when typing into a custom split row. Users can keep entering digits via the numpad even after a member's value already covers or exceeds the total, resulting in "over total" states that shouldn't be reachable via manual input.
+# Fix Date Calculation Bug in formatRelativeDate
 
-**Fix:** In the numpad handler's custom-focused branch (both the `freshFocus` path and the normal path), after computing the new value, check if it would exceed the maximum allowable amount for that member. The max is `totalNum - (sum of all OTHER members' amounts)`. If the new value exceeds this max, reject the keystroke (return the previous value unchanged).
+## Overview
 
-### Changes in `src/components/expense/ExpenseScreen.tsx` (lines 160-183)
+Replace the broken `formatRelativeDate` function in `src/lib/bountt-utils.ts` with a corrected version that properly parses dates and generates dynamic relative labels.
 
-Add a clamping check in both custom input branches:
+## Changes
 
-```typescript
-if (isCustomFocused) {
-  // Calculate max this member can have
-  const maxForMember = (() => {
-    let othersSum = 0;
-    for (const id of activeIds) {
-      if (id !== focusedMemberId) {
-        othersSum += parseFloat(customAmounts.get(id) || "0") || 0;
-      }
-    }
-    return Math.max(0, totalNum - othersSum);
-  })();
+### `src/lib/bountt-utils.ts` — Rewrite `formatRelativeDate`
 
-  if (freshFocus) {
-    setFreshFocus(false);
-    setCustomAmounts((prev) => {
-      const next = new Map(prev);
-      let newVal: string;
-      if (key === "del") newVal = "0";
-      else if (key === ".") newVal = "0.";
-      else newVal = key;
+**What changes:**
 
-      if (parseFloat(newVal) > maxForMember) return prev;
-      next.set(focusedMemberId!, newVal);
-      return next;
-    });
-    return;
-  }
-  setCustomAmounts((prev) => {
-    const next = new Map(prev);
-    const current = next.get(focusedMemberId!) ?? "0";
-    const newVal = updateField(current);
-    if (parseFloat(newVal) > maxForMember) return prev;
-    next.set(focusedMemberId!, newVal);
-    return next;
-  });
-}
+1. **Fix date parsing**: Extract date portion before "T" to handle both `"2026-02-24"` and `"2026-02-24T18:30:00.000Z"` formats
+2. **Fix timezone**: Parse year/month/day as local midnight to avoid UTC off-by-one errors
+3. **Dynamic labels**: Replace hardcoded ranges with calculated week/month/year labels
+
+**New logic:**
+
 ```
+datePart = dateStr.split("T")[0]
+parts = datePart.split("-")
+target = new Date(year, month-1, day)  // local midnight
+today = new Date(now.year, now.month, now.date)  // local midnight
+diffDays = Math.round((today - target) / 86400000)
 
-This prevents any single member's value from exceeding what's available after accounting for all other members' assigned amounts. Keystrokes that would cause an excess are silently rejected.  
-  
-**Error Indicator UX:** When keystroke is rejected (over max), user might not notice.   
-Consider:  
-**Visual shake/flash**
-
-- Input row shakes briefly
-- Indicates "can't add more"
-
----
-
-## Bug 2: "You" row not editable when custom mode first opens
-
-**Root cause:** In `toggleMode` (line 199-212), when switching to custom mode, `setFocusedMemberId(selectedMembers[0]?.id)` is called but `setFreshFocus(true)` is NOT called. The first member ("You") gets an equally-distributed value like "5.00", but without `freshFocus` being true, typing "3" appends to produce "5.003" instead of replacing with "3". This makes it appear non-editable/broken.
-
-**Fix:** Add `setFreshFocus(true)` in the `toggleMode` function right after setting the focused member.
-
-### Changes in `src/components/expense/ExpenseScreen.tsx` (line 204)
-
-```typescript
-setSplitMode("custom");
-const total = parseFloat(amount) || 0;
-setCustomAmounts(distributeEqually(total, selectedMembers));
-setFocusedMemberId(selectedMembers[0]?.id ?? null);
-setFreshFocus(true);  // <-- ADD THIS LINE
-setEditingTotal(false);
+if diffDays < 0   -> "UPCOMING"
+if diffDays === 0  -> "TODAY"
+if diffDays === 1  -> "YESTERDAY"
+if diffDays <= 7   -> "LAST WEEK"
+if diffDays <= 28  -> Math.ceil(diffDays/7) + " WEEKS AGO"
+if diffDays <= 60  -> "LAST MONTH"
+if diffDays <= 365 -> Math.floor(diffDays/30) + " MONTHS AGO"
+if diffDays <= 730 -> "LAST YEAR"
+else               -> Math.floor(diffDays/365) + " YEARS AGO"
 ```
-
----
 
 ## Files Modified
 
+| File | Change |
+|------|--------|
+| `src/lib/bountt-utils.ts` | Rewrite `formatRelativeDate` function (lines 36-52) |
 
-| File                                       | Change                                                                                           |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| `src/components/expense/ExpenseScreen.tsx` | Add max-value clamping in numpad custom input handler; add `setFreshFocus(true)` in `toggleMode` |
