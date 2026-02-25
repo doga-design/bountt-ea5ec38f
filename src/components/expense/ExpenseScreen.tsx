@@ -7,7 +7,6 @@ import { distributeCents } from "@/lib/bountt-utils";
 import confetti from "canvas-confetti";
 import { GroupMember } from "@/types";
 
-import MemberChipSelector from "./MemberChipSelector";
 import AmountDisplay from "./AmountDisplay";
 import SplitSentence from "./SplitSentence";
 import CustomSplitRows from "./CustomSplitRows";
@@ -398,15 +397,6 @@ export default function ExpenseScreen({
 
       {/* Scrollable middle section */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        {/* Member chips */}
-        <MemberChipSelector
-          members={activeMembers}
-          activeIds={activeIds}
-          currentUserId={user?.id}
-          onToggle={handleToggleChip}
-          onAddPress={() => setAddMemberOpen(true)}
-        />
-
         {/* Amount display */}
         <AmountDisplay
           amount={amount}
@@ -427,6 +417,10 @@ export default function ExpenseScreen({
           isSingleUser={isSingleUser}
           payerMember={payerMember}
           onCyclePayer={cyclePayer}
+          allActiveMembers={activeMembers}
+          activeIds={activeIds}
+          onToggleMember={handleToggleChip}
+          onAddPress={() => setAddMemberOpen(true)}
         />
 
         {/* Custom split rows */}
