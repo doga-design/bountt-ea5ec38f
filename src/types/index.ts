@@ -70,6 +70,27 @@ export interface SmartMatchDismissal {
   dismissed_at: string;
 }
 
+export interface ActivityLog {
+  id: string;
+  group_id: string;
+  actor_id: string;
+  actor_name: string;
+  action_type: 'added' | 'edited' | 'deleted' | 'joined';
+  expense_snapshot: {
+    expense_id: string;
+    description: string;
+    amount: number;
+    paid_by_name: string;
+    member_names: string[];
+  } | null;
+  change_detail: Array<{
+    field: string;
+    old_value: string;
+    new_value: string;
+  }> | null;
+  created_at: string;
+}
+
 // =====================================================
 // APP CONTEXT TYPES
 // =====================================================

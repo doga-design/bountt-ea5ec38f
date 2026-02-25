@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_log: {
+        Row: {
+          action_type: string
+          actor_id: string
+          actor_name: string
+          change_detail: Json | null
+          created_at: string
+          expense_snapshot: Json | null
+          group_id: string
+          id: string
+        }
+        Insert: {
+          action_type: string
+          actor_id: string
+          actor_name: string
+          change_detail?: Json | null
+          created_at?: string
+          expense_snapshot?: Json | null
+          group_id: string
+          id?: string
+        }
+        Update: {
+          action_type?: string
+          actor_id?: string
+          actor_name?: string
+          change_detail?: Json | null
+          created_at?: string
+          expense_snapshot?: Json | null
+          group_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_log_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expense_splits: {
         Row: {
           created_at: string
@@ -286,6 +327,20 @@ export type Database = {
         }
         Returns: Json
       }
+      delete_expense: {
+        Args: { p_actor_name: string; p_expense_id: string }
+        Returns: Json
+      }
+      edit_expense: {
+        Args: {
+          p_actor_name: string
+          p_amount: number
+          p_description: string
+          p_expense_id: string
+          p_splits: Json
+        }
+        Returns: Json
+      }
       get_group_splits: {
         Args: { p_group_id: string }
         Returns: {
@@ -306,6 +361,10 @@ export type Database = {
       is_group_member: {
         Args: { p_group_id: string; p_user_id: string }
         Returns: boolean
+      }
+      log_member_joined: {
+        Args: { p_actor_name: string; p_group_id: string }
+        Returns: undefined
       }
       lookup_group_by_invite: {
         Args: { p_invite_code: string }

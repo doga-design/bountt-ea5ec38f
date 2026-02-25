@@ -5,6 +5,7 @@ interface SaveButtonProps {
   loading: boolean;
   onClick: () => void;
   isSingleUser?: boolean;
+  label?: string;
 }
 
 export default function SaveButton({
@@ -14,6 +15,7 @@ export default function SaveButton({
   loading,
   onClick,
   isSingleUser = false,
+  label = "Save",
 }: SaveButtonProps) {
   const isCustomReady = splitMode === "custom" && isBalanced && canSave && !isSingleUser;
   const isDefaultReady = splitMode === "equal" && canSave && !isSingleUser;
@@ -39,7 +41,7 @@ export default function SaveButton({
             : "0 4px 14px rgba(217,79,0,0.3)",
         }}
       >
-        {loading ? "Saving..." : "Save"}
+        {loading ? "Saving..." : label}
       </button>
     </div>
   );

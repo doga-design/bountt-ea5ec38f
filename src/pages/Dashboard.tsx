@@ -9,10 +9,11 @@ import EmptyState from "@/components/dashboard/EmptyState";
 import AddExpensePrompt from "@/components/dashboard/AddExpensePrompt";
 import ExpenseScreen from "@/components/expense/ExpenseScreen";
 import ExpenseCard from "@/components/dashboard/ExpenseCard";
+import ExpenseDetailSheet from "@/components/dashboard/ExpenseDetailSheet";
 import MemberCardScroll from "@/components/dashboard/MemberCardScroll";
 import BottomNav from "@/components/BottomNav";
 import { formatRelativeDate } from "@/lib/bountt-utils";
-import { GroupMember } from "@/types";
+import { GroupMember, Expense, ExpenseSplit } from "@/types";
 import MemberDetailSheet from "@/components/group-settings/MemberDetailSheet";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -36,6 +37,9 @@ export default function Dashboard() {
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<GroupMember | null>(null);
+  const [detailExpense, setDetailExpense] = useState<Expense | null>(null);
+  const [editExpense, setEditExpense] = useState<Expense | undefined>(undefined);
+  const [editSplits, setEditSplits] = useState<ExpenseSplit[] | undefined>(undefined);
 
   useEffect(() => {
     if (groupId) {
@@ -147,6 +151,7 @@ export default function Dashboard() {
                       expense={expense}
                       splits={expenseSplits.filter((s) => s.expense_id === expense.id)}
                       groupMembers={groupMembers}
+                      onClick={() => setDetailExpense(expense)}
                     />
                   ))}
                 </div>
@@ -168,6 +173,7 @@ export default function Dashboard() {
                         expense={expense}
                         splits={expenseSplits.filter((s) => s.expense_id === expense.id)}
                         groupMembers={groupMembers}
+                        onClick={() => setDetailExpense(expense)}
                       />
                     ))}
                   </div>
@@ -179,7 +185,28 @@ export default function Dashboard() {
           <BottomNav onFabPress={() => setSheetOpen(true)} />
           <ExpenseScreen
             open={sheetOpen}
-            onOpenChange={setSheetOpen}
+            onOpenChange={(o) => {
+              setSheetOpen(o);
+              if (!o) {
+                setEditExpense(undefined);
+                setEditSplits(undefined);
+              }
+            }}
+            editExpense={editExpense}
+            editSplits={editSplits}
+          />
+
+          <ExpenseDetailSheet
+            open={!!detailExpense}
+            onOpenChange={(o) => !o && setDetailExpense(null)}
+            expense={detailExpense}
+            splits={expenseSplits}
+            groupMembers={groupMembers}
+            onEdit={(exp, splits) => {
+              setEditExpense(exp);
+              setEditSplits(splits);
+              setSheetOpen(true);
+            }}
           />
 
           <MemberDetailSheet

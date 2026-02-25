@@ -21,6 +21,7 @@ interface SplitSentenceProps {
   allActiveMembers: GroupMember[];
   activeIds: Set<string>;
   onToggleMember: (memberId: string) => void;
+  hidePayerDrawer?: boolean;
 }
 
 export default function SplitSentence({
@@ -35,6 +36,7 @@ export default function SplitSentence({
   allActiveMembers,
   activeIds,
   onToggleMember,
+  hidePayerDrawer = false,
 }: SplitSentenceProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [payerSheetOpen, setPayerSheetOpen] = useState(false);
@@ -113,7 +115,7 @@ export default function SplitSentence({
         }`}
       >
         <button
-          onClick={() => setPayerSheetOpen(true)}
+          onClick={() => hidePayerDrawer ? onSetPayer("") : setPayerSheetOpen(true)}
           className="font-extrabold underline decoration-dotted underline-offset-4 text-foreground"
           disabled={disabled}
         >
