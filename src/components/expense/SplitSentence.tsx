@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { GroupMember } from "@/types";
 import {
   Drawer,
@@ -21,7 +21,6 @@ interface SplitSentenceProps {
   allActiveMembers: GroupMember[];
   activeIds: Set<string>;
   onToggleMember: (memberId: string) => void;
-  onAddPress: () => void;
 }
 
 export default function SplitSentence({
@@ -36,7 +35,6 @@ export default function SplitSentence({
   allActiveMembers,
   activeIds,
   onToggleMember,
-  onAddPress,
 }: SplitSentenceProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -61,7 +59,7 @@ export default function SplitSentence({
     return (
       <button
         key={member.id}
-        onClick={() => onToggleMember(member.id)}
+        onClick={() => setSheetOpen(true)}
         className="font-bold text-foreground underline decoration-dotted underline-offset-4 active:opacity-50 transition-opacity"
         disabled={disabled}
       >
@@ -74,7 +72,7 @@ export default function SplitSentence({
   if (others.length === 0) {
     namesDisplay = (
       <button
-        onClick={() => onToggleMember(payerMember?.id ?? "")}
+        onClick={() => setSheetOpen(true)}
         className="font-bold text-foreground underline decoration-dotted underline-offset-4 active:opacity-50 transition-opacity"
         disabled={disabled}
       >
@@ -132,14 +130,6 @@ export default function SplitSentence({
           {isEqual ? "equally" : "custom"}
         </button>{" "}
         with {namesDisplay}
-        {/* [+] button */}
-        <button
-          onClick={() => setSheetOpen(true)}
-          disabled={disabled}
-          className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-dashed border-muted-foreground/50 ml-1.5 align-middle active:opacity-50 transition-opacity"
-        >
-          <Plus className="w-3 h-3 text-muted-foreground" />
-        </button>
       </p>
 
       {/* Member selection drawer */}
@@ -178,17 +168,6 @@ export default function SplitSentence({
               );
             })}
 
-            {/* Add new member */}
-            <button
-              onClick={() => {
-                setSheetOpen(false);
-                onAddPress();
-              }}
-              className="flex items-center gap-2 w-full rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground active:bg-muted/50 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Add new member
-            </button>
           </div>
         </DrawerContent>
       </Drawer>
