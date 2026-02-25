@@ -39,6 +39,7 @@ export default function ExpenseScreen({
   const [loading, setLoading] = useState(false);
   const [editingTotal, setEditingTotal] = useState(false);
   const [freshFocus, setFreshFocus] = useState(false);
+  const [shakeMemberId, setShakeMemberId] = useState<string | null>(null);
 
   // Active members sorted: "You" first
   const activeMembers = useMemo(() => {
@@ -178,7 +179,11 @@ export default function ExpenseScreen({
             else if (key === ".") newVal = "0.";
             else newVal = key;
 
-            if (parseFloat(newVal) > maxForMember) return prev;
+            if (parseFloat(newVal) > maxForMember) {
+              setShakeMemberId(focusedMemberId);
+              setTimeout(() => setShakeMemberId(null), 350);
+              return prev;
+            }
             next.set(focusedMemberId!, newVal);
             return next;
           });
@@ -188,7 +193,11 @@ export default function ExpenseScreen({
           const next = new Map(prev);
           const current = next.get(focusedMemberId!) ?? "0";
           const newVal = updateField(current);
-          if (parseFloat(newVal) > maxForMember) return prev;
+          if (parseFloat(newVal) > maxForMember) {
+            setShakeMemberId(focusedMemberId);
+            setTimeout(() => setShakeMemberId(null), 350);
+            return prev;
+          }
           next.set(focusedMemberId!, newVal);
           return next;
         });
@@ -401,6 +410,7 @@ export default function ExpenseScreen({
           currentUserId={user?.id}
           customAmounts={customAmounts}
           focusedMemberId={focusedMemberId}
+          shakeMemberId={shakeMemberId}
           onFocus={handleFocusRow}
           visible={splitMode === "custom"}
         />
