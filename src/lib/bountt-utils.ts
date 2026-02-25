@@ -36,8 +36,9 @@ export function formatCurrency(amount: number, currency = "USD"): string {
 // =====================================================
 
 export function formatRelativeDate(dateStr: string): string {
-  // Parse as local date to avoid UTC timezone shift
-  const parts = dateStr.split("-");
+  // Extract date portion before "T" to handle both "2026-02-24" and ISO timestamps
+  const datePart = dateStr.split("T")[0];
+  const parts = datePart.split("-");
   const target = new Date(
     parseInt(parts[0]),
     parseInt(parts[1]) - 1,
@@ -49,12 +50,15 @@ export function formatRelativeDate(dateStr: string): string {
   const diffMs = today.getTime() - target.getTime();
   const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
+  if (diffDays < 0) return "UPCOMING";
   if (diffDays === 0) return "TODAY";
   if (diffDays === 1) return "YESTERDAY";
   if (diffDays <= 7) return "LAST WEEK";
-  if (diffDays <= 14) return "2 WEEKS AGO";
-
-  return target.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase();
+  if (diffDays <= 28) return Math.ceil(diffDays / 7) + " WEEKS AGO";
+  if (diffDays <= 60) return "LAST MONTH";
+  if (diffDays <= 365) return Math.floor(diffDays / 30) + " MONTHS AGO";
+  if (diffDays <= 730) return "LAST YEAR";
+  return Math.floor(diffDays / 365) + " YEARS AGO";
 }
 
 // =====================================================
