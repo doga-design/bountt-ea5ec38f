@@ -3,6 +3,8 @@ interface AmountDisplayProps {
   splitMode: "equal" | "custom";
   remaining: number; // total - sum of custom amounts
   isBalanced: boolean;
+  onDistribute?: () => void;
+  canDistribute?: boolean;
 }
 
 export default function AmountDisplay({
@@ -10,6 +12,8 @@ export default function AmountDisplay({
   splitMode,
   remaining,
   isBalanced,
+  onDistribute,
+  canDistribute = false,
 }: AmountDisplayProps) {
   const display = amount === "0" ? "0" : amount;
   const total = parseFloat(amount) || 0;
@@ -17,6 +21,7 @@ export default function AmountDisplay({
   if (splitMode === "custom") {
     const overBudget = remaining < -0.01;
     const unassigned = remaining > 0.01;
+    const showButton = canDistribute && Math.abs(remaining) > 0.01 && total > 0;
 
     let statusText = "assign to everyone";
     let statusColor = "hsl(var(--muted-foreground))";
@@ -32,6 +37,10 @@ export default function AmountDisplay({
     } else if (unassigned) {
       statusText = `$${remaining.toFixed(2)} left to assign`;
     }
+
+    const buttonLabel = overBudget
+      ? `Remove $${Math.abs(remaining).toFixed(2)} →`
+      : `Distribute $${remaining.toFixed(2)} →`;
 
     return (
       <div className="flex flex-col items-center py-2 transition-all">
@@ -52,9 +61,27 @@ export default function AmountDisplay({
             {display}
           </span>
         </div>
-        <span className="text-xs font-semibold mt-1" style={{ color: statusColor }}>
-          {statusText}
-        </span>
+        {showButton ? (
+          <button
+            type="button"
+            onClick={onDistribute}
+            className="mt-1 px-4 py-1.5 rounded-full font-bold transition-transform active:scale-[0.96]"
+            style={{
+              background: "#FFF0E8",
+              border: "1.5px solid rgba(217, 79, 0, 0.6)",
+              color: "#D94F00",
+              fontSize: "13px",
+              fontWeight: 700,
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
+            {buttonLabel}
+          </button>
+        ) : (
+          <span className="text-xs font-semibold mt-1" style={{ color: statusColor }}>
+            {statusText}
+          </span>
+        )}
       </div>
     );
   }

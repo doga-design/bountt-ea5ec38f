@@ -98,6 +98,45 @@ export default function ExpenseScreen({
   const remaining = totalNum - customSum;
   const isBalanced = Math.abs(remaining) < 0.01 && totalNum > 0;
 
+  // Distribute remaining across non-focused members
+  const handleDistribute = useCallback(() => {
+    if (!focusedMemberId || Math.abs(remaining) < 0.01) return;
+    const others = selectedMembers.filter((m) => m.id !== focusedMemberId);
+    if (others.length === 0) return;
+
+    const perMember = remaining / others.length;
+    const newAmounts = new Map(customAmounts);
+    let unclaimed = 0;
+
+    others.forEach((m, i) => {
+      const current = parseFloat(newAmounts.get(m.id) || "0") || 0;
+      let newVal = current + perMember;
+      if (newVal < 0) {
+        unclaimed += newVal; // negative leftover
+        newVal = 0;
+      }
+      // Rounding: give remainder penny to last member
+      if (i === others.length - 1) {
+        // Recalculate to absorb rounding
+        let sumOthers = 0;
+        others.slice(0, -1).forEach((om) => {
+          sumOthers += parseFloat(newAmounts.get(om.id) || "0") || 0;
+        });
+        const focusedVal = parseFloat(newAmounts.get(focusedMemberId) || "0") || 0;
+        newVal = Math.max(0, totalNum - sumOthers - focusedVal);
+      }
+      newAmounts.set(m.id, newVal.toFixed(2));
+    });
+
+    setCustomAmounts(newAmounts);
+  }, [focusedMemberId, remaining, selectedMembers, customAmounts, totalNum]);
+
+  const canDistribute =
+    splitMode === "custom" &&
+    focusedMemberId !== null &&
+    selectedMembers.length >= 2 &&
+    selectedMembers.filter((m) => m.id !== focusedMemberId).length > 0;
+
   // Handle numpad key
   const handleKey = useCallback(
     (key: string) => {
@@ -327,6 +366,8 @@ export default function ExpenseScreen({
           splitMode={splitMode}
           remaining={remaining}
           isBalanced={isBalanced}
+          onDistribute={handleDistribute}
+          canDistribute={canDistribute}
         />
 
         {/* Split sentence */}
