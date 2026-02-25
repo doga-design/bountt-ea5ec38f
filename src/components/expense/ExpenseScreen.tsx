@@ -287,11 +287,13 @@ export default function ExpenseScreen({
           share_amount: shares[i],
         }));
       } else {
-        splits = selectedMembers.map((m) => ({
-          user_id: m.user_id,
-          member_name: m.name,
-          share_amount: parseFloat(customAmounts.get(m.id) || "0") || 0,
-        }));
+        splits = selectedMembers
+          .map((m) => ({
+            user_id: m.user_id,
+            member_name: m.name,
+            share_amount: parseFloat(customAmounts.get(m.id) || "0") || 0,
+          }))
+          .filter((s) => s.share_amount > 0); // Filter out $0 splits
       }
 
       const { error: rpcError } = await supabase.rpc("create_expense_with_splits", {

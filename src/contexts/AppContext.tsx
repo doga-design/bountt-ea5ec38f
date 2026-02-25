@@ -102,6 +102,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setUser(newSession?.user ?? null);
         setAuthLoading(false);
 
+        // Show toast on session expiry
+        if (event === "SIGNED_OUT" && !newSession && user) {
+          toast({ title: "Session expired. Please sign in again.", variant: "destructive" });
+        }
+
         if (newSession?.user) {
           setTimeout(() => fetchProfile(newSession.user.id), 0);
           if (groupsFetchedForRef.current !== newSession.user.id) {
