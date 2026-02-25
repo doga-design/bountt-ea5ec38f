@@ -158,17 +158,28 @@ export default function ExpenseScreen({
       };
 
       if (isCustomFocused) {
+        // Calculate max this member can have
+        const maxForMember = (() => {
+          let othersSum = 0;
+          for (const id of activeIds) {
+            if (id !== focusedMemberId) {
+              othersSum += parseFloat(customAmounts.get(id) || "0") || 0;
+            }
+          }
+          return Math.max(0, totalNum - othersSum);
+        })();
+
         if (freshFocus) {
           setFreshFocus(false);
           setCustomAmounts((prev) => {
             const next = new Map(prev);
-            if (key === "del") {
-              next.set(focusedMemberId!, "0");
-            } else if (key === ".") {
-              next.set(focusedMemberId!, "0.");
-            } else {
-              next.set(focusedMemberId!, key);
-            }
+            let newVal: string;
+            if (key === "del") newVal = "0";
+            else if (key === ".") newVal = "0.";
+            else newVal = key;
+
+            if (parseFloat(newVal) > maxForMember) return prev;
+            next.set(focusedMemberId!, newVal);
             return next;
           });
           return;
@@ -177,7 +188,7 @@ export default function ExpenseScreen({
           const next = new Map(prev);
           const current = next.get(focusedMemberId!) ?? "0";
           const newVal = updateField(current);
-          if (parseFloat(newVal) < 0) return prev;
+          if (parseFloat(newVal) > maxForMember) return prev;
           next.set(focusedMemberId!, newVal);
           return next;
         });
@@ -202,6 +213,7 @@ export default function ExpenseScreen({
       const total = parseFloat(amount) || 0;
       setCustomAmounts(distributeEqually(total, selectedMembers));
       setFocusedMemberId(selectedMembers[0]?.id ?? null);
+      setFreshFocus(true);
       setEditingTotal(false);
     } else {
       setSplitMode("equal");
