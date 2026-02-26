@@ -156,20 +156,20 @@ export default function NetBalanceSlide({ netBalance, totalOwedToYou, totalYouOw
   const microCopy = currentDebt
     ? isOwed
       ? `${currentDebt.payerName} owes ${formatCurrency(currentDebt.amount)} to you`
-      : `${formatCurrency(currentDebt.amount)} owed to ${currentDebt.payerName}`
+      : `${formatCurrency(currentDebt.amount)} unsettled with ${currentDebt.payerName}`
     : "";
 
   return (
     <div className="flex flex-col justify-center px-6 py-4 min-h-[200px] relative">
       {/* Badge */}
       <div className="mb-2">
-        <span className="inline-block bg-white/20 text-white text-xs font-semibold rounded-full px-3 py-1">
+        <span className="inline-block bg-white/10 text-white text-xs font-semibold rounded-full px-3 py-1 mb-2">
           {badge}
         </span>
       </div>
 
       {/* Large balance */}
-      <div className="flex items-baseline gap-0.5 mb-1">
+      <div className="flex items-baseline gap-0.5 mb-2">
         {prefix && (
           <span className="text-5xl font-extrabold text-white/40">{prefix}</span>
         )}
@@ -180,11 +180,11 @@ export default function NetBalanceSlide({ netBalance, totalOwedToYou, totalYouOw
       <div className="space-y-0.5 mb-2">
         <p className="text-sm text-white/60">
           <span className="font-semibold text-white">{formatCurrency(totalOwedToYou)}</span>{" "}
-          owed to you
+          others pay you
         </p>
         <p className="text-sm text-white/60">
           <span className="font-semibold text-white">{formatCurrency(totalYouOwe)}</span>{" "}
-          you owe
+          to settle
         </p>
       </div>
 

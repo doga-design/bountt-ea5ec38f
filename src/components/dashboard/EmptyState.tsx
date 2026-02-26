@@ -32,11 +32,11 @@ export default function EmptyState() {
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-6 py-10">
-      <h2 className="text-xl font-bold text-foreground text-center mb-2">
+    <div className="flex-1 flex flex-col items-leftjustify-start px-6 py-10 mt-10">
+      <h2 className="text-xl font-bold text-foreground text-left mb-2 tracking-tight leading-tight">
         Who've you been splitting costs with?
       </h2>
-      <p className="text-sm text-muted-foreground text-center mb-8">
+      <p className="text-sm text-muted-foreground text-left mb-8 font-medium">
         Type your friend's name to get started!
       </p>
 
@@ -51,7 +51,7 @@ export default function EmptyState() {
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
           placeholder="e.g. Kyle, Sarah..."
-          className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground outline-none text-base"
+          className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground outline-none text-base font-medium text-sm"
           maxLength={50}
           aria-label="Friend's name"
         />

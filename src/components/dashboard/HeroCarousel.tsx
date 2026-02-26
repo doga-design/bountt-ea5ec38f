@@ -78,7 +78,7 @@ export default function HeroCarousel() {
   const showDots = slides.length > 1;
 
   return (
-    <div className="relative rounded-b-2xl overflow-hidden" style={bgStyle}>
+    <div className="relative overflow-hidden" style={bgStyle}>
       {/* Nav bar with darker tint */}
       <div className="relative z-10">
         <div className="absolute inset-0 bg-black/10" />

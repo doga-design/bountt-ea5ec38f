@@ -425,7 +425,7 @@ export default function ExpenseScreen({
 
         if (isFirstExpense) {
           confetti({
-            particleCount: 120,
+            particleCount: 160,
             spread: 100,
             origin: { y: 0.5 },
             colors: ["#E8480A", "#FFFFFF", "#D4D4D4"],

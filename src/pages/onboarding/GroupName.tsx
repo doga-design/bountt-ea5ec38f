@@ -55,24 +55,17 @@ export default function GroupName() {
   };
 
   return (
-    <div className="screen-container bg-background">
-      {/* Orange header with curved bottom */}
+    <div className="screen-container relative bg-background">
+     
+    {/* Orange header: wide background shape + normal-width content */}
       <div
-        className="bg-primary px-6 pt-12 pb-10 relative"
-        style={{ borderBottomLeftRadius: "40px", borderBottomRightRadius: "40px" }}
-      >
-        {/* bountt. wordmark */}
-        <h1 className="bountt-wordmark text-3xl text-primary-foreground text-center mb-6">
-          bountt<span className="opacity-70">.</span>
-        </h1>
+        className="absolute top-0 left-1/2 -translate-x-1/2 z-10 w-[500px] h-[200px] bg-primary pt-12 pb-10"
+        style={{ borderBottomLeftRadius: "50%", borderBottomRightRadius: "50%" }}
+        aria-hidden
+      />
 
-        {/* Progress dots — step 1 of 2 */}
-        <div className="flex items-center justify-center gap-2" role="progressbar" aria-label="Step 1 of 2" aria-valuenow={1} aria-valuemax={2}>
-          <div className="w-8 h-2 bg-primary-foreground rounded-full" />
-          <div className="w-2 h-2 bg-primary-foreground/40 rounded-full" />
-        </div>
-
-        {/* Nav arrows */}
+      <div className="relative z-20 px-6 pt-12 pb-10">
+        {/* Nav row: back | progress | continue */}
         <div className="flex items-center justify-between mt-4">
           <button
             onClick={() => navigate("/auth")}
@@ -81,6 +74,20 @@ export default function GroupName() {
           >
             <ChevronLeft className="w-5 h-5 text-primary-foreground" />
           </button>
+
+          <div className="flex-1 flex justify-center">
+            <div
+              className="flex items-center justify-center gap-2"
+              role="progressbar"
+              aria-label="Step 1 of 2"
+              aria-valuenow={1}
+              aria-valuemax={2}
+            >
+              <div className="w-8 h-2 bg-primary-foreground rounded-full" />
+              <div className="w-2 h-2 bg-primary-foreground/40 rounded-full" />
+            </div>
+          </div>
+
           <button
             onClick={handleContinue}
             disabled={loading || !name.trim()}
@@ -94,17 +101,22 @@ export default function GroupName() {
             )}
           </button>
         </div>
+
+        {/* bountt. wordmark */}
+        <h1 className="bountt-wordmark text-3xl text-primary-foreground text-center mb-3">
+          bountt<span className="opacity-70">.</span>
+        </h1>
       </div>
 
       {/* Content */}
       <div className="flex-1 flex flex-col px-6 pt-8">
         {/* Header pill */}
-        <div className="flex justify-center mb-2">
-          <span className="bg-secondary text-secondary-foreground rounded-full px-5 py-2.5 text-sm font-bold">
+        <div className="flex z-10 justify-center mb-10 -mt-16">
+          <span className="bg-secondary text-secondary-foreground rounded-2xl px-6 py-4 text-sm font-bold">
             Name your group 🏅
           </span>
         </div>
-        <p className="text-center text-muted-foreground text-sm mb-8">
+        <p className="text-left text-muted-foreground text-sm mb-2">
           This is what everyone will see
         </p>
 
