@@ -6,7 +6,6 @@ interface SaveButtonProps {
   onClick: () => void;
   isSingleUser?: boolean;
   label?: string;
-  isCoverMode?: boolean;
 }
 
 export default function SaveButton({
@@ -17,14 +16,10 @@ export default function SaveButton({
   onClick,
   isSingleUser = false,
   label = "Save",
-  isCoverMode = false,
 }: SaveButtonProps) {
   const isCustomReady = splitMode === "custom" && isBalanced && canSave && !isSingleUser;
-  const isCoverReady = isCoverMode && canSave;
-  const isDefaultReady = splitMode === "equal" && canSave && !isSingleUser && !isCoverMode;
-  const enabled = isCustomReady || isDefaultReady || isCoverReady;
-
-  const displayLabel = isCoverMode ? "Cover it" : label;
+  const isDefaultReady = splitMode === "equal" && canSave && !isSingleUser;
+  const enabled = isCustomReady || isDefaultReady;
 
   return (
     <div className="px-4 pb-2 pt-3">
@@ -46,7 +41,7 @@ export default function SaveButton({
             : "0 4px 14px rgba(217,79,0,0.3)",
         }}
       >
-        {loading ? "Saving..." : displayLabel}
+        {loading ? "Saving..." : label}
       </button>
     </div>
   );

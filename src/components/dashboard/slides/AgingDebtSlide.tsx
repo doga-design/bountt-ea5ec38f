@@ -21,13 +21,9 @@ export default function AgingDebtSlide({ agingDebts }: Props) {
   };
 
   const contextLine =
-    debt.expenseType === "cover"
-      ? debt.direction === "you_owe"
-        ? <><span className="font-semibold">{debt.personName}</span> covered your <span className="font-semibold">{debt.expenseName}</span>. You owe {formatCurrency(debt.amount)}</>
-        : <>You covered <span className="font-semibold">{debt.personName}</span>'s <span className="font-semibold">{debt.expenseName}</span> {debt.daysWaiting} days ago. Still waiting.</>
-      : debt.direction === "you_owe"
-        ? <>You owe <span className="font-semibold">{debt.personName}</span> {formatCurrency(debt.amount)} from <span className="font-semibold">{debt.expenseName}</span></>
-        : <><span className="font-semibold">{debt.personName}</span> still owes you {formatCurrency(debt.amount)} from <span className="font-semibold">{debt.expenseName}</span></>;
+    debt.direction === "you_owe"
+      ? <>You owe <span className="font-semibold">{debt.personName}</span> {formatCurrency(debt.amount)} from <span className="font-semibold">{debt.expenseName}</span></>
+      : <><span className="font-semibold">{debt.personName}</span> still owes you {formatCurrency(debt.amount)} from <span className="font-semibold">{debt.expenseName}</span></>;
 
   return (
     <div className="flex flex-col justify-center px-6 py-4 min-h-[200px]">

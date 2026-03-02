@@ -17,7 +17,6 @@ interface ActivityLogEntry {
     amount: number;
     paid_by_name: string;
     member_names: string[];
-    expense_type?: 'split' | 'cover';
   } | null;
   change_detail: Array<{
     field: string;
@@ -71,25 +70,15 @@ function ActivityCard({ entry, currentUserId }: { entry: ActivityLogEntry; curre
   // Build detail pills
   const pills: React.ReactNode[] = [];
 
-  if (entry.action_type === "added" && entry.expense_snapshot) {
-    const isCover = entry.expense_snapshot.expense_type === "cover";
-    if (isCover) {
-      const coveredName = entry.expense_snapshot.member_names?.[0] ?? "someone";
-      pills.push(
-        <span key="added" className={`inline-block text-xs px-2 py-0.5 rounded-full ${config.pillBg} ${config.pillText} font-medium`}>
-          covered {coveredName}
-        </span>
-      );
-    } else if (entry.expense_snapshot.member_names) {
-      const names = entry.expense_snapshot.member_names
-        .map((n) => (n === entry.actor_name && entry.actor_id === currentUserId ? "You" : n))
-        .join(" & ");
-      pills.push(
-        <span key="added" className={`inline-block text-xs px-2 py-0.5 rounded-full ${config.pillBg} ${config.pillText} font-medium`}>
-          split with {names}
-        </span>
-      );
-    }
+  if (entry.action_type === "added" && entry.expense_snapshot?.member_names) {
+    const names = entry.expense_snapshot.member_names
+      .map((n) => (n === entry.actor_name && entry.actor_id === currentUserId ? "You" : n))
+      .join(" & ");
+    pills.push(
+      <span key="added" className={`inline-block text-xs px-2 py-0.5 rounded-full ${config.pillBg} ${config.pillText} font-medium`}>
+        split with {names}
+      </span>
+    );
   }
 
   if (entry.action_type === "deleted" && entry.expense_snapshot?.member_names) {

@@ -103,7 +103,6 @@ export type Database = {
           created_by: string
           date: string
           description: string
-          expense_type: string
           group_id: string
           id: string
           is_settled: boolean
@@ -117,7 +116,6 @@ export type Database = {
           created_by: string
           date?: string
           description: string
-          expense_type?: string
           group_id: string
           id?: string
           is_settled?: boolean
@@ -131,7 +129,6 @@ export type Database = {
           created_by?: string
           date?: string
           description?: string
-          expense_type?: string
           group_id?: string
           id?: string
           is_settled?: boolean
@@ -314,32 +311,18 @@ export type Database = {
     }
     Functions: {
       claim_placeholder: { Args: { p_placeholder_id: string }; Returns: string }
-      create_expense_with_splits:
-        | {
-            Args: {
-              p_amount: number
-              p_created_by: string
-              p_description: string
-              p_group_id: string
-              p_paid_by_name: string
-              p_paid_by_user_id: string
-              p_splits: Json
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_amount: number
-              p_created_by: string
-              p_description: string
-              p_expense_type?: string
-              p_group_id: string
-              p_paid_by_name: string
-              p_paid_by_user_id: string
-              p_splits: Json
-            }
-            Returns: Json
-          }
+      create_expense_with_splits: {
+        Args: {
+          p_amount: number
+          p_created_by: string
+          p_description: string
+          p_group_id: string
+          p_paid_by_name: string
+          p_paid_by_user_id: string
+          p_splits: Json
+        }
+        Returns: Json
+      }
       create_group_with_creator: {
         Args: {
           p_avatar_color: string
@@ -354,28 +337,16 @@ export type Database = {
         Args: { p_actor_name: string; p_expense_id: string }
         Returns: Json
       }
-      edit_expense:
-        | {
-            Args: {
-              p_actor_name: string
-              p_amount: number
-              p_description: string
-              p_expense_id: string
-              p_splits: Json
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_actor_name: string
-              p_amount: number
-              p_description: string
-              p_expense_id: string
-              p_expense_type?: string
-              p_splits: Json
-            }
-            Returns: Json
-          }
+      edit_expense: {
+        Args: {
+          p_actor_name: string
+          p_amount: number
+          p_description: string
+          p_expense_id: string
+          p_splits: Json
+        }
+        Returns: Json
+      }
       get_group_splits: {
         Args: { p_group_id: string }
         Returns: {

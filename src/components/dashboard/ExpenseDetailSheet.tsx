@@ -190,7 +190,7 @@ export default function ExpenseDetailSheet({
 
               {/* Paid by */}
               <p className="text-sm text-muted-foreground mb-4">
-                {expense.expense_type === "cover" ? "Covered" : "Paid"} by{" "}
+                Paid by{" "}
                 <span className="font-semibold text-foreground">
                   {expense.paid_by_user_id === user?.id ? "You" : expense.paid_by_name}
                 </span>
@@ -199,7 +199,7 @@ export default function ExpenseDetailSheet({
               {/* Split breakdown */}
               <div className="space-y-2 mb-4">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  {expense.expense_type === "cover" ? "Covered for" : "Split breakdown"}
+                  Split breakdown
                 </p>
                 {expenseSplits.map((split) => {
                   const member = groupMembers.find(

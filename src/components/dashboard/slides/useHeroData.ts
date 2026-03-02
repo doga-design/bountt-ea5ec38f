@@ -22,7 +22,6 @@ export interface AgingDebt {
   expenseName: string;
   direction: "you_owe" | "owed_to_you";
   expenseId: string;
-  expenseType: "split" | "cover";
 }
 
 export interface HeroData {
@@ -140,7 +139,6 @@ export function useHeroData(): HeroData {
             expenseName: expense.description,
             direction: "owed_to_you",
             expenseId: expense.id,
-            expenseType: (expense as any).expense_type ?? "split",
           });
         }
       } else {
@@ -155,7 +153,6 @@ export function useHeroData(): HeroData {
             expenseName: expense.description,
             direction: "you_owe",
             expenseId: expense.id,
-            expenseType: (expense as any).expense_type ?? "split",
           });
         }
       }

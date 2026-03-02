@@ -8,8 +8,8 @@ import React, {
 } from "react";
 import { User, Session, RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { Group, GroupMember, Expense, ExpenseSplit, Profile, AppContextValue } from "@/types";
-import { generateInviteCode } from "@/lib/bountt-utils";
+import { Group, GroupMember, Expense, ExpenseSplit, Profile, AppContextValue, BalanceSummary } from "@/types";
+import { generateInviteCode, calculateBalances as calcBalances } from "@/lib/bountt-utils";
 import { pickAvailableColor } from "@/lib/avatar-utils";
 import { toast } from "@/hooks/use-toast";
 
@@ -401,6 +401,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, groupMembers, currentGroup]);
 
+  const calculateBalances = useCallback((): BalanceSummary[] => {
+    return calcBalances(expenses);
+  }, [expenses]);
 
   // =====================================================
   // REALTIME SUBSCRIPTIONS
@@ -513,7 +516,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     fetchExpenses,
     addExpense,
     fetchExpenseSplits,
-    
+    calculateBalances,
     signOut,
   };
 
