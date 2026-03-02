@@ -1,66 +1,67 @@
 
-
-# Fix: Persistent Numpad + Step 2 Inline Controls
+# Add Cover Mode UX to Custom Split Rows
 
 ## Problem
-The current implementation swaps the entire panel content between Step 1 and Step 2 using a conditional (`step === 1 ? ... : ...`). This removes the numpad entirely on Step 2, breaking the custom split editing flow and violating the design intent. The numpad must always be visible -- it drives both the total amount input (Step 1) and custom row editing (Step 2).
-
-Step 2's interactive elements (sentence with tappable chips, description input, save button) are also not rendering as described. The full flow should be:
-
-- **Step 1**: Large amount display + continue button + numpad
-- **Step 2**: Compact amount + live sentence (with tappable payer, mode, members) + description + save button + **numpad still pinned at the bottom**
+Cover mode exists in the code (triggered by deselecting yourself in the member drawer opened via the sentence), but there's no visible, discoverable entry point for it. The user expects an inline "Exclude myself" label on their own row in the custom split panel, plus a ghosted state with "Add myself back" undo affordance.
 
 ## Solution
 
-### Changes (1 file: `src/components/expense/ExpenseScreen.tsx`)
+### File 1: `src/components/expense/CustomSplitRows.tsx`
 
-**Replace the `step === 1 ? ... : ...` conditional** (lines 591-758) with a single layout where the numpad is always rendered at the bottom and the upper content transitions between steps.
+Add cover mode awareness to the component:
 
-#### New layout structure (inside the `max-w-[430px]` container):
+**New props:**
+- `isCoverMode: boolean` -- whether cover mode is active
+- `payerMemberId: string | undefined` -- the payer's member ID (to identify "self" row for exclude)
+- `onExcludeSelf: () => void` -- called when user taps "Exclude myself"
+- `onAddSelfBack: () => void` -- called when user taps "Add myself back"
 
-```text
-+-------------------------------+
-| Top bar (title, back/close)   |  <- flex-shrink-0
-+-------------------------------+
-| Upper content area            |  <- flex-1, overflow-y-auto
-|   Step 1: AmountDisplay large |
-|     OR                        |
-|   Step 2: Compact amount      |
-|           SplitSentence       |
-|           CustomSplitRows     |
-|           Description input   |
-+-------------------------------+
-| Action row                    |  <- flex-shrink-0
-|   Step 1: Continue button     |
-|   Step 2: SaveButton          |
-+-------------------------------+
-| NumpadGrid (ALWAYS)           |  <- flex-shrink-0
-+-------------------------------+
+**Row behavior changes for the current user's row:**
+
+- **Normal custom mode (not cover):** Subtitle changes from `"tap to edit"` to `"Exclude myself -->"` (tappable). Tapping it calls `onExcludeSelf` instead of `onFocus`.
+- **Cover mode active:** The user's row renders in a ghosted state:
+  - Opacity reduced, background faded (e.g. `bg-muted/30`)
+  - Amount shows `$0` grayed out
+  - Subtitle shows `"Add myself back"` (tappable, calls `onAddSelfBack`)
+  - Row is not focusable for numpad input
+- **Other members' rows:** Unchanged behavior -- tap to focus, show amounts
+
+**Collapse logic:** The `visible` prop already controls panel visibility. When cover mode activates and only 1 member remains, the parent (`ExpenseScreen`) will set `splitMode` back to `"equal"`, which makes `visible={splitMode === "custom" && !isCoverMode}` collapse the panel automatically. This already works.
+
+### File 2: `src/components/expense/ExpenseScreen.tsx`
+
+**New handler -- `handleExcludeSelf`:**
+- Calls `handleToggleChip(currentUserMemberId)` which already handles cover mode entry (deselects self, restricts to single selection, resets to equal mode)
+
+**New handler -- `handleAddSelfBack`:**
+- Adds `currentUserMemberId` back into `activeIds`
+- Resets `splitMode` to `"equal"` and clears custom amounts
+- This exits cover mode since `isCoverMode = !activeIds.has(payerId)` becomes false
+
+**Pass new props to CustomSplitRows:**
+```
+<CustomSplitRows
+  members={selectedMembers}
+  currentUserId={user?.id}
+  customAmounts={customAmounts}
+  focusedMemberId={focusedMemberId}
+  shakeMemberId={shakeMemberId}
+  onFocus={handleFocusRow}
+  visible={splitMode === "custom" && !isCoverMode}
+  isCoverMode={isCoverMode}
+  payerMemberId={currentUserMemberId}
+  onExcludeSelf={handleExcludeSelf}
+  onAddSelfBack={handleAddSelfBack}
+/>
 ```
 
-#### Specific changes:
+Note: The custom panel auto-collapses when cover mode activates (because `visible` becomes false), and the sentence updates to "You paid, covering for Jay" via the existing `SplitSentence` component. The "Add myself back" affordance would appear only if the user re-opens custom mode -- but since cover mode hides the custom panel, the primary "undo" path is tapping themselves in the member drawer (which already shows a toast) or tapping the covered member name in the sentence.
 
-1. **Top bar**: Always renders. In Step 1: title "Adding cost" + close button. In Step 2: back arrow (create mode only) + title "Who's splitting?" + close button. Same as current, just not duplicated.
+**Alternative undo path:** Add a small inline "Add myself back" pill below the sentence when `isCoverMode` is true, so the user doesn't need to find the drawer. This renders inside the Step 2 content area, between the `SplitSentence` and the description input.
 
-2. **Upper content area** (`flex-1 overflow-y-auto min-h-0`):
-   - **Step 1**: `AmountDisplay` (large format) centered vertically
-   - **Step 2**: 
-     - Compact `AmountDisplay` (tappable back to Step 1 in create mode, read-only in edit mode)
-     - Locked payer label (edit mode only)
-     - `SplitSentence` with all existing props (isCoverMode, coveredMemberName, onToggleMember, onSetPayer, etc.)
-     - `CustomSplitRows` (slides in when custom mode active)
-     - Description input
-
-3. **Action row** (`flex-shrink-0`):
-   - **Step 1**: Continue button with arrow (disabled when amount is "0")
-   - **Step 2**: `SaveButton` with all current props
-
-4. **NumpadGrid** (`flex-shrink-0`): Always rendered at the bottom, no conditional. `onKey={handleKey}` works for both steps because `handleKey` already routes to either the amount or the focused custom row based on `splitMode` and `focusedMemberId`.
-
-#### What does NOT change:
-- All state variables, refs, callbacks (`handleKey`, `handleToggleChip`, `handleSetPayer`, `toggleMode`, `handleContinue`, `handleSave`, `handleDismiss`)
-- The slide-up/slide-down animation wrapper (backdrop + panel)
-- `SplitSentence` component and its drawer-based interactions
-- `CustomSplitRows`, `AmountDisplay`, `SaveButton` components
-- Cover mode derivation and chip logic
+### What does NOT change
+- SplitSentence component (already handles cover mode sentence)
+- SaveButton (already shows "Cover it" in cover mode)
+- NumpadGrid, AmountDisplay
+- All save/edit logic, cover mode DB writes
 - No new files, no new dependencies
