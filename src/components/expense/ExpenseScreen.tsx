@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef, useLayoutEffect } from "react";
 import { X, ArrowLeft, ArrowRight, Lock } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { useToast } from "@/hooks/use-toast";
@@ -540,181 +540,223 @@ export default function ExpenseScreen({
   const canSave = totalNum > 0;
   const isSingleUser = selectedMembers.length <= 1 && !isCoverMode;
 
-  if (!open) return null;
-
   const saveLabel = isEditMode ? "Save changes" : "Save";
 
+  /* ---- slide-up / slide-down animation state ---- */
+  const [mounted, setMounted] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const closingRef = useRef(false);
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      closingRef.current = false;
+      // trigger slide-up on next frame
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setVisible(true));
+      });
+    }
+  }, [open]);
+
+  const handleDismiss = useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setVisible(false);
+    setTimeout(() => {
+      setMounted(false);
+      onOpenChange(false);
+    }, 300);
+  }, [onOpenChange]);
+
+  if (!mounted) return null;
+
   return (
-    <div className="fixed inset-0 z-50 bg-background">
-      <div className="max-w-[430px] mx-auto flex flex-col" style={{ minHeight: '100dvh' }}>
-        {step === 1 ? (
-          /* ================ STEP 1: Amount ================ */
-          <div className="flex flex-col h-full">
-            {/* Top bar */}
-            <div className="flex items-center justify-between px-5 pt-3 pb-1 flex-shrink-0">
-              <h2 className="font-sora text-lg font-bold text-foreground">Adding cost</h2>
-              <button
-                onClick={() => onOpenChange(false)}
-                className="w-9 h-9 flex items-center justify-center rounded-full bg-card"
-              >
-                <X className="w-5 h-5 text-foreground" />
-              </button>
-            </div>
+    <div className="fixed inset-0 z-50">
+      {/* Backdrop – dark tinted + blurred */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300"
+        style={{ opacity: visible ? 1 : 0 }}
+        onClick={handleDismiss}
+      />
 
-            {/* Amount display */}
-            <div className="flex-1 flex items-center justify-center">
-              <AmountDisplay
-                amount={amount}
-                splitMode="equal"
-                remaining={0}
-                isBalanced={false}
-              />
-            </div>
+      {/* Slide-up panel */}
+      <div
+        className="absolute inset-x-0 bottom-0 z-50 rounded-t-2xl bg-background transition-transform duration-300 ease-out"
+        style={{
+          height: '85dvh',
+          transform: visible ? 'translateY(0)' : 'translateY(100%)',
+        }}
+      >
+        <div className="max-w-[430px] mx-auto flex flex-col h-full">
+          {step === 1 ? (
+            /* ================ STEP 1: Amount ================ */
+            <div className="flex flex-col h-full">
+              {/* Top bar */}
+              <div className="flex items-center justify-between px-5 pt-3 pb-1 flex-shrink-0">
+                <h2 className="font-sora text-lg font-bold text-foreground">Adding cost</h2>
+                <button
+                  onClick={handleDismiss}
+                  className="w-9 h-9 flex items-center justify-center rounded-full bg-card"
+                >
+                  <X className="w-5 h-5 text-foreground" />
+                </button>
+              </div>
 
-            {/* Continue button */}
-            <div className="px-4 pb-1 flex-shrink-0">
-              <button
-                onClick={handleContinue}
-                disabled={amount === "0"}
-                className="w-full rounded-[18px] py-4 font-sora text-[17px] font-extrabold transition-all active:scale-[0.985] flex items-center justify-center gap-2"
-                style={{
-                  backgroundColor: amount === "0" ? "#EAEAE6" : "hsl(var(--primary))",
-                  color: amount === "0" ? "#C0C0BC" : "#FFFFFF",
-                  boxShadow: amount === "0" ? "none" : "0 4px 14px rgba(217,79,0,0.3)",
-                }}
-              >
-                Continue
-                <ArrowRight className="w-5 h-5" />
-              </button>
-            </div>
+              {/* Amount display */}
+              <div className="flex-1 flex items-center justify-center">
+                <AmountDisplay
+                  amount={amount}
+                  splitMode="equal"
+                  remaining={0}
+                  isBalanced={false}
+                />
+              </div>
 
-            {/* Numpad */}
-            <div className="flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-              <NumpadGrid onKey={handleKey} />
+              {/* Continue button */}
+              <div className="px-4 pb-1 flex-shrink-0">
+                <button
+                  onClick={handleContinue}
+                  disabled={amount === "0"}
+                  className="w-full rounded-[18px] py-4 font-sora text-[17px] font-extrabold transition-all active:scale-[0.985] flex items-center justify-center gap-2"
+                  style={{
+                    backgroundColor: amount === "0" ? "#EAEAE6" : "hsl(var(--primary))",
+                    color: amount === "0" ? "#C0C0BC" : "#FFFFFF",
+                    boxShadow: amount === "0" ? "none" : "0 4px 14px rgba(217,79,0,0.3)",
+                  }}
+                >
+                  Continue
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Numpad */}
+              <div className="flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+                <NumpadGrid onKey={handleKey} />
+              </div>
             </div>
-          </div>
-        ) : (
-          /* ================ STEP 2: Who + How ================ */
-          <div className="flex flex-col h-full">
-            {/* Top bar */}
-            <div className="flex items-center justify-between px-5 pt-3 pb-1 flex-shrink-0">
-              <div className="flex items-center gap-2">
-                {!isEditMode && (
+          ) : (
+            /* ================ STEP 2: Who + How ================ */
+            <div className="flex flex-col h-full">
+              {/* Top bar */}
+              <div className="flex items-center justify-between px-5 pt-3 pb-1 flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  {!isEditMode && (
+                    <button
+                      onClick={() => setStep(1)}
+                      className="w-9 h-9 flex items-center justify-center rounded-full bg-card"
+                    >
+                      <ArrowLeft className="w-5 h-5 text-foreground" />
+                    </button>
+                  )}
+                  <h2 className="font-sora text-lg font-bold text-foreground">
+                    {isEditMode ? "Editing cost" : "Who's splitting?"}
+                  </h2>
+                </div>
+                <button
+                  onClick={handleDismiss}
+                  className="w-9 h-9 flex items-center justify-center rounded-full bg-card"
+                >
+                  <X className="w-5 h-5 text-foreground" />
+                </button>
+              </div>
+
+              {/* Scrollable content */}
+              <div className="flex-1 overflow-y-auto min-h-0">
+                {/* Compact amount (tappable back to Step 1 in create mode) */}
+                {!isEditMode ? (
+                  <AmountDisplay
+                    amount={amount}
+                    splitMode={splitMode}
+                    remaining={remaining}
+                    isBalanced={isBalanced}
+                    onDistribute={handleDistribute}
+                    canDistribute={canDistribute}
+                    compact={splitMode === "equal" && !isCoverMode}
+                    onTap={() => setStep(1)}
+                  />
+                ) : (
+                  <AmountDisplay
+                    amount={amount}
+                    splitMode={splitMode}
+                    remaining={remaining}
+                    isBalanced={isBalanced}
+                    onDistribute={handleDistribute}
+                    canDistribute={canDistribute}
+                    compact={splitMode === "equal"}
+                  />
+                )}
+
+                {/* Locked payer label (edit mode) */}
+                {isEditMode && editExpense && (
                   <button
-                    onClick={() => setStep(1)}
-                    className="w-9 h-9 flex items-center justify-center rounded-full bg-card"
+                    onClick={() => toast({ title: "To change the payer, delete this expense and log a new one" })}
+                    className="flex items-center justify-center gap-1.5 mx-auto mb-1 px-3 py-1"
                   >
-                    <ArrowLeft className="w-5 h-5 text-foreground" />
+                    <Lock className="w-3 h-3 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground font-medium">
+                      Paid by {editExpense.paid_by_user_id === user?.id ? "You" : editExpense.paid_by_name}
+                    </span>
                   </button>
                 )}
-                <h2 className="font-sora text-lg font-bold text-foreground">
-                  {isEditMode ? "Editing cost" : "Who's splitting?"}
-                </h2>
+
+                {/* Split sentence */}
+                <SplitSentence
+                  splitMode={splitMode}
+                  onToggleMode={toggleMode}
+                  activeMembers={selectedMembers}
+                  currentUserId={user?.id}
+                  disabled={amount === "0"}
+                  isSingleUser={isSingleUser}
+                  payerMember={payerMember}
+                  onSetPayer={isEditMode ? () => toast({ title: "To change the payer, delete this expense and log a new one" }) : handleSetPayer}
+                  allActiveMembers={activeMembers}
+                  activeIds={activeIds}
+                  onToggleMember={handleToggleChip}
+                  hidePayerDrawer={isEditMode}
+                  isCoverMode={isCoverMode}
+                  coveredMemberName={coveredMemberName}
+                />
+
+                {/* Custom split rows */}
+                <CustomSplitRows
+                  members={selectedMembers}
+                  currentUserId={user?.id}
+                  customAmounts={customAmounts}
+                  focusedMemberId={focusedMemberId}
+                  shakeMemberId={shakeMemberId}
+                  onFocus={handleFocusRow}
+                  visible={splitMode === "custom" && !isCoverMode}
+                />
               </div>
-              <button
-                onClick={() => onOpenChange(false)}
-                className="w-9 h-9 flex items-center justify-center rounded-full bg-card"
-              >
-                <X className="w-5 h-5 text-foreground" />
-              </button>
-            </div>
 
-            {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto min-h-0">
-              {/* Compact amount (tappable back to Step 1 in create mode) */}
-              {!isEditMode ? (
-                <AmountDisplay
-                  amount={amount}
-                  splitMode={splitMode}
-                  remaining={remaining}
-                  isBalanced={isBalanced}
-                  onDistribute={handleDistribute}
-                  canDistribute={canDistribute}
-                  compact={splitMode === "equal" && !isCoverMode}
-                  onTap={() => setStep(1)}
+              {/* Description input */}
+              <div className="px-5 pt-2 pb-1 flex-shrink-0">
+                <input
+                  type="text"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="e.g., Pizza, Rent, Groceries"
+                  maxLength={50}
+                  className="w-full text-center text-base font-medium rounded-xl px-4 py-3.5 bg-muted text-foreground placeholder:text-muted-foreground outline-none border-none font-sora"
                 />
-              ) : (
-                <AmountDisplay
-                  amount={amount}
+              </div>
+
+              {/* Save button */}
+              <div className="flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+                <SaveButton
                   splitMode={splitMode}
-                  remaining={remaining}
+                  canSave={canSave}
                   isBalanced={isBalanced}
-                  onDistribute={handleDistribute}
-                  canDistribute={canDistribute}
-                  compact={splitMode === "equal"}
+                  loading={loading}
+                  onClick={handleSave}
+                  isSingleUser={isSingleUser}
+                  label={saveLabel}
+                  isCoverMode={isCoverMode}
                 />
-              )}
-
-              {/* Locked payer label (edit mode) */}
-              {isEditMode && editExpense && (
-                <button
-                  onClick={() => toast({ title: "To change the payer, delete this expense and log a new one" })}
-                  className="flex items-center justify-center gap-1.5 mx-auto mb-1 px-3 py-1"
-                >
-                  <Lock className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground font-medium">
-                    Paid by {editExpense.paid_by_user_id === user?.id ? "You" : editExpense.paid_by_name}
-                  </span>
-                </button>
-              )}
-
-              {/* Split sentence */}
-              <SplitSentence
-                splitMode={splitMode}
-                onToggleMode={toggleMode}
-                activeMembers={selectedMembers}
-                currentUserId={user?.id}
-                disabled={amount === "0"}
-                isSingleUser={isSingleUser}
-                payerMember={payerMember}
-                onSetPayer={isEditMode ? () => toast({ title: "To change the payer, delete this expense and log a new one" }) : handleSetPayer}
-                allActiveMembers={activeMembers}
-                activeIds={activeIds}
-                onToggleMember={handleToggleChip}
-                hidePayerDrawer={isEditMode}
-                isCoverMode={isCoverMode}
-                coveredMemberName={coveredMemberName}
-              />
-
-              {/* Custom split rows */}
-              <CustomSplitRows
-                members={selectedMembers}
-                currentUserId={user?.id}
-                customAmounts={customAmounts}
-                focusedMemberId={focusedMemberId}
-                shakeMemberId={shakeMemberId}
-                onFocus={handleFocusRow}
-                visible={splitMode === "custom" && !isCoverMode}
-              />
+              </div>
             </div>
-
-            {/* Description input */}
-            <div className="px-5 pt-2 pb-1 flex-shrink-0">
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="e.g., Pizza, Rent, Groceries"
-                maxLength={50}
-                className="w-full text-center text-base font-medium rounded-xl px-4 py-3.5 bg-muted text-foreground placeholder:text-muted-foreground outline-none border-none font-sora"
-              />
-            </div>
-
-            {/* Save button */}
-            <div className="flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-              <SaveButton
-                splitMode={splitMode}
-                canSave={canSave}
-                isBalanced={isBalanced}
-                loading={loading}
-                onClick={handleSave}
-                isSingleUser={isSingleUser}
-                label={saveLabel}
-                isCoverMode={isCoverMode}
-              />
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
