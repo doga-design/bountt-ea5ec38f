@@ -681,6 +681,28 @@ export default function ExpenseScreen({
                   coveredMemberName={coveredMemberName}
                 />
 
+                {/* "Add myself back" pill when in cover mode */}
+                {isCoverMode && (
+                  <div className="flex justify-center py-2">
+                    <button
+                      onClick={() => {
+                        if (!currentUserMemberId) return;
+                        setActiveIds((prev) => {
+                          const next = new Set(prev);
+                          next.add(currentUserMemberId);
+                          return next;
+                        });
+                        setSplitMode("equal");
+                        setCustomAmounts(new Map());
+                        setFocusedMemberId(null);
+                      }}
+                      className="px-4 py-1.5 rounded-full text-xs font-semibold bg-muted text-primary transition-all active:scale-95"
+                    >
+                      Add myself back →
+                    </button>
+                  </div>
+                )}
+
                 {/* Custom split rows */}
                 <CustomSplitRows
                   members={selectedMembers}
@@ -690,6 +712,22 @@ export default function ExpenseScreen({
                   shakeMemberId={shakeMemberId}
                   onFocus={handleFocusRow}
                   visible={splitMode === "custom" && !isCoverMode}
+                  isCoverMode={isCoverMode}
+                  payerMemberId={currentUserMemberId}
+                  onExcludeSelf={() => {
+                    if (currentUserMemberId) handleToggleChip(currentUserMemberId);
+                  }}
+                  onAddSelfBack={() => {
+                    if (!currentUserMemberId) return;
+                    setActiveIds((prev) => {
+                      const next = new Set(prev);
+                      next.add(currentUserMemberId);
+                      return next;
+                    });
+                    setSplitMode("equal");
+                    setCustomAmounts(new Map());
+                    setFocusedMemberId(null);
+                  }}
                 />
 
                 {/* Description input */}
