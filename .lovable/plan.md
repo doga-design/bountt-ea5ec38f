@@ -1,202 +1,175 @@
-# Bountt Cost Logging Flow Rebuild
+
+
+# Bountt Settlement System
 
 ## Overview
 
-Complete rebuild of the expense entry flow from a single full-screen interface into a two-slide bottom drawer. This replaces `ExpenseScreen.tsx` and updates related components while preserving all RPC logic, AppContext, and settlement systems.
+Build per-split settlement with two RPCs (`settle_my_share`, `settle_all`), update balance calculations to exclude settled splits, add settlement UI to the expense detail sheet, implement a PayPal return confirmation flow in the hero, and extend the activity log with the `settled` action type.
 
-## What Gets Deleted
+---
 
-- `src/components/expense/ExpenseSheet.tsx` -- dead code, remove entirely
-- `src/components/expense/ExpenseScreen.tsx` -- delete and rebuild from scratch
+## Phase 1: Database Migration
 
-## What Gets Created (New Files)
+A single migration that:
 
-- `src/components/expense/MemberAvatarGrid.tsx` -- avatar selection grid for Slide 2
-- `src/components/expense/PayerAvatar.tsx` -- circular payer avatar next to amount on Slide 2
-- `src/assets/avatars/avatar01.svg` through `avatar05.svg` -- copy all 5 uploaded SVG files
+1. **Add columns to `expense_splits`:**
+   - `is_settled BOOLEAN NOT NULL DEFAULT false`
+   - `settled_at TIMESTAMPTZ`
 
-## What Gets Rebuilt
+2. **Update `activity_log` CHECK constraint** to include `'settled'`:
+   ```sql
+   ALTER TABLE activity_log DROP CONSTRAINT IF EXISTS activity_log_action_type_check;
+   ALTER TABLE activity_log ADD CONSTRAINT activity_log_action_type_check
+   CHECK (action_type IN ('added', 'edited', 'deleted', 'joined', 'settled'));
+   ```
 
-- `src/components/expense/ExpenseScreen.tsx` -- new two-slide drawer architecture
-- `src/components/expense/SplitSentence.tsx` -- simplified for new layout (no member drawer, just text display + payer drawer)
-- `src/components/expense/SaveButton.tsx` -- new "Log cost +" / "Log cost -->" states with shake animation
-- `src/components/expense/NumpadGrid.tsx` -- visual update (rounded rectangles with soft shadows, keep key logic)
-- `src/components/expense/AmountDisplay.tsx` -- updated for both slide contexts
-- `src/components/expense/CustomSplitRows.tsx` -- updated to use large circular SVG avatars with amount boxes per Image 5
+3. **Create `settle_my_share` RPC:**
+   - Derives `actor_id` from `auth.uid()` (never trusts client)
+   - Finds split where `expense_id = p_expense_id AND user_id = auth.uid()`
+   - Validates: not found -> error, already settled -> error
+   - Sets `is_settled = true, settled_at = now()` on that split
+   - Checks if ALL splits for this expense are now settled; if so, sets `expenses.is_settled = true`
+   - Fetches actor display name from `profiles`
+   - Inserts `activity_log` entry with `action_type = 'settled'`, snapshot, and `change_detail = [{ field: 'settled_by', old_value: '', new_value: actor_name }]`
 
-## What Gets Fixed (Minor)
+4. **Create `settle_all` RPC:**
+   - Derives `actor_id` from `auth.uid()`
+   - Verifies `paid_by_user_id = auth.uid()` (only payer can settle all)
+   - Validates: already fully settled -> error
+   - Sets `is_settled = true, settled_at = now()` on ALL splits for this expense
+   - Sets `expenses.is_settled = true, updated_at = now()`
+   - Inserts `activity_log` entry with `action_type = 'settled'`, snapshot, and `change_detail = [{ field: 'settled_all', ... }]`
 
-- `src/contexts/AppContext.tsx` (line 475) -- add `filter: 'expense_id=in.(select id from expenses where group_id=eq.GROUP_ID)'` or use a workaround to scope realtime to current group only
+Both RPCs run inside implicit PL/pgSQL transactions (atomic).
 
-## Architecture: Two-Slide Drawer
+---
 
-```text
-+----------------------------------+
-|     Dashboard (blurred behind)   |
-+----------------------------------+
-|  [Drawer - 85dvh, slide-up]     |
-|                                  |
-|  SLIDE 1 (Amount Entry)         |
-|  - Drag handle                  |
-|  - "What did you pay?"          |
-|  - $[amount] + blinking cursor  |
-|  - "I am covering..." (visual)  |
-|  - "Log cost +" button          |
-|  - NumpadGrid                   |
-|                                  |
-|  SLIDE 2 (Split Config)         |
-|  - Back arrow + Drag handle     |
-|  - $[amount] + PayerAvatar      |
-|  - SplitSentence                |
-|  - MemberAvatarGrid             |
-|  - "I am covering..." (visual)  |
-|  - "Log cost +" button          |
-|                                  |
-+----------------------------------+
+## Phase 2: Balance Recalculation
+
+### `src/components/dashboard/slides/useHeroData.ts`
+
+The current code filters expenses by `!e.is_settled` (expense-level), but now settlement is per-split. Update the balance logic to filter at the **split level** using `is_settled` on each split row:
+
+- When iterating unsettled expenses, for each split, additionally check `s.is_settled !== true` before adding to `totalOwedToYou` / `totalYouOwe` / `debtsYouOwe` / `agingDebts`
+- Keep the expense-level `!e.is_settled` filter for the outer loop (settled expenses are fully done), but within partially-settled expenses, skip individual settled splits
+- This requires updating the `ExpenseSplit` type first
+
+### `src/types/index.ts`
+
+Add to `ExpenseSplit`:
+```typescript
+is_settled: boolean;
+settled_at: string | null;
 ```
 
-Slides transition via `translateX` -- Slide 1 moves left, Slide 2 moves in from the right. State variable `currentSlide: 1 | 2` controls this.
+Update `ActivityLog.action_type` to include `'settled'`.
 
-## Detailed Component Specs
+---
 
-### ExpenseScreen.tsx (Full Rebuild)
+## Phase 3: Expense Detail Sheet Updates
 
-- Renders as a custom overlay div (not using Drawer component) with dark backdrop (#000 at 60% opacity, backdrop-blur-sm)
-- Fixed height: 85dvh from bottom
-- Contains two "slides" in a horizontal container, controlled by `translateX(0)` vs `translateX(-100%)`
-- All existing state management preserved: `amount`, `splitMode`, `activeIds`, `customAmounts`, `focusedMemberId`, `freshFocus`, `shakeMemberId`, `payerId`, `loading`
-- New state: `currentSlide` (1 or 2)
-- Member list snapshotted on open via `useRef` -- only recomputes when `open` changes from false to true
-- `handleKey` dependency array fixed to include `customAmounts` and `activeIds`
-- Description field REMOVED -- hardcoded to "Quick Expense"
-- On Slide 1, "Log cost +" tapping: if amount is 0, shake the button (350ms); if amount > 0, transition to Slide 2
-- On Slide 2, back arrow: returns to Slide 1, amount preserved
-- If amount changed when returning to Slide 2 and custom mode is active, custom amounts reset to equal
-- Backdrop tap closes drawer entirely
+### `src/components/dashboard/ExpenseDetailSheet.tsx`
 
-### Slide 1 Layout
+Major additions to the existing sheet:
 
-Per Image 1:
+**State derivations:**
+- `isPayer = expense.paid_by_user_id === user?.id`
+- `mySplit = expenseSplits.find(s => s.user_id === user?.id)`
+- `iAlreadySettled = mySplit?.is_settled === true`
+- `expenseFullySettled = expense.is_settled === true`
 
-- Drag handle pill (gray, centered)
-- "What did **you** pay?" -- "you" in orange with dotted underline, tappable (opens payer selector)
-- Large `$[amount]` centered, Sora font, with blinking orange cursor
-- Spacer
-- "I am covering for someone" with circular arrow icon (visual only)
-- "Log cost +" / disabled "Log cost -->" button
-- NumpadGrid at bottom
+**Rendering changes:**
 
-### Slide 2 Layout
+1. If `expenseFullySettled`: show green "Settled" badge below title. Hide edit/delete buttons entirely. Sheet is read-only.
 
-Per Images 2-4:
+2. In split breakdown rows: if a split's `is_settled`, show a muted "Settled" label next to the amount. For the current user's row specifically, show "Your share settled" in green if settled.
 
-- Back arrow (circular, top-left) + drag handle
-- `$[amount]` (slightly smaller) + PayerAvatar (44px, circular, to the right)
-- SplitSentence: "[Payer] paid, splitting [equally/custom] with [names]"
-- MemberAvatarGrid: all active members EXCEPT payer, horizontal row, grayscale when deselected, colored when selected, "+" button at end
-- "I am covering for someone" (visual only)
-- "Log cost +" / disabled "Log cost -->" button
+3. **Settlement action buttons** (below the split breakdown, only if not fully settled):
+   - If `mySplit` exists and `!iAlreadySettled`: "Settle my share" button (dark, full width). On tap, show inline confirmation:
+     - "Did you send $[amount] to [paid_by_name]?"
+     - "Yes, I sent it" (orange) -> calls `settle_my_share` RPC
+     - "I'll do it later" (muted text) -> dismiss
+   - If `isPayer` and `!expenseFullySettled`: "Settle all" button (outlined). One tap, no confirmation -> calls `settle_all` RPC
 
-### MemberAvatarGrid.tsx (New)
+4. On RPC success: refresh expenses + splits, close or update sheet, show toast
+5. On RPC error: show inline error, keep sheet open
 
-- Receives: members (excluding payer), activeIds, onToggle callback, currentUserId
-- Renders horizontal row of circular avatars
-- Deselected: grayscale filter on avatar, muted name
-- Selected: full color (using member's avatar_color as background), bold name
-- Avatars scale dynamically based on count to fit screen width (no wrapping)
-- "+" button at end of row (visual only, no handler)
-- Tapping toggles selection
+---
 
-### PayerAvatar.tsx (New)
+## Phase 4: PayPal Return Confirmation
 
-- Receives: payerMember, onClick, isEditMode
-- Renders circular avatar (~44px) with member's SVG avatar and avatar_color background
-- Tapping opens payer selector (or shows locked toast in edit mode)
+### `src/components/dashboard/slides/NetBalanceSlide.tsx`
 
-### SaveButton.tsx (Rebuild)
+The "Pay [name]" / "Settle Up" button currently does nothing (no onClick handler). Add:
 
-- Two visual states:
-  - **Disabled**: gray background (#EAEAE6), muted text, shows "Log cost" with arrow icon (-->), fully non-interactive on Slide 2, shake animation on Slide 1
-  - **Active**: orange (#D94F00) background, white text, shows "Log cost" with "+" icon
-- Props: `enabled`, `loading`, `onClick`, `shakeOnDisabledClick` (for Slide 1 behavior)
+1. **State:** `pendingDebt: { expenseId, amount, payeeName } | null` and `showPayConfirm: boolean`
 
-### NumpadGrid.tsx (Visual Update)
+2. **On CTA click:**
+   - For "you_owe" debts: store `pendingDebt` with the debt details, then open PayPal deeplink (`https://paypal.me/...` or just a generic payment prompt). Set a `paypalTriggered` flag.
+   - For "owed_to_you" debts: call `settle_my_share` directly (since you're the payer settling someone else's debt -- actually no, `settle_all` would be more appropriate here). Actually per the spec, "Settle Up" for owed_to_you should call `settle_all`. "Pay [name]" for you_owe should deeplink to PayPal.
 
-- Keep exact same key logic and layout
-- Update style: rounded rectangles with soft shadow instead of flat gray cells
-- Keep sub-letters on 2-9
-- Keep backspace icon
+3. **Visibility change detection:** Add a `visibilitychange` / `focus` listener. When app regains focus AND `paypalTriggered` is true, show the confirmation prompt.
 
-### SplitSentence.tsx (Rebuild)
+4. **Confirmation prompt** (rendered as a fixed bottom overlay or inline in the hero):
+   - "Did you send $[amount] to [name]?"
+   - "Yes, I sent it" -> calls `settle_my_share(expenseId)` -> dismiss + recalculate
+   - "Not yet" -> dismiss, clear flag
 
-- Simplified: only renders the sentence text and payer selector drawer
-- No member selection drawer (that's handled by MemberAvatarGrid now)
-- Payer name: orange, dotted underline, tappable
-- Mode word: orange for "equally", blue for "custom", dotted underline, tappable to toggle
-- Names list: "No one" when empty, otherwise comma-separated with "&" for last
+5. For "Settle Up" (owed_to_you): call `settle_all` RPC directly on tap, show toast. No PayPal flow needed.
 
-### CustomSplitRows.tsx (Update)
+---
 
-- Per Image 5: large circular avatars (~80px) with amount box to the right
-- Rows separated by hairline dividers
-- Focused row highlighted
-- Numpad inputs into focused row
+## Phase 5: Activity Log Updates
 
-### AppContext.tsx (Minor Fix)
+### `src/pages/ActivityLog.tsx`
 
-- Line 475: Add filter to the expense_splits realtime channel so it only receives events for expenses in the current group. Since we can't filter by group_id directly on expense_splits (no group_id column), the pragmatic fix is to keep the current approach but it already scopes the re-fetch to `currentGroupRef.current?.id`. The existing behavior is functionally correct (just slightly noisy). No change needed here unless we add a group_id column to expense_splits.
-- In AppContext, on the expense_splits realtime channel INSERT/UPDATE/DELETE handler, add a guard: if the received payload's expense_id is not in the current local expenses array, ignore the event. This prevents cross-group noise without a schema change.
+1. Add `'settled'` to `ActivityLogEntry.action_type` union
+2. Add to `ACTION_CONFIG`:
+   ```
+   settled: { icon: Check, bg: "bg-emerald-100", pillBg: "bg-emerald-50", pillText: "text-emerald-700" }
+   ```
+   (green tint icon bg `#F0FFF7`, green icon color `#00A857`)
 
-### Avatar Files
+3. In `ActivityCard`, handle the settled action type:
+   - Check `change_detail[0].field`:
+     - `'settled_by'` -> "[Actor] settled their share of "[description]" -- $[share amount]"
+     - `'settled_all'` -> "[Actor] settled "[description]" for everyone -- $[total amount]"
+   - Green pill with appropriate text
 
-- Copy all 5 SVG avatar files to `src/assets/avatars/`
-- For this rebuild, avatars are assigned randomly from this set per member (future: stored in DB)
-- Use the member's `avatar_color` as the background circle color, render the SVG illustration inside
-- Avatar assignment must be deterministic. Derive the avatar index from the member's `id` string — for example `parseInt(member.id.replace(/-/g, '').slice(0, 8), 16) % totalAvatarCount`. This gives each member a consistent avatar without a DB change.
+---
 
-## Payer Logic
+## Phase 6: Realtime Wiring
 
-- Default payer: current user
-- Payer is excluded from the member avatar grid
-- Changing payer: old payer re-appears in grid, new payer disappears
-- If new payer was selected as split member, they get deselected from the split
-- In edit mode: payer is locked, tapping shows toast
+The existing `AppContext` already:
+- Subscribes to `expenses` realtime changes and re-fetches splits on any expense change
+- `expense_splits` is already in the realtime publication
 
-## Save Logic (Unchanged)
+Add a realtime subscription for `expense_splits` changes in `AppContext.tsx` so that when splits are updated (settlement), the local state refreshes without needing an expense change event. This ensures balance recalculation is instant.
 
-- Create: calls `create_expense_with_splits` RPC with description "Quick Expense"
-- Edit: calls `edit_expense` RPC
-- No-change detection preserved
-- Confetti on first expense preserved
-- Error handling preserved
+---
 
-## Edge Cases Handled
+## File Summary
 
-- Amount 0 + tap button on Slide 1: shake animation, no navigation
-- No members selected on Slide 2: button fully disabled, no response
-- Backdrop tap: closes drawer
-- Back arrow on Slide 2: returns to Slide 1, amount preserved
-- Amount changed after visiting Slide 2: custom amounts reset to equal on return
-- Edit mode + settled expense: toast immediately, drawer does not open
-- Double-tap save: loading state prevents
-- Network error: destructive toast, drawer stays open on Slide 2
+| File | Change |
+|------|--------|
+| Migration SQL | Add columns, update constraint, create 2 RPCs |
+| `src/types/index.ts` | Add `is_settled`, `settled_at` to ExpenseSplit; add `'settled'` to ActivityLog |
+| `src/components/dashboard/slides/useHeroData.ts` | Filter settled splits from balance calculations |
+| `src/components/dashboard/ExpenseDetailSheet.tsx` | Settlement UI: badges, inline confirm, RPC calls |
+| `src/components/dashboard/slides/NetBalanceSlide.tsx` | PayPal deeplink, return confirmation prompt |
+| `src/pages/ActivityLog.tsx` | Add settled action type config + rendering |
+| `src/contexts/AppContext.tsx` | Add expense_splits realtime subscription |
 
-## Files Summary
+---
 
+## Edge Cases
 
-| File                                          | Action                                         |
-| --------------------------------------------- | ---------------------------------------------- |
-| `src/assets/avatars/avatar01-05.svg`          | Copy from uploads                              |
-| `src/components/expense/ExpenseSheet.tsx`     | Delete                                         |
-| `src/components/expense/ExpenseScreen.tsx`    | Delete and rebuild                             |
-| `src/components/expense/MemberAvatarGrid.tsx` | Create new                                     |
-| `src/components/expense/PayerAvatar.tsx`      | Create new                                     |
-| `src/components/expense/SplitSentence.tsx`    | Rebuild                                        |
-| `src/components/expense/SaveButton.tsx`       | Rebuild                                        |
-| `src/components/expense/NumpadGrid.tsx`       | Visual update                                  |
-| `src/components/expense/AmountDisplay.tsx`    | Update for both slides                         |
-| `src/components/expense/CustomSplitRows.tsx`  | Update avatar style                            |
-| `src/index.css`                               | Add shake-x animation keyframes if not present |
+- Non-payer calls `settle_all` -> RPC throws, UI shows error toast
+- Already-settled split -> RPC throws "Already settled"
+- All splits individually settled -> `expenses.is_settled` auto-flips, `settle_all` would throw "Already fully settled"
+- Settled expense -> edit/delete hidden, sheet read-only
+- User has no split on expense -> no settlement buttons shown
+- PayPal prompt dismissed with "Not yet" -> no RPC, flag cleared
+- PayPal prompt RPC failure -> error shown in prompt, stays open for retry
+- Balance recalculation -> driven by realtime on both expenses and expense_splits tables
 
-
-No changes to: Dashboard.tsx, AppContext.tsx, any RPCs, ExpenseDetailSheet.tsx, settlement system, activity log, bountt-utils.ts, or the deprecated addExpense/calculateBalances.
