@@ -1,34 +1,66 @@
 
-# Fix: Expense Screen as Slide-Up Drawer Overlay
+
+# Fix: Persistent Numpad + Step 2 Inline Controls
 
 ## Problem
-The expense screen is currently a solid full-screen div (`fixed inset-0 z-50 bg-background`) that completely hides the page behind it. The user wants it to behave like a drawer that slides up from the bottom over a dark, blurred overlay -- so the dashboard feed is still visible behind it.
+The current implementation swaps the entire panel content between Step 1 and Step 2 using a conditional (`step === 1 ? ... : ...`). This removes the numpad entirely on Step 2, breaking the custom split editing flow and violating the design intent. The numpad must always be visible -- it drives both the total amount input (Step 1) and custom row editing (Step 2).
+
+Step 2's interactive elements (sentence with tappable chips, description input, save button) are also not rendering as described. The full flow should be:
+
+- **Step 1**: Large amount display + continue button + numpad
+- **Step 2**: Compact amount + live sentence (with tappable payer, mode, members) + description + save button + **numpad still pinned at the bottom**
 
 ## Solution
-Replace the opaque full-screen container with a proper slide-up overlay pattern:
 
 ### Changes (1 file: `src/components/expense/ExpenseScreen.tsx`)
 
-**Wrapper structure** (replaces lines 547-719):
+**Replace the `step === 1 ? ... : ...` conditional** (lines 591-758) with a single layout where the numpad is always rendered at the bottom and the upper content transitions between steps.
 
-1. **Backdrop layer**: A `fixed inset-0` div with `bg-black/60 backdrop-blur-sm` that shows the page behind it, tinted and blurred. Tapping it dismisses the screen (`onOpenChange(false)`).
+#### New layout structure (inside the `max-w-[430px]` container):
 
-2. **Slide-up panel**: A `fixed inset-x-0 bottom-0` div that holds all the content. Height set to `85dvh` (enough room for numpad without cropping). Rounded top corners (`rounded-t-2xl`). Solid `bg-background`.
+```text
++-------------------------------+
+| Top bar (title, back/close)   |  <- flex-shrink-0
++-------------------------------+
+| Upper content area            |  <- flex-1, overflow-y-auto
+|   Step 1: AmountDisplay large |
+|     OR                        |
+|   Step 2: Compact amount      |
+|           SplitSentence       |
+|           CustomSplitRows     |
+|           Description input   |
++-------------------------------+
+| Action row                    |  <- flex-shrink-0
+|   Step 1: Continue button     |
+|   Step 2: SaveButton          |
++-------------------------------+
+| NumpadGrid (ALWAYS)           |  <- flex-shrink-0
++-------------------------------+
+```
 
-3. **Slide animation**: 
-   - On mount: panel translates from `translateY(100%)` to `translateY(0)` (slides up)
-   - On dismiss: slides back down before unmounting
-   - Use CSS transition (`transform 0.3s ease-out`) with a state variable to control the animation
-   - Backdrop fades in/out alongside the panel
+#### Specific changes:
 
-4. **Internal layout**: Both Step 1 and Step 2 content remain exactly as-is inside the panel. The panel uses `flex flex-col h-full` so the numpad stays pinned to the bottom.
+1. **Top bar**: Always renders. In Step 1: title "Adding cost" + close button. In Step 2: back arrow (create mode only) + title "Who's splitting?" + close button. Same as current, just not duplicated.
 
-### Animation approach
-- Add a `visible` state that starts `false`, then sets to `true` on next frame (via `requestAnimationFrame`) to trigger the CSS transition
-- On close: set `visible` to `false`, wait for transition to end (300ms), then call `onOpenChange(false)`
-- This gives native-feeling slide-in / slide-out without adding any dependencies
+2. **Upper content area** (`flex-1 overflow-y-auto min-h-0`):
+   - **Step 1**: `AmountDisplay` (large format) centered vertically
+   - **Step 2**: 
+     - Compact `AmountDisplay` (tappable back to Step 1 in create mode, read-only in edit mode)
+     - Locked payer label (edit mode only)
+     - `SplitSentence` with all existing props (isCoverMode, coveredMemberName, onToggleMember, onSetPayer, etc.)
+     - `CustomSplitRows` (slides in when custom mode active)
+     - Description input
 
-### What does NOT change
-- All internal state, 2-step flow, cover mode logic, save handlers
-- NumpadGrid, AmountDisplay, SplitSentence, SaveButton, CustomSplitRows
+3. **Action row** (`flex-shrink-0`):
+   - **Step 1**: Continue button with arrow (disabled when amount is "0")
+   - **Step 2**: `SaveButton` with all current props
+
+4. **NumpadGrid** (`flex-shrink-0`): Always rendered at the bottom, no conditional. `onKey={handleKey}` works for both steps because `handleKey` already routes to either the amount or the focused custom row based on `splitMode` and `focusedMemberId`.
+
+#### What does NOT change:
+- All state variables, refs, callbacks (`handleKey`, `handleToggleChip`, `handleSetPayer`, `toggleMode`, `handleContinue`, `handleSave`, `handleDismiss`)
+- The slide-up/slide-down animation wrapper (backdrop + panel)
+- `SplitSentence` component and its drawer-based interactions
+- `CustomSplitRows`, `AmountDisplay`, `SaveButton` components
+- Cover mode derivation and chip logic
 - No new files, no new dependencies
