@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Check, Lock } from "lucide-react";
+import { Check } from "lucide-react";
 import { GroupMember } from "@/types";
+import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
 import {
   Drawer,
   DrawerContent,
@@ -11,77 +12,46 @@ import {
 interface SplitSentenceProps {
   splitMode: "equal" | "custom";
   onToggleMode: () => void;
-  activeMembers: GroupMember[];
+  selectedMembers: GroupMember[];
   currentUserId: string | undefined;
-  disabled: boolean;
-  isSingleUser?: boolean;
   payerMember: GroupMember | undefined;
   onSetPayer: (memberId: string) => void;
-  // Member management
   allActiveMembers: GroupMember[];
-  activeIds: Set<string>;
-  onToggleMember: (memberId: string) => void;
   hidePayerDrawer?: boolean;
 }
 
 export default function SplitSentence({
   splitMode,
   onToggleMode,
-  activeMembers,
+  selectedMembers,
   currentUserId,
-  disabled,
-  isSingleUser = false,
   payerMember,
   onSetPayer,
   allActiveMembers,
-  activeIds,
-  onToggleMember,
   hidePayerDrawer = false,
 }: SplitSentenceProps) {
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [payerSheetOpen, setPayerSheetOpen] = useState(false);
-
-  if (isSingleUser) {
-    return (
-      <p className="text-center text-sm font-semibold text-muted-foreground px-6 opacity-40">
-        assigning a split
-      </p>
-    );
-  }
 
   const payerIsYou = payerMember?.user_id === currentUserId;
   const payerDisplay = payerIsYou ? "You" : payerMember?.name ?? "You";
 
-  // "with" list: everyone in the split except the payer
-  const others = activeMembers.filter((m) => m.id !== payerMember?.id);
-
   const isEqual = splitMode === "equal";
+
+  // Names: everyone in selectedMembers except the payer
+  const others = selectedMembers.filter((m) => m.id !== payerMember?.id);
 
   const renderName = (member: GroupMember) => {
     const label = member.user_id === currentUserId ? "you" : member.name;
     return (
-      <button
-        key={member.id}
-        onClick={() => setSheetOpen(true)}
-        className="font-bold text-foreground underline decoration-dotted underline-offset-4 active:opacity-50 transition-opacity"
-        disabled={disabled}
-      >
+      <span key={member.id} className="font-bold text-foreground">
         {label}
-      </button>
+      </span>
     );
   };
 
   let namesDisplay: React.ReactNode;
   if (others.length === 0) {
-    namesDisplay = (
-      <button
-        onClick={() => setSheetOpen(true)}
-        className="font-bold text-foreground underline decoration-dotted underline-offset-4 active:opacity-50 transition-opacity"
-        disabled={disabled}
-      >
-        yourself
-      </button>
-    );
+    namesDisplay = <span className="font-bold text-foreground">No one</span>;
   } else if (others.length === 1) {
     namesDisplay = renderName(others[0]);
   } else if (others.length === 2) {
@@ -109,15 +79,14 @@ export default function SplitSentence({
 
   return (
     <>
-      <p
-        className={`text-center text-sm font-semibold text-muted-foreground px-6 ${
-          disabled ? "opacity-40 pointer-events-none" : ""
-        }`}
-      >
+      <p className="text-center text-sm font-semibold text-muted-foreground px-6">
         <button
-          onClick={() => hidePayerDrawer ? onSetPayer("") : setPayerSheetOpen(true)}
-          className="font-extrabold underline decoration-dotted underline-offset-4 text-foreground"
-          disabled={disabled}
+          onClick={() => {
+            if (hidePayerDrawer) return;
+            setPayerSheetOpen(true);
+          }}
+          className="font-extrabold underline decoration-dotted underline-offset-4"
+          style={{ color: "#D94F00" }}
         >
           {payerDisplay}
         </button>
@@ -125,66 +94,12 @@ export default function SplitSentence({
         <button
           onClick={onToggleMode}
           className="font-extrabold underline decoration-dotted underline-offset-4"
-          style={{
-            color: isEqual ? "hsl(var(--primary))" : "#3B82F6",
-          }}
-          disabled={disabled}
+          style={{ color: isEqual ? "#D94F00" : "#2563EB" }}
         >
           {isEqual ? "equally" : "custom"}
         </button>{" "}
         with {namesDisplay}
       </p>
-
-      {/* Member selection drawer */}
-      <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle className="font-sora">Edit split members</DrawerTitle>
-          </DrawerHeader>
-          <div className="px-4 pb-6 space-y-1">
-            {allActiveMembers.map((m) => {
-              const isSelf = m.user_id === currentUserId;
-              const label = isSelf ? "You" : m.name;
-              const isPayer = m.id === payerMember?.id;
-              const isChecked = activeIds.has(m.id) || isPayer;
-
-              return (
-                <button
-                  key={m.id}
-                  onClick={() => !isPayer && onToggleMember(m.id)}
-                  disabled={isPayer}
-                  className={`flex items-center justify-between w-full rounded-xl px-4 py-3 transition-colors ${
-                    isPayer ? "opacity-60" : "active:bg-muted/50"
-                  }`}
-                >
-                  <span className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    {label}
-                    {isPayer && (
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Lock className="w-3 h-3" />
-                        payer
-                      </span>
-                    )}
-                  </span>
-                  <div
-                    className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${
-                      isChecked
-                        ? isPayer
-                          ? "bg-primary/50"
-                          : "bg-primary"
-                        : "border-2 border-muted-foreground/30"
-                    }`}
-                  >
-                    {isChecked && (
-                      <Check className="w-3 h-3 text-primary-foreground" />
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </DrawerContent>
-      </Drawer>
 
       {/* Payer selection drawer */}
       <Drawer open={payerSheetOpen} onOpenChange={setPayerSheetOpen}>
@@ -197,6 +112,8 @@ export default function SplitSentence({
               const isSelf = m.user_id === currentUserId;
               const label = isSelf ? "You" : m.name;
               const isSelected = m.id === payerMember?.id;
+              const avatarImg = getAvatarImage(m);
+              const color = getAvatarColor(m);
 
               return (
                 <button
@@ -207,9 +124,15 @@ export default function SplitSentence({
                   }}
                   className="flex items-center justify-between w-full rounded-xl px-4 py-3 transition-colors active:bg-muted/50"
                 >
-                  <span className="text-sm font-semibold text-foreground">
-                    {label}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center overflow-hidden"
+                      style={{ backgroundColor: color }}
+                    >
+                      <img src={avatarImg} alt={label} className="w-[75%] h-[75%] object-contain" draggable={false} />
+                    </div>
+                    <span className="text-sm font-semibold text-foreground">{label}</span>
+                  </div>
                   {isSelected && (
                     <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
                       <Check className="w-3 h-3 text-primary-foreground" />
