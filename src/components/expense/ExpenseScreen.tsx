@@ -588,22 +588,34 @@ export default function ExpenseScreen({
         }}
       >
         <div className="max-w-[430px] mx-auto flex flex-col h-full">
-          {step === 1 ? (
-            /* ================ STEP 1: Amount ================ */
-            <div className="flex flex-col h-full">
-              {/* Top bar */}
-              <div className="flex items-center justify-between px-5 pt-3 pb-1 flex-shrink-0">
-                <h2 className="font-sora text-lg font-bold text-foreground">Adding cost</h2>
+          {/* ===== Top bar ===== */}
+          <div className="flex items-center justify-between px-5 pt-3 pb-1 flex-shrink-0">
+            <div className="flex items-center gap-2">
+              {step === 2 && !isEditMode && (
                 <button
-                  onClick={handleDismiss}
+                  onClick={() => setStep(1)}
                   className="w-9 h-9 flex items-center justify-center rounded-full bg-card"
                 >
-                  <X className="w-5 h-5 text-foreground" />
+                  <ArrowLeft className="w-5 h-5 text-foreground" />
                 </button>
-              </div>
+              )}
+              <h2 className="font-sora text-lg font-bold text-foreground">
+                {step === 1 ? "Adding cost" : isEditMode ? "Editing cost" : "Who's splitting?"}
+              </h2>
+            </div>
+            <button
+              onClick={handleDismiss}
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-card"
+            >
+              <X className="w-5 h-5 text-foreground" />
+            </button>
+          </div>
 
-              {/* Amount display */}
-              <div className="flex-1 flex items-center justify-center">
+          {/* ===== Upper content area ===== */}
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {step === 1 ? (
+              /* Step 1: Large amount centered */
+              <div className="flex items-center justify-center h-full">
                 <AmountDisplay
                   amount={amount}
                   splitMode="equal"
@@ -611,57 +623,9 @@ export default function ExpenseScreen({
                   isBalanced={false}
                 />
               </div>
-
-              {/* Continue button */}
-              <div className="px-4 pb-1 flex-shrink-0">
-                <button
-                  onClick={handleContinue}
-                  disabled={amount === "0"}
-                  className="w-full rounded-[18px] py-4 font-sora text-[17px] font-extrabold transition-all active:scale-[0.985] flex items-center justify-center gap-2"
-                  style={{
-                    backgroundColor: amount === "0" ? "#EAEAE6" : "hsl(var(--primary))",
-                    color: amount === "0" ? "#C0C0BC" : "#FFFFFF",
-                    boxShadow: amount === "0" ? "none" : "0 4px 14px rgba(217,79,0,0.3)",
-                  }}
-                >
-                  Continue
-                  <ArrowRight className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Numpad */}
-              <div className="flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-                <NumpadGrid onKey={handleKey} />
-              </div>
-            </div>
-          ) : (
-            /* ================ STEP 2: Who + How ================ */
-            <div className="flex flex-col h-full">
-              {/* Top bar */}
-              <div className="flex items-center justify-between px-5 pt-3 pb-1 flex-shrink-0">
-                <div className="flex items-center gap-2">
-                  {!isEditMode && (
-                    <button
-                      onClick={() => setStep(1)}
-                      className="w-9 h-9 flex items-center justify-center rounded-full bg-card"
-                    >
-                      <ArrowLeft className="w-5 h-5 text-foreground" />
-                    </button>
-                  )}
-                  <h2 className="font-sora text-lg font-bold text-foreground">
-                    {isEditMode ? "Editing cost" : "Who's splitting?"}
-                  </h2>
-                </div>
-                <button
-                  onClick={handleDismiss}
-                  className="w-9 h-9 flex items-center justify-center rounded-full bg-card"
-                >
-                  <X className="w-5 h-5 text-foreground" />
-                </button>
-              </div>
-
-              {/* Scrollable content */}
-              <div className="flex-1 overflow-y-auto min-h-0">
+            ) : (
+              /* Step 2: Compact amount + sentence + custom rows */
+              <>
                 {/* Compact amount (tappable back to Step 1 in create mode) */}
                 {!isEditMode ? (
                   <AmountDisplay
@@ -727,35 +691,58 @@ export default function ExpenseScreen({
                   onFocus={handleFocusRow}
                   visible={splitMode === "custom" && !isCoverMode}
                 />
-              </div>
 
-              {/* Description input */}
-              <div className="px-5 pt-2 pb-1 flex-shrink-0">
-                <input
-                  type="text"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="e.g., Pizza, Rent, Groceries"
-                  maxLength={50}
-                  className="w-full text-center text-base font-medium rounded-xl px-4 py-3.5 bg-muted text-foreground placeholder:text-muted-foreground outline-none border-none font-sora"
-                />
-              </div>
+                {/* Description input */}
+                <div className="px-5 pt-2 pb-1">
+                  <input
+                    type="text"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="e.g., Pizza, Rent, Groceries"
+                    maxLength={50}
+                    className="w-full text-center text-base font-medium rounded-xl px-4 py-3.5 bg-muted text-foreground placeholder:text-muted-foreground outline-none border-none font-sora"
+                  />
+                </div>
+              </>
+            )}
+          </div>
 
-              {/* Save button */}
-              <div className="flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-                <SaveButton
-                  splitMode={splitMode}
-                  canSave={canSave}
-                  isBalanced={isBalanced}
-                  loading={loading}
-                  onClick={handleSave}
-                  isSingleUser={isSingleUser}
-                  label={saveLabel}
-                  isCoverMode={isCoverMode}
-                />
+          {/* ===== Action row ===== */}
+          <div className="flex-shrink-0">
+            {step === 1 ? (
+              <div className="px-4 pb-1">
+                <button
+                  onClick={handleContinue}
+                  disabled={amount === "0"}
+                  className="w-full rounded-[18px] py-4 font-sora text-[17px] font-extrabold transition-all active:scale-[0.985] flex items-center justify-center gap-2"
+                  style={{
+                    backgroundColor: amount === "0" ? "#EAEAE6" : "hsl(var(--primary))",
+                    color: amount === "0" ? "#C0C0BC" : "#FFFFFF",
+                    boxShadow: amount === "0" ? "none" : "0 4px 14px rgba(217,79,0,0.3)",
+                  }}
+                >
+                  Continue
+                  <ArrowRight className="w-5 h-5" />
+                </button>
               </div>
-            </div>
-          )}
+            ) : (
+              <SaveButton
+                splitMode={splitMode}
+                canSave={canSave}
+                isBalanced={isBalanced}
+                loading={loading}
+                onClick={handleSave}
+                isSingleUser={isSingleUser}
+                label={saveLabel}
+                isCoverMode={isCoverMode}
+              />
+            )}
+          </div>
+
+          {/* ===== Numpad (ALWAYS visible) ===== */}
+          <div className="flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+            <NumpadGrid onKey={handleKey} />
+          </div>
         </div>
       </div>
     </div>
