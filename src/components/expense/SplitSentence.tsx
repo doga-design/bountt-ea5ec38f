@@ -17,11 +17,12 @@ interface SplitSentenceProps {
   isSingleUser?: boolean;
   payerMember: GroupMember | undefined;
   onSetPayer: (memberId: string) => void;
-  // Member management
   allActiveMembers: GroupMember[];
   activeIds: Set<string>;
   onToggleMember: (memberId: string) => void;
   hidePayerDrawer?: boolean;
+  isCoverMode?: boolean;
+  coveredMemberName?: string;
 }
 
 export default function SplitSentence({
@@ -37,14 +38,17 @@ export default function SplitSentence({
   activeIds,
   onToggleMember,
   hidePayerDrawer = false,
+  isCoverMode = false,
+  coveredMemberName,
 }: SplitSentenceProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [payerSheetOpen, setPayerSheetOpen] = useState(false);
 
-  if (isSingleUser) {
+  // Solo state
+  if (isSingleUser && !isCoverMode) {
     return (
-      <p className="text-center text-sm font-semibold text-muted-foreground px-6 opacity-40">
-        assigning a split
+      <p className="text-center text-sm font-semibold text-muted-foreground px-6 opacity-60">
+        You paid · personal expense
       </p>
     );
   }
@@ -52,10 +56,87 @@ export default function SplitSentence({
   const payerIsYou = payerMember?.user_id === currentUserId;
   const payerDisplay = payerIsYou ? "You" : payerMember?.name ?? "You";
 
-  // "with" list: everyone in the split except the payer
-  const others = activeMembers.filter((m) => m.id !== payerMember?.id);
-
   const isEqual = splitMode === "equal";
+
+  // Cover mode sentence
+  if (isCoverMode) {
+    const coveredName = coveredMemberName ?? "someone";
+    const coveredIsYou = activeMembers.length === 1 && activeMembers[0]?.user_id === currentUserId;
+    const coveredDisplay = coveredIsYou ? "you" : coveredName;
+
+    return (
+      <>
+        <p
+          className={`text-center text-sm font-semibold text-muted-foreground px-6 ${
+            disabled ? "opacity-40 pointer-events-none" : ""
+          }`}
+        >
+          <button
+            onClick={() => hidePayerDrawer ? onSetPayer("") : setPayerSheetOpen(true)}
+            className="font-extrabold underline decoration-dotted underline-offset-4 text-foreground"
+            disabled={disabled}
+          >
+            {payerDisplay}
+          </button>
+          {" paid, covering for "}
+          <button
+            onClick={() => setSheetOpen(true)}
+            className="font-bold text-foreground underline decoration-dotted underline-offset-4 active:opacity-50 transition-opacity"
+            disabled={disabled}
+          >
+            {coveredDisplay}
+          </button>
+        </p>
+
+        {/* Member selection drawer (cover mode - single select) */}
+        <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle className="font-sora">Who are you covering?</DrawerTitle>
+            </DrawerHeader>
+            <div className="px-4 pb-6 space-y-1">
+              {allActiveMembers
+                .filter((m) => m.user_id !== currentUserId)
+                .map((m) => {
+                  const isChecked = activeIds.has(m.id);
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => {
+                        onToggleMember(m.id);
+                        setSheetOpen(false);
+                      }}
+                      className="flex items-center justify-between w-full rounded-xl px-4 py-3 transition-colors active:bg-muted/50"
+                    >
+                      <span className="text-sm font-semibold text-foreground">{m.name}</span>
+                      {isChecked && (
+                        <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                          <Check className="w-3 h-3 text-primary-foreground" />
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+            </div>
+          </DrawerContent>
+        </Drawer>
+
+        {/* Payer selection drawer */}
+        <CoverPayerDrawer
+          open={payerSheetOpen}
+          onOpenChange={setPayerSheetOpen}
+          allActiveMembers={allActiveMembers}
+          currentUserId={currentUserId}
+          payerMember={payerMember}
+          onSetPayer={onSetPayer}
+          coveredMemberId={activeMembers[0]?.id}
+        />
+      </>
+    );
+  }
+
+  // Split mode sentence
+  const others = activeMembers.filter((m) => m.id !== payerMember?.id);
 
   const renderName = (member: GroupMember) => {
     const label = member.user_id === currentUserId ? "you" : member.name;
@@ -222,5 +303,70 @@ export default function SplitSentence({
         </DrawerContent>
       </Drawer>
     </>
+  );
+}
+
+// Separate payer drawer for cover mode — disables the covered person
+function CoverPayerDrawer({
+  open,
+  onOpenChange,
+  allActiveMembers,
+  currentUserId,
+  payerMember,
+  onSetPayer,
+  coveredMemberId,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  allActiveMembers: GroupMember[];
+  currentUserId: string | undefined;
+  payerMember: GroupMember | undefined;
+  onSetPayer: (id: string) => void;
+  coveredMemberId: string | undefined;
+}) {
+  return (
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle className="font-sora">Who paid?</DrawerTitle>
+        </DrawerHeader>
+        <div className="px-4 pb-6 space-y-1">
+          {allActiveMembers.map((m) => {
+            const isSelf = m.user_id === currentUserId;
+            const label = isSelf ? "You" : m.name;
+            const isSelected = m.id === payerMember?.id;
+            const isCoveredPerson = m.id === coveredMemberId;
+
+            return (
+              <button
+                key={m.id}
+                onClick={() => {
+                  if (!isCoveredPerson) {
+                    onSetPayer(m.id);
+                    onOpenChange(false);
+                  }
+                }}
+                disabled={isCoveredPerson}
+                className={`flex items-center justify-between w-full rounded-xl px-4 py-3 transition-colors ${
+                  isCoveredPerson ? "opacity-40" : "active:bg-muted/50"
+                }`}
+              >
+                <span className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  {label}
+                  {isCoveredPerson && (
+                    <span className="text-xs text-muted-foreground">being covered</span>
+                  )}
+                </span>
+                {isSelected && (
+                  <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                    <Check className="w-3 h-3 text-primary-foreground" />
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </DrawerContent>
+    </Drawer>
   );
 }

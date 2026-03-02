@@ -14,8 +14,8 @@ interface ExpenseCardProps {
 export default function ExpenseCard({ expense, splits, groupMembers, onClick }: ExpenseCardProps) {
   const { user } = useApp();
   const isPayer = expense.paid_by_user_id === user?.id;
+  const isCover = expense.expense_type === "cover";
 
-  // Find the payer's group member record for color lookup
   const payerMember = groupMembers.find(
     (m) =>
       (expense.paid_by_user_id && m.user_id === expense.paid_by_user_id) ||
@@ -41,65 +41,86 @@ export default function ExpenseCard({ expense, splits, groupMembers, onClick }: 
     amountColor = "hsl(var(--foreground))";
   }
 
-  // --- Subtitle: "Paid by X · Y owes $Z" ---
-  const payerLabel = isPayer ? "You" : expense.paid_by_name;
+  // --- Build subtitle per copy table ---
+  const payerName = isPayer ? "You" : expense.paid_by_name;
   const payerLabelColor = expense.is_settled
     ? "hsl(var(--muted-foreground))"
     : isPayer
       ? ORANGE
       : payerColor;
 
-  // Find the "owes" portion
-  let owesText = "";
-  if (!expense.is_settled) {
-    if (splits.length === 1) {
-      // Single-member expense, no owes text
-    } else if (splits.length === 2) {
-      // 2-person split
-      if (isPayer) {
-        const otherSplit = splits.find((s) => s.user_id !== user?.id);
-        if (otherSplit) {
-          owesText = `${otherSplit.member_name} owes ${formatCurrency(Number(otherSplit.share_amount))}`;
-        }
+  // Check if current user has a split
+  const mySplit = splits.find((s) => s.user_id === user?.id);
+  const isInvolved = isPayer || !!mySplit;
+
+  let primaryLabel = "";
+  let secondaryLabel = "";
+
+  if (expense.is_settled) {
+    // Settled states
+    if (isCover) {
+      primaryLabel = isPayer ? "You covered" : `${expense.paid_by_name} covered`;
+      secondaryLabel = "paid back ✓";
+    } else {
+      primaryLabel = isPayer ? "You paid" : `${expense.paid_by_name} paid`;
+      secondaryLabel = isPayer ? "all settled ✓" : "settled ✓";
+    }
+  } else if (isCover) {
+    // Cover unsettled states
+    const coveredSplit = splits[0]; // Cover has exactly one split
+    const coveredName = coveredSplit?.member_name ?? "someone";
+    const coveredIsMe = coveredSplit?.user_id === user?.id;
+
+    if (isPayer) {
+      primaryLabel = "You covered";
+      secondaryLabel = `${coveredName} owes you ${formatCurrency(Number(coveredSplit?.share_amount ?? 0))}`;
+    } else if (coveredIsMe) {
+      primaryLabel = `${expense.paid_by_name} covered`;
+      secondaryLabel = `you owe ${expense.paid_by_name} ${formatCurrency(Number(coveredSplit?.share_amount ?? 0))}`;
+    } else {
+      primaryLabel = `${expense.paid_by_name} covered ${coveredName}`;
+      secondaryLabel = "just so you know";
+    }
+  } else {
+    // Split unsettled states
+    if (isPayer) {
+      if (splits.length === 1) {
+        primaryLabel = "You paid";
+      } else if (splits.length === 2) {
+        const other = splits.find((s) => s.user_id !== user?.id);
+        primaryLabel = "You paid";
+        secondaryLabel = `split with ${other?.member_name ?? "someone"}`;
       } else {
-        const mySplit = splits.find((s) => s.user_id === user?.id);
-        if (mySplit) {
-          owesText = `You owe ${formatCurrency(Number(mySplit.share_amount))}`;
-        }
+        primaryLabel = "You paid";
+        secondaryLabel = `split ${splits.length} ways`;
       }
-    } else if (splits.length > 2) {
-      // 3+ person: show largest non-payer split
-      if (isPayer) {
-        const nonPayerSplits = splits.filter((s) => s.user_id !== user?.id);
-        const largest = nonPayerSplits.sort((a, b) => Number(b.share_amount) - Number(a.share_amount))[0];
-        if (largest) {
-          owesText = `${largest.member_name} owes ${formatCurrency(Number(largest.share_amount))}`;
-        }
-      } else {
-        const mySplit = splits.find((s) => s.user_id === user?.id);
-        if (mySplit) {
-          owesText = `You owe ${formatCurrency(Number(mySplit.share_amount))}`;
-        }
-      }
+    } else if (mySplit) {
+      primaryLabel = `${expense.paid_by_name} paid`;
+      secondaryLabel = `you owe ${formatCurrency(Number(mySplit.share_amount))}`;
+    } else {
+      // Not involved
+      const names = splits.map((s) => s.member_name);
+      primaryLabel = `${expense.paid_by_name} paid`;
+      secondaryLabel = `between ${names.join(" & ")}`;
     }
   }
 
   // --- Split indicator ---
-  let splitIndicator: React.ReactNode;
+  let splitIndicator: React.ReactNode = null;
   if (expense.is_settled) {
     splitIndicator = (
       <span className="flex items-center gap-0.5 text-xs" style={{ color: GREEN }}>
         settled <Check className="w-3 h-3" />
       </span>
     );
+  } else if (isCover) {
+    splitIndicator = <span className="text-xs text-muted-foreground">cover</span>;
   } else if (splits.length === 2) {
     const isEqual = splits.every((s) => Number(s.share_amount) === Number(splits[0].share_amount));
     splitIndicator = <span className="text-xs text-muted-foreground">{isEqual ? "50 / 50" : "custom split"}</span>;
   } else if (splits.length > 2) {
     const isEqual = splits.every((s) => Number(s.share_amount) === Number(splits[0].share_amount));
     splitIndicator = <span className="text-xs text-muted-foreground">{isEqual ? `${splits.length}-way` : "custom split"}</span>;
-  } else {
-    splitIndicator = null;
   }
 
   const settledTextClass = expense.is_settled ? "text-muted-foreground" : "";
@@ -115,22 +136,14 @@ export default function ExpenseCard({ expense, splits, groupMembers, onClick }: 
         <p className={`font-semibold text-sm ${settledTextClass || "text-foreground"}`}>
           {expense.description}
         </p>
-        <p className="text-xs mt-0.5 flex items-center gap-0">
+        <p className="text-xs mt-0.5 flex items-center gap-0 flex-wrap">
           <span style={{ color: payerLabelColor }}>
-            Paid by {payerLabel}
+            {primaryLabel}
           </span>
-          {owesText && (
+          {secondaryLabel && (
             <>
               <span className="text-muted-foreground mx-1">·</span>
-              <span className="text-muted-foreground">{owesText}</span>
-            </>
-          )}
-          {expense.is_settled && (
-            <>
-              <span className="text-muted-foreground mx-1">·</span>
-              <span className="flex items-center gap-0.5" style={{ color: GREEN }}>
-                Settled <Check className="w-3 h-3" />
-              </span>
+              <span className="text-muted-foreground">{secondaryLabel}</span>
             </>
           )}
         </p>

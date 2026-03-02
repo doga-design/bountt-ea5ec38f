@@ -1,10 +1,12 @@
 interface AmountDisplayProps {
   amount: string;
   splitMode: "equal" | "custom";
-  remaining: number; // total - sum of custom amounts
+  remaining: number;
   isBalanced: boolean;
   onDistribute?: () => void;
   canDistribute?: boolean;
+  compact?: boolean;
+  onTap?: () => void;
 }
 
 export default function AmountDisplay({
@@ -14,9 +16,30 @@ export default function AmountDisplay({
   isBalanced,
   onDistribute,
   canDistribute = false,
+  compact = false,
+  onTap,
 }: AmountDisplayProps) {
   const display = amount === "0" ? "0" : amount;
   const total = parseFloat(amount) || 0;
+
+  // Compact read-only variant for Step 2
+  if (compact) {
+    return (
+      <button
+        onClick={onTap}
+        className="flex items-baseline justify-center py-2 gap-1 active:opacity-60 transition-opacity w-full"
+        type="button"
+      >
+        <span className="font-sora text-lg font-bold text-muted-foreground">$</span>
+        <span
+          className="font-sora text-3xl font-extrabold text-foreground"
+          style={{ letterSpacing: "-0.05em" }}
+        >
+          {display}
+        </span>
+      </button>
+    );
+  }
 
   if (splitMode === "custom") {
     const overBudget = remaining < -0.01;

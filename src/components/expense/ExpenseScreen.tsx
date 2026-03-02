@@ -1,11 +1,15 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
-import { X, Lock } from "lucide-react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { X, ArrowLeft, ArrowRight, Lock } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { distributeCents } from "@/lib/bountt-utils";
 import confetti from "canvas-confetti";
 import { GroupMember, Expense, ExpenseSplit } from "@/types";
+import {
+  Drawer,
+  DrawerContent,
+} from "@/components/ui/drawer";
 
 import AmountDisplay from "./AmountDisplay";
 import SplitSentence from "./SplitSentence";
@@ -32,6 +36,7 @@ export default function ExpenseScreen({
   const { currentGroup, user, profile, groupMembers, fetchExpenses, fetchExpenseSplits, addPlaceholderMember } = useApp();
   const { toast } = useToast();
 
+  const [step, setStep] = useState<1 | 2>(1);
   const [amount, setAmount] = useState("0");
   const [description, setDescription] = useState("");
   const [splitMode, setSplitMode] = useState<"equal" | "custom">("equal");
@@ -44,6 +49,9 @@ export default function ExpenseScreen({
   const [freshFocus, setFreshFocus] = useState(false);
   const [shakeMemberId, setShakeMemberId] = useState<string | null>(null);
   const [payerId, setPayerId] = useState<string | null>(null);
+
+  // Track amount when entering Step 2 to detect changes on return
+  const lastStep2AmountRef = useRef<string>("0");
 
   // Active members sorted: "You" first
   const activeMembers = useMemo(() => {
@@ -58,18 +66,27 @@ export default function ExpenseScreen({
 
   const isEditMode = !!editExpense;
 
+  // Current user's member ID
+  const currentUserMemberId = useMemo(
+    () => activeMembers.find((m) => m.user_id === user?.id)?.id,
+    [activeMembers, user?.id]
+  );
+
+  // Derived cover mode — no separate state
+  const isCoverMode = currentUserMemberId ? !activeIds.has(currentUserMemberId) : false;
+
   useEffect(() => {
     setActiveIds(new Set(activeMembers.map((m) => m.id)));
   }, [activeMembers.length]);
 
+  // KNOWN DEBT: Edit mode always opens in equal mode, losing original custom split data
   useEffect(() => {
     if (open) {
       if (isEditMode && editExpense && editSplits) {
-        // Pre-fill from edit data
+        setStep(2); // Skip Step 1 in edit mode
         setAmount(String(editExpense.amount));
         setDescription(editExpense.description);
         setSplitMode("equal");
-        // Match split member IDs to current group members
         const splitMemberIds = new Set<string>();
         editSplits.forEach((s) => {
           const member = activeMembers.find(
@@ -83,7 +100,6 @@ export default function ExpenseScreen({
         } else {
           setActiveIds(new Set(activeMembers.map((m) => m.id)));
         }
-        // Find the payer member
         const payerM = activeMembers.find(
           (m) => (editExpense.paid_by_user_id && m.user_id === editExpense.paid_by_user_id) ||
             (!editExpense.paid_by_user_id && m.name === editExpense.paid_by_name && m.is_placeholder)
@@ -92,7 +108,9 @@ export default function ExpenseScreen({
         setFocusedMemberId(null);
         setCustomAmounts(new Map());
         setEditingTotal(false);
+        lastStep2AmountRef.current = String(editExpense.amount);
       } else {
+        setStep(1);
         setAmount("0");
         setDescription("");
         setSplitMode("equal");
@@ -100,14 +118,13 @@ export default function ExpenseScreen({
         setFocusedMemberId(null);
         setCustomAmounts(new Map());
         setEditingTotal(false);
-        // Default payer to current user's member record
         const selfMember = activeMembers.find((m) => m.user_id === user?.id);
         setPayerId(selfMember?.id ?? null);
+        lastStep2AmountRef.current = "0";
       }
     }
   }, [open]);
 
-  // Resolve current payer member; fallback to self if removed
   const payerMember = useMemo(() => {
     const found = activeMembers.find((m) => m.id === payerId);
     if (found) return found;
@@ -118,6 +135,14 @@ export default function ExpenseScreen({
     () => activeMembers.filter((m) => activeIds.has(m.id)),
     [activeMembers, activeIds]
   );
+
+  // The covered member name in cover mode
+  const coveredMemberName = useMemo(() => {
+    if (!isCoverMode) return undefined;
+    const covered = selectedMembers[0];
+    if (!covered) return undefined;
+    return covered.user_id === user?.id ? "you" : covered.name;
+  }, [isCoverMode, selectedMembers, user?.id]);
 
   // Distribute equally helper
   const distributeEqually = useCallback(
@@ -207,7 +232,7 @@ export default function ExpenseScreen({
     selectedMembers.length >= 2 &&
     selectedMembers.filter((m) => m.id !== focusedMemberId).length > 0;
 
-  // Handle numpad key
+  // Handle numpad key — Phase 8 bug fix: added customAmounts and activeIds to deps
   const handleKey = useCallback(
     (key: string) => {
       const isCustomFocused = splitMode === "custom" && focusedMemberId && !editingTotal;
@@ -225,7 +250,6 @@ export default function ExpenseScreen({
       };
 
       if (isCustomFocused) {
-        // Calculate max this member can have
         const maxForMember = (() => {
           let othersSum = 0;
           for (const id of activeIds) {
@@ -278,7 +302,7 @@ export default function ExpenseScreen({
         });
       }
     },
-    [splitMode, focusedMemberId, editingTotal, freshFocus, selectedMembers, distributeEqually]
+    [splitMode, focusedMemberId, editingTotal, freshFocus, selectedMembers, distributeEqually, customAmounts, activeIds]
   );
 
   // Toggle split mode
@@ -298,10 +322,52 @@ export default function ExpenseScreen({
     }
   }, [splitMode, amount, selectedMembers, distributeEqually]);
 
-  // Toggle chip — payer cannot be unchecked
+  // Toggle chip — cover mode aware
   const handleToggleChip = useCallback(
     (memberId: string) => {
-      // Prevent unchecking the payer
+      const isCurrentUser = memberId === currentUserMemberId;
+
+      // Current user tapping themselves
+      if (isCurrentUser) {
+        if (isCoverMode) {
+          // Already in cover mode, tapping ghosted You chip — show toast
+          toast({ title: "You're covering this — you're not in the split." });
+          return;
+        }
+
+        // Entering cover mode: deselect self
+        // Edge case: if only 1 other member, can't enter cover mode
+        if (activeMembers.length <= 1) return;
+
+        setActiveIds((prev) => {
+          const next = new Set(prev);
+          next.delete(memberId);
+          // Keep only one other member (most recently in the set)
+          const othersInSet = Array.from(next);
+          if (othersInSet.length > 1) {
+            // Keep the last one
+            const keep = othersInSet[othersInSet.length - 1];
+            return new Set([keep]);
+          }
+          return next;
+        });
+
+        // Close custom panel, reset to equal
+        if (splitMode === "custom") {
+          setSplitMode("equal");
+          setCustomAmounts(new Map());
+          setFocusedMemberId(null);
+        }
+        return;
+      }
+
+      // In cover mode: single-select among non-payer members
+      if (isCoverMode) {
+        setActiveIds(new Set([memberId]));
+        return;
+      }
+
+      // Normal split mode toggling
       if (memberId === payerMember?.id) return;
 
       setActiveIds((prev) => {
@@ -323,7 +389,7 @@ export default function ExpenseScreen({
         return next;
       });
     },
-    [splitMode, amount, activeMembers, distributeEqually]
+    [splitMode, amount, activeMembers, distributeEqually, currentUserMemberId, isCoverMode, payerMember, toast]
   );
 
   // Handle focusing a custom row (also unfocuses total editing)
@@ -333,19 +399,34 @@ export default function ExpenseScreen({
     setFreshFocus(true);
   }, []);
 
+  // Continue from Step 1 to Step 2
+  const handleContinue = useCallback(() => {
+    const currentAmount = amount;
+    if (currentAmount !== lastStep2AmountRef.current) {
+      // Amount changed since last Step 2 visit — redistribute
+      const total = parseFloat(currentAmount) || 0;
+      setCustomAmounts(distributeEqually(total, selectedMembers));
+    }
+    lastStep2AmountRef.current = currentAmount;
+    setStep(2);
+  }, [amount, selectedMembers, distributeEqually]);
+
   // Save
   const handleSave = async () => {
     if (!currentGroup || !user || loading) return;
     const numAmount = parseFloat(amount);
     if (!numAmount || numAmount <= 0) return;
 
-    if (splitMode === "custom" && !isBalanced) return;
+    if (splitMode === "custom" && !isBalanced && !isCoverMode) return;
 
     // Edit mode: check for settled
     if (isEditMode && editExpense?.is_settled) {
       toast({ title: "This expense has been settled and can't be edited.", variant: "destructive" });
       return;
     }
+
+    // Solo check
+    if (!isCoverMode && selectedMembers.length <= 1) return;
 
     // Edit mode: no-change detection
     if (isEditMode && editExpense && editSplits) {
@@ -367,9 +448,18 @@ export default function ExpenseScreen({
       const paidByUserId = selectedPayer?.user_id ?? null;
       const paidByName = selectedPayer?.name ?? user.email?.split("@")[0] ?? "You";
 
+      const expenseType = isCoverMode ? "cover" : "split";
+
       let splits: { user_id: string | null; member_name: string; share_amount: number }[];
 
-      if (splitMode === "equal") {
+      if (isCoverMode) {
+        // Cover mode: the single covered member gets the full amount
+        splits = selectedMembers.map((m) => ({
+          user_id: m.user_id,
+          member_name: m.name,
+          share_amount: numAmount,
+        }));
+      } else if (splitMode === "equal") {
         const shares = distributeCents(numAmount, selectedMembers.length);
         splits = selectedMembers
           .map((m, i) => ({
@@ -397,6 +487,7 @@ export default function ExpenseScreen({
           p_description: description.trim() || "Quick Expense",
           p_splits: splits,
           p_actor_name: actorName,
+          p_expense_type: expenseType,
         } as any);
 
         if (rpcError) throw rpcError;
@@ -417,6 +508,7 @@ export default function ExpenseScreen({
           p_paid_by_name: paidByName,
           p_created_by: user.id,
           p_splits: splits,
+          p_expense_type: expenseType,
         });
 
         if (rpcError) throw rpcError;
@@ -450,106 +542,190 @@ export default function ExpenseScreen({
 
 
   const canSave = totalNum > 0;
-  const isSingleUser = selectedMembers.length <= 1;
+  const isSingleUser = selectedMembers.length <= 1 && !isCoverMode;
 
   if (!open) return null;
 
+  const saveLabel = isEditMode ? "Save changes" : "Save";
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background max-w-[430px] mx-auto" style={{ height: '100dvh' }}>
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-5 pt-4 pb-1 flex-shrink-0">
-        <h2 className="font-sora text-lg font-bold text-foreground">{isEditMode ? "Editing cost" : "Adding cost"}</h2>
-        <button
-          onClick={() => onOpenChange(false)}
-          className="w-9 h-9 flex items-center justify-center rounded-full bg-card"
-        >
-          <X className="w-5 h-5 text-foreground" />
-        </button>
-      </div>
+    <Drawer
+      open={open}
+      onOpenChange={onOpenChange}
+      snapPoints={[0.8]}
+      activeSnapPoint={0.8}
+      fadeFromIndex={0}
+    >
+      <DrawerContent className="max-w-[430px] mx-auto flex flex-col" style={{ maxHeight: '80dvh' }}>
+        {step === 1 ? (
+          /* ================ STEP 1: Amount ================ */
+          <div className="flex flex-col h-full">
+            {/* Top bar */}
+            <div className="flex items-center justify-between px-5 pt-3 pb-1 flex-shrink-0">
+              <h2 className="font-sora text-lg font-bold text-foreground">Adding cost</h2>
+              <button
+                onClick={() => onOpenChange(false)}
+                className="w-9 h-9 flex items-center justify-center rounded-full bg-card"
+              >
+                <X className="w-5 h-5 text-foreground" />
+              </button>
+            </div>
 
-      {/* Scrollable middle section */}
-      <div className="flex-1 overflow-y-auto min-h-0">
-        {/* Amount display */}
-        <AmountDisplay
-          amount={amount}
-          splitMode={splitMode}
-          remaining={remaining}
-          isBalanced={isBalanced}
-          onDistribute={handleDistribute}
-          canDistribute={canDistribute}
-        />
+            {/* Amount display */}
+            <div className="flex-1 flex items-center justify-center">
+              <AmountDisplay
+                amount={amount}
+                splitMode="equal"
+                remaining={0}
+                isBalanced={false}
+              />
+            </div>
 
-        {/* Locked payer label (edit mode) */}
-        {isEditMode && editExpense && (
-          <button
-            onClick={() => toast({ title: "To change the payer, delete this expense and log a new one" })}
-            className="flex items-center justify-center gap-1.5 mx-auto mb-1 px-3 py-1"
-          >
-            <Lock className="w-3 h-3 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground font-medium">
-              Paid by {editExpense.paid_by_user_id === user?.id ? "You" : editExpense.paid_by_name}
-            </span>
-          </button>
+            {/* Continue button */}
+            <div className="px-4 pb-1 flex-shrink-0">
+              <button
+                onClick={handleContinue}
+                disabled={amount === "0"}
+                className="w-full rounded-[18px] py-4 font-sora text-[17px] font-extrabold transition-all active:scale-[0.985] flex items-center justify-center gap-2"
+                style={{
+                  backgroundColor: amount === "0" ? "#EAEAE6" : "hsl(var(--primary))",
+                  color: amount === "0" ? "#C0C0BC" : "#FFFFFF",
+                  boxShadow: amount === "0" ? "none" : "0 4px 14px rgba(217,79,0,0.3)",
+                }}
+              >
+                Continue
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Numpad */}
+            <div className="flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+              <NumpadGrid onKey={handleKey} />
+            </div>
+          </div>
+        ) : (
+          /* ================ STEP 2: Who + How ================ */
+          <div className="flex flex-col h-full">
+            {/* Top bar */}
+            <div className="flex items-center justify-between px-5 pt-3 pb-1 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                {!isEditMode && (
+                  <button
+                    onClick={() => setStep(1)}
+                    className="w-9 h-9 flex items-center justify-center rounded-full bg-card"
+                  >
+                    <ArrowLeft className="w-5 h-5 text-foreground" />
+                  </button>
+                )}
+                <h2 className="font-sora text-lg font-bold text-foreground">
+                  {isEditMode ? "Editing cost" : "Who's splitting?"}
+                </h2>
+              </div>
+              <button
+                onClick={() => onOpenChange(false)}
+                className="w-9 h-9 flex items-center justify-center rounded-full bg-card"
+              >
+                <X className="w-5 h-5 text-foreground" />
+              </button>
+            </div>
+
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {/* Compact amount (tappable back to Step 1 in create mode) */}
+              {!isEditMode ? (
+                <AmountDisplay
+                  amount={amount}
+                  splitMode={splitMode}
+                  remaining={remaining}
+                  isBalanced={isBalanced}
+                  onDistribute={handleDistribute}
+                  canDistribute={canDistribute}
+                  compact={splitMode === "equal" && !isCoverMode}
+                  onTap={() => setStep(1)}
+                />
+              ) : (
+                <AmountDisplay
+                  amount={amount}
+                  splitMode={splitMode}
+                  remaining={remaining}
+                  isBalanced={isBalanced}
+                  onDistribute={handleDistribute}
+                  canDistribute={canDistribute}
+                  compact={splitMode === "equal"}
+                />
+              )}
+
+              {/* Locked payer label (edit mode) */}
+              {isEditMode && editExpense && (
+                <button
+                  onClick={() => toast({ title: "To change the payer, delete this expense and log a new one" })}
+                  className="flex items-center justify-center gap-1.5 mx-auto mb-1 px-3 py-1"
+                >
+                  <Lock className="w-3 h-3 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground font-medium">
+                    Paid by {editExpense.paid_by_user_id === user?.id ? "You" : editExpense.paid_by_name}
+                  </span>
+                </button>
+              )}
+
+              {/* Split sentence */}
+              <SplitSentence
+                splitMode={splitMode}
+                onToggleMode={toggleMode}
+                activeMembers={selectedMembers}
+                currentUserId={user?.id}
+                disabled={amount === "0"}
+                isSingleUser={isSingleUser}
+                payerMember={payerMember}
+                onSetPayer={isEditMode ? () => toast({ title: "To change the payer, delete this expense and log a new one" }) : handleSetPayer}
+                allActiveMembers={activeMembers}
+                activeIds={activeIds}
+                onToggleMember={handleToggleChip}
+                hidePayerDrawer={isEditMode}
+                isCoverMode={isCoverMode}
+                coveredMemberName={coveredMemberName}
+              />
+
+              {/* Custom split rows */}
+              <CustomSplitRows
+                members={selectedMembers}
+                currentUserId={user?.id}
+                customAmounts={customAmounts}
+                focusedMemberId={focusedMemberId}
+                shakeMemberId={shakeMemberId}
+                onFocus={handleFocusRow}
+                visible={splitMode === "custom" && !isCoverMode}
+              />
+            </div>
+
+            {/* Description input */}
+            <div className="px-5 pt-2 pb-1 flex-shrink-0">
+              <input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g., Pizza, Rent, Groceries"
+                maxLength={50}
+                className="w-full text-center text-base font-medium rounded-xl px-4 py-3.5 bg-muted text-foreground placeholder:text-muted-foreground outline-none border-none font-sora"
+              />
+            </div>
+
+            {/* Save button */}
+            <div className="flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+              <SaveButton
+                splitMode={splitMode}
+                canSave={canSave}
+                isBalanced={isBalanced}
+                loading={loading}
+                onClick={handleSave}
+                isSingleUser={isSingleUser}
+                label={saveLabel}
+                isCoverMode={isCoverMode}
+              />
+            </div>
+          </div>
         )}
-
-        {/* Split sentence */}
-        <SplitSentence
-          splitMode={splitMode}
-          onToggleMode={toggleMode}
-          activeMembers={selectedMembers}
-          currentUserId={user?.id}
-          disabled={amount === "0"}
-          isSingleUser={isSingleUser}
-          payerMember={payerMember}
-          onSetPayer={isEditMode ? () => toast({ title: "To change the payer, delete this expense and log a new one" }) : handleSetPayer}
-          allActiveMembers={activeMembers}
-          activeIds={activeIds}
-          onToggleMember={handleToggleChip}
-          hidePayerDrawer={isEditMode}
-        />
-
-        {/* Custom split rows */}
-        <CustomSplitRows
-          members={selectedMembers}
-          currentUserId={user?.id}
-          customAmounts={customAmounts}
-          focusedMemberId={focusedMemberId}
-          shakeMemberId={shakeMemberId}
-          onFocus={handleFocusRow}
-          visible={splitMode === "custom"}
-        />
-      </div>
-
-      {/* Description input - above save */}
-      <div className="px-5 pt-2 pb-1 flex-shrink-0">
-        <input
-          type="text"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="e.g., Pizza, Rent, Groceries"
-          maxLength={50}
-          className="w-full text-center text-base font-medium rounded-xl px-4 py-3.5 bg-muted text-foreground placeholder:text-muted-foreground outline-none border-none font-sora"
-        />
-      </div>
-
-      {/* Save button */}
-      <div className="flex-shrink-0">
-        <SaveButton
-          splitMode={splitMode}
-          canSave={canSave}
-          isBalanced={isBalanced}
-          loading={loading}
-          onClick={handleSave}
-          isSingleUser={isSingleUser}
-          label={isEditMode ? "Save changes" : "Save"}
-        />
-      </div>
-
-      {/* Numpad - fixed height */}
-      <div className="flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <NumpadGrid onKey={handleKey} />
-      </div>
-
-    </div>
+      </DrawerContent>
+    </Drawer>
   );
 }
