@@ -6,10 +6,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { distributeCents } from "@/lib/bountt-utils";
 import confetti from "canvas-confetti";
 import { GroupMember, Expense, ExpenseSplit } from "@/types";
-import {
-  Drawer,
-  DrawerContent,
-} from "@/components/ui/drawer";
 
 import AmountDisplay from "./AmountDisplay";
 import SplitSentence from "./SplitSentence";
@@ -549,14 +545,8 @@ export default function ExpenseScreen({
   const saveLabel = isEditMode ? "Save changes" : "Save";
 
   return (
-    <Drawer
-      open={open}
-      onOpenChange={onOpenChange}
-      snapPoints={[0.8]}
-      activeSnapPoint={0.8}
-      fadeFromIndex={0}
-    >
-      <DrawerContent className="max-w-[430px] mx-auto flex flex-col" style={{ maxHeight: '80dvh' }}>
+    <div className="fixed inset-0 z-50 bg-background">
+      <div className="max-w-[430px] mx-auto flex flex-col" style={{ minHeight: '100dvh' }}>
         {step === 1 ? (
           /* ================ STEP 1: Amount ================ */
           <div className="flex flex-col h-full">
@@ -725,7 +715,7 @@ export default function ExpenseScreen({
             </div>
           </div>
         )}
-      </DrawerContent>
-    </Drawer>
+      </div>
+    </div>
   );
 }
