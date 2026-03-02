@@ -1,175 +1,232 @@
+# Bountt: Cost Entry Redesign + Cover Mode
 
+## Phase 1 -- Database Migration
 
-# Bountt Settlement System
+Add `expense_type` column to `expenses` table:
 
-## Overview
+- `expense_type TEXT NOT NULL DEFAULT 'split' CHECK (expense_type IN ('split', 'cover'))`
+- Backfill: existing rows get `'split'` via the DEFAULT automatically
 
-Build per-split settlement with two RPCs (`settle_my_share`, `settle_all`), update balance calculations to exclude settled splits, add settlement UI to the expense detail sheet, implement a PayPal return confirmation flow in the hero, and extend the activity log with the `settled` action type.
+Update two RPCs:
 
----
+- `create_expense_with_splits`: Add `p_expense_type TEXT` parameter, store it on insert. Include `expense_type` in `expense_snapshot` JSONB.
+- `edit_expense`: Add `p_expense_type TEXT` parameter, store it on update. Include `expense_type` in `expense_snapshot` JSONB.
 
-## Phase 1: Database Migration
+Update the `Expense` TypeScript interface in `src/types/index.ts` to include `expense_type: 'split' | 'cover'`.
 
-A single migration that:
+## Phase 2 -- Delete Dead Code
 
-1. **Add columns to `expense_splits`:**
-   - `is_settled BOOLEAN NOT NULL DEFAULT false`
-   - `settled_at TIMESTAMPTZ`
+- Delete `src/components/dashboard/ExpenseSheet.tsx` entirely (confirmed unused/unimported)
+- Remove the deprecated `calculateBalances` function from `bountt-utils.ts`
+- Remove the `calculateBalances` wrapper from `AppContext.tsx` and the `calculateBalances` field from the context interface in `types/index.ts`
+- Remove `BalanceSummary` type if no longer referenced
 
-2. **Update `activity_log` CHECK constraint** to include `'settled'`:
-   ```sql
-   ALTER TABLE activity_log DROP CONSTRAINT IF EXISTS activity_log_action_type_check;
-   ALTER TABLE activity_log ADD CONSTRAINT activity_log_action_type_check
-   CHECK (action_type IN ('added', 'edited', 'deleted', 'joined', 'settled'));
-   ```
+## Phase 3 -- 2-Step Flow (Drawer-Based)
 
-3. **Create `settle_my_share` RPC:**
-   - Derives `actor_id` from `auth.uid()` (never trusts client)
-   - Finds split where `expense_id = p_expense_id AND user_id = auth.uid()`
-   - Validates: not found -> error, already settled -> error
-   - Sets `is_settled = true, settled_at = now()` on that split
-   - Checks if ALL splits for this expense are now settled; if so, sets `expenses.is_settled = true`
-   - Fetches actor display name from `profiles`
-   - Inserts `activity_log` entry with `action_type = 'settled'`, snapshot, and `change_detail = [{ field: 'settled_by', old_value: '', new_value: actor_name }]`
+**Fallback rule**: If converting to a Drawer component introduces any layout issues with the numpad or keyboard on mobile, keep the existing full-screen container and implement the 2-step flow within it instead.
 
-4. **Create `settle_all` RPC:**
-   - Derives `actor_id` from `auth.uid()`
-   - Verifies `paid_by_user_id = auth.uid()` (only payer can settle all)
-   - Validates: already fully settled -> error
-   - Sets `is_settled = true, settled_at = now()` on ALL splits for this expense
-   - Sets `expenses.is_settled = true, updated_at = now()`
-   - Inserts `activity_log` entry with `action_type = 'settled'`, snapshot, and `change_detail = [{ field: 'settled_all', ... }]`
+The current `ExpenseScreen` is restructured into a bottom drawer (80% screen height) with two internal steps.
 
-Both RPCs run inside implicit PL/pgSQL transactions (atomic).
+### Step 1 -- Amount Entry
 
----
+- Rendered when `step === 1` (new state, default for create mode)
+- Shows: top bar with title + close button, `AmountDisplay` (large format), `NumpadGrid`, and a continue arrow button at the bottom
+- Continue arrow disabled when amount is `"0"`, enabled otherwise
+- Tapping continue sets `step = 2`
+- No sentence, no description, no split controls
 
-## Phase 2: Balance Recalculation
+### Step 2 -- Who + How
 
-### `src/components/dashboard/slides/useHeroData.ts`
+- Rendered when `step === 2`
+- Top bar has a back arrow (returns to Step 1, preserves all state) and close button
+- Compact read-only amount display at top (tapping it also returns to Step 1)
+- Below: `SplitSentence` (updated for cover mode)
+- Below: description input
+- Below: `SaveButton`
+- `CustomSplitRows` slides in when custom mode is active (same as current)
 
-The current code filters expenses by `!e.is_settled` (expense-level), but now settlement is per-split. Update the balance logic to filter at the **split level** using `is_settled` on each split row:
+### Amount Change After Returning from Step 2
 
-- When iterating unsettled expenses, for each split, additionally check `s.is_settled !== true` before adding to `totalOwedToYou` / `totalYouOwe` / `debtsYouOwe` / `agingDebts`
-- Keep the expense-level `!e.is_settled` filter for the outer loop (settled expenses are fully done), but within partially-settled expenses, skip individual settled splits
-- This requires updating the `ExpenseSplit` type first
+When the user taps back to Step 1 and changes the amount, then returns to Step 2: `distributeEqually` is explicitly called on the transition back to Step 2 if the amount differs from what it was when Step 2 was last shown. This is wired in the continue-arrow handler by comparing the current amount against a `lastStep2Amount` ref. If changed, `distributeEqually()` fires before setting `step = 2`.
 
-### `src/types/index.ts`
+### Edit Mode
 
-Add to `ExpenseSplit`:
-```typescript
-is_settled: boolean;
-settled_at: string | null;
+- Skips Step 1 entirely -- opens directly on Step 2 with `step = 2`
+- Amount is read-only (displayed at top, not tappable back to Step 1)
+
+### Navigation
+
+- Back arrow on Step 2 returns to Step 1 with amount and all Step 2 state preserved
+- Closing the drawer entirely resets all state
+- No progress dots or labels
+
+## Phase 4 -- Cover Mode
+
+### Derivation (no new state)
+
+```text
+const currentUserMemberId = activeMembers.find(m => m.user_id === user?.id)?.id;
+const isCoverMode = currentUserMemberId ? !activeIds.has(currentUserMemberId) : false;
 ```
 
-Update `ActivityLog.action_type` to include `'settled'`.
+### Entering Cover Mode
 
----
+- User taps their own "You" chip to deselect themselves
+- On deselection: keep only one other member active (most recently selected), close custom split panel if open, reset `splitMode` to `"equal"`
+- The "You" chip becomes ghosted (muted opacity, small x indicator) but remains visible
 
-## Phase 3: Expense Detail Sheet Updates
+### Exiting Cover Mode
 
-### `src/components/dashboard/ExpenseDetailSheet.tsx`
+- Tapping the ghosted "You" chip re-adds them to `activeIds`, returning to split mode
+- All chips re-select (all active members), sentence returns to normal
 
-Major additions to the existing sheet:
+### Cover Mode Chip Rules
 
-**State derivations:**
-- `isPayer = expense.paid_by_user_id === user?.id`
-- `mySplit = expenseSplits.find(s => s.user_id === user?.id)`
-- `iAlreadySettled = mySplit?.is_settled === true`
-- `expenseFullySettled = expense.is_settled === true`
+- Maximum one non-payer chip selected at a time
+- Tapping a different person deselects the current one, selects the new one
+- Tapping the ghosted "You" chip in cover mode shows toast: "You're covering this -- you're not in the split."
 
-**Rendering changes:**
+### Cover Mode + Payer
 
-1. If `expenseFullySettled`: show green "Settled" badge below title. Hide edit/delete buttons entirely. Sheet is read-only.
+- Payer stored as `paid_by_user_id` as normal
+- No split row created for payer (existing `.filter(s => s.share_amount > 0)` handles this)
+- In cover mode the single covered member gets the full amount
 
-2. In split breakdown rows: if a split's `is_settled`, show a muted "Settled" label next to the amount. For the current user's row specifically, show "Your share settled" in green if settled.
+### Cover Mode + Payer Change
 
-3. **Settlement action buttons** (below the split breakdown, only if not fully settled):
-   - If `mySplit` exists and `!iAlreadySettled`: "Settle my share" button (dark, full width). On tap, show inline confirmation:
-     - "Did you send $[amount] to [paid_by_name]?"
-     - "Yes, I sent it" (orange) -> calls `settle_my_share` RPC
-     - "I'll do it later" (muted text) -> dismiss
-   - If `isPayer` and `!expenseFullySettled`: "Settle all" button (outlined). One tap, no confirmation -> calls `settle_all` RPC
+- Cover mode persists. The covered person cannot be selected as payer (disabled in payer drawer).
 
-4. On RPC success: refresh expenses + splits, close or update sheet, show toast
-5. On RPC error: show inline error, keep sheet open
+### Edge Cases
 
----
+- Cover mode impossible if `activeMembers.length <= 2` -- disable self-deselection
+- Cover mode + edit: `isCoverMode` derived from `activeIds` automatically
 
-## Phase 4: PayPal Return Confirmation
+## Phase 5 -- Sentence System Updates
 
-### `src/components/dashboard/slides/NetBalanceSlide.tsx`
+Rewrite `SplitSentence.tsx` to handle all sentence states:
 
-The "Pay [name]" / "Settle Up" button currently does nothing (no onClick handler). Add:
 
-1. **State:** `pendingDebt: { expenseId, amount, payeeName } | null` and `showPayConfirm: boolean`
+| State                   | Sentence                                       |
+| ----------------------- | ---------------------------------------------- |
+| Split equal, you paid   | "You paid, splitting equally with Kyle & Anya" |
+| Split custom, you paid  | "You paid, splitting custom with Kyle & Anya"  |
+| Split equal, other paid | "Kyle paid, splitting equally with you & Anya" |
+| Cover, you paid         | "You paid, covering for Kyle"                  |
+| Cover, other paid       | "Kyle paid, covering for you"                  |
+| Solo (only you)         | "You paid . personal expense"                  |
 
-2. **On CTA click:**
-   - For "you_owe" debts: store `pendingDebt` with the debt details, then open PayPal deeplink (`https://paypal.me/...` or just a generic payment prompt). Set a `paypalTriggered` flag.
-   - For "owed_to_you" debts: call `settle_my_share` directly (since you're the payer settling someone else's debt -- actually no, `settle_all` would be more appropriate here). Actually per the spec, "Settle Up" for owed_to_you should call `settle_all`. "Pay [name]" for you_owe should deeplink to PayPal.
 
-3. **Visibility change detection:** Add a `visibilitychange` / `focus` listener. When app regains focus AND `paypalTriggered` is true, show the confirmation prompt.
+- Accept `isCoverMode` prop
+- When `isCoverMode` is true, hide the "equally"/"custom" toggle word entirely
+- When `isCoverMode` is true, change "splitting ... with" to "covering for [single name]"
+- All tappable words keep dotted underline treatment
 
-4. **Confirmation prompt** (rendered as a fixed bottom overlay or inline in the hero):
-   - "Did you send $[amount] to [name]?"
-   - "Yes, I sent it" -> calls `settle_my_share(expenseId)` -> dismiss + recalculate
-   - "Not yet" -> dismiss, clear flag
+## Phase 6 -- Save Button States
 
-5. For "Settle Up" (owed_to_you): call `settle_all` RPC directly on tap, show toast. No PayPal flow needed.
+Update `SaveButton.tsx` to accept `isCoverMode` prop:
 
----
+- Cover mode valid: label = "Cover it", orange
+- Default split: label = "Save", orange
+- Edit mode: label = "Save changes", orange
+- Loading: "Saving...", disabled
+- Custom not balanced: disabled, muted
 
-## Phase 5: Activity Log Updates
+## Phase 7 -- expense_type Propagation
 
-### `src/pages/ActivityLog.tsx`
+### ExpenseCard.tsx
 
-1. Add `'settled'` to `ActivityLogEntry.action_type` union
-2. Add to `ACTION_CONFIG`:
-   ```
-   settled: { icon: Check, bg: "bg-emerald-100", pillBg: "bg-emerald-50", pillText: "text-emerald-700" }
-   ```
-   (green tint icon bg `#F0FFF7`, green icon color `#00A857`)
+These are copy references only. Do not change card layout or structure.
 
-3. In `ActivityCard`, handle the settled action type:
-   - Check `change_detail[0].field`:
-     - `'settled_by'` -> "[Actor] settled their share of "[description]" -- $[share amount]"
-     - `'settled_all'` -> "[Actor] settled "[description]" for everyone -- $[total amount]"
-   - Green pill with appropriate text
 
----
+| State                        | Label                               |
+| ---------------------------- | ----------------------------------- |
+| Split, you paid, >1          | You paid . split 3 ways             |
+| Split, you paid, 1 person    | You paid . split with Kyle          |
+| Split, someone paid, you owe | Kyle paid . you owe $12.50          |
+| Split, not involved          | Kyle paid . between Anya & Jay      |
+| Cover, you covered           | You covered . Jay owes you $25      |
+| Cover, someone covered you   | Kyle covered . you owe Kyle $25     |
+| Cover, not involved          | Kyle covered Jay . just so you know |
+| Split settled, you paid      | You paid . all settled checkmark    |
+| Split settled, you owed      | Kyle paid . settled checkmark       |
+| Cover settled                | You covered . paid back checkmark   |
 
-## Phase 6: Realtime Wiring
 
-The existing `AppContext` already:
-- Subscribes to `expenses` realtime changes and re-fetches splits on any expense change
-- `expense_splits` is already in the realtime publication
+### ExpenseDetailSheet.tsx
 
-Add a realtime subscription for `expense_splits` changes in `AppContext.tsx` so that when splits are updated (settlement), the local state refreshes without needing an expense change event. This ensures balance recalculation is instant.
+- Section label: "Split breakdown" for split, "Covered for" for cover
+- Payer label: "Kyle paid" for split, "Kyle covered" for cover
 
----
+### ActivityLog.tsx
 
-## File Summary
+- Added split: "Doga added 'Tims Run' -- $18.00 split with Kyle & Anya"
+- Added cover: "Doga covered 'Coffee run' for Kyle -- $8.00"
 
-| File | Change |
-|------|--------|
-| Migration SQL | Add columns, update constraint, create 2 RPCs |
-| `src/types/index.ts` | Add `is_settled`, `settled_at` to ExpenseSplit; add `'settled'` to ActivityLog |
-| `src/components/dashboard/slides/useHeroData.ts` | Filter settled splits from balance calculations |
-| `src/components/dashboard/ExpenseDetailSheet.tsx` | Settlement UI: badges, inline confirm, RPC calls |
-| `src/components/dashboard/slides/NetBalanceSlide.tsx` | PayPal deeplink, return confirmation prompt |
-| `src/pages/ActivityLog.tsx` | Add settled action type config + rendering |
-| `src/contexts/AppContext.tsx` | Add expense_splits realtime subscription |
+### AgingDebtSlide.tsx
 
----
+- Split: existing language unchanged
+- Cover: "You covered Kyle's coffee run 14 days ago. Still waiting."
 
-## Edge Cases
+## Phase 8 -- Bug Fixes
 
-- Non-payer calls `settle_all` -> RPC throws, UI shows error toast
-- Already-settled split -> RPC throws "Already settled"
-- All splits individually settled -> `expenses.is_settled` auto-flips, `settle_all` would throw "Already fully settled"
-- Settled expense -> edit/delete hidden, sheet read-only
-- User has no split on expense -> no settlement buttons shown
-- PayPal prompt dismissed with "Not yet" -> no RPC, flag cleared
-- PayPal prompt RPC failure -> error shown in prompt, stays open for retry
-- Balance recalculation -> driven by realtime on both expenses and expense_splits tables
+### handleKey stale closure
 
+Add `customAmounts` and `activeIds` to the `useCallback` dependency array in `ExpenseScreen.tsx`.
+
+### Deprecated calculateBalances
+
+Remove entirely from `bountt-utils.ts`, `AppContext.tsx`, and `types/index.ts`.
+
+### Edit mode custom split hydration
+
+Add comment flagging as known debt: `// KNOWN DEBT: Edit mode always opens in equal mode, losing original custom split data`
+
+## Phase 9 -- Edge Case Handling
+
+
+| Scenario                                   | Behavior                                                                     |
+| ------------------------------------------ | ---------------------------------------------------------------------------- |
+| Amount changed after returning from Step 2 | `distributeEqually` called explicitly on Step 2 re-entry when amount differs |
+| Cover mode, only 1 group member            | Disable self-deselection when `activeMembers.length <= 1`                    |
+| Cover mode, payer = covered person         | Block in payer drawer: disable covered person as payer                       |
+| Custom open, user deselects themselves     | Custom panel closes, cover mode activates                                    |
+| Re-add self                                | Split mode returns, equal split recalculates                                 |
+| Solo expense                               | Save blocked, sentence: "You paid . personal expense"                        |
+| Tapping ghosted You chip                   | Toast only, no mode change                                                   |
+| Cover + second person chip                 | Deselect current, select new (one max)                                       |
+| Description empty                          | Defaults to "Quick Expense"                                                  |
+| Edit cover expense                         | `isCoverMode` activates via derived state, payer locked                      |
+
+
+## Files Changed Summary
+
+
+| File                                                 | Action                                                                                          |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `supabase/migrations/`                               | New migration: add `expense_type` column, update RPCs                                           |
+| `src/types/index.ts`                                 | Add `expense_type` to Expense, remove `calculateBalances` from context, remove `BalanceSummary` |
+| `src/components/dashboard/ExpenseSheet.tsx`          | DELETE                                                                                          |
+| `src/lib/bountt-utils.ts`                            | Remove deprecated `calculateBalances`                                                           |
+| `src/contexts/AppContext.tsx`                        | Remove `calculateBalances`                                                                      |
+| `src/components/expense/ExpenseScreen.tsx`           | 2-step flow, drawer container (with full-screen fallback), cover mode logic, handleKey fix      |
+| `src/components/expense/AmountDisplay.tsx`           | Add compact read-only variant for Step 2                                                        |
+| `src/components/expense/SplitSentence.tsx`           | Cover mode sentences, hide equally/custom in cover                                              |
+| `src/components/expense/SaveButton.tsx`              | Cover mode label                                                                                |
+| `src/components/dashboard/ExpenseCard.tsx`           | expense_type-aware labels per copy table                                                        |
+| `src/components/dashboard/ExpenseDetailSheet.tsx`    | expense_type-aware section labels                                                               |
+| `src/pages/ActivityLog.tsx`                          | Cover-aware activity text                                                                       |
+| `src/components/dashboard/slides/AgingDebtSlide.tsx` | Cover-aware aging debt text                                                                     |
+| `src/pages/Dashboard.tsx`                            | Pass updated ExpenseScreen props                                                                |
+
+
+## What Is NOT Changed
+
+- Numpad key logic and `distributeCents` algorithm
+- RPC JSONB shape for splits (only `p_expense_type` added)
+- Settlement flows
+- Activity log DB structure (only language rendering)
+- Payer drawer component internals
+- `isFirstExpense` confetti behavior
+- AppContext realtime subscriptions
+- Any RLS policies
+- Card layout or structure (only copy/labels change)
