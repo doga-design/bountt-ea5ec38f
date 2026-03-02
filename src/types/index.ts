@@ -47,6 +47,7 @@ export interface Expense {
   paid_by_name: string;
   date: string;
   is_settled: boolean;
+  expense_type: 'split' | 'cover';
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -143,9 +144,6 @@ export interface AppContextValue extends AppState {
   addExpense: (expense: Omit<Expense, "id" | "created_at" | "updated_at">) => Promise<Expense | null>;
   fetchExpenseSplits: (groupId: string) => Promise<void>;
 
-  // Balance utilities
-  calculateBalances: () => BalanceSummary[];
-
   // Auth actions
   signOut: () => Promise<void>;
 }
@@ -154,11 +152,6 @@ export interface AppContextValue extends AppState {
 // UTILITY TYPES
 // =====================================================
 
-export interface BalanceSummary {
-  userId: string | null;
-  memberName: string;
-  netBalance: number; // positive = owed money, negative = owes money
-}
 
 export interface SmartMatchSuggestion {
   expense1: Expense;

@@ -1,4 +1,4 @@
-import { Expense, BalanceSummary, SmartMatchSuggestion, GroupMember } from "@/types";
+import { Expense, SmartMatchSuggestion, GroupMember } from "@/types";
 
 // =====================================================
 // INVITE CODE GENERATION
@@ -115,29 +115,6 @@ export function calculateNetBalance(
   return balance;
 }
 
-/**
- * @deprecated This function only sums paid amounts without accounting for splits.
- * Use the split-based balance logic in useHeroData instead for accurate net balances.
- */
-export function calculateBalances(expenses: Expense[]): BalanceSummary[] {
-  const balanceMap = new Map<string, BalanceSummary>();
-
-  for (const expense of expenses) {
-    if (expense.is_settled) continue;
-    const key = expense.paid_by_user_id ?? expense.paid_by_name;
-    if (!balanceMap.has(key)) {
-      balanceMap.set(key, {
-        userId: expense.paid_by_user_id,
-        memberName: expense.paid_by_name,
-        netBalance: 0,
-      });
-    }
-    const entry = balanceMap.get(key)!;
-    entry.netBalance += expense.amount;
-  }
-
-  return Array.from(balanceMap.values());
-}
 
 // =====================================================
 // SMART MATCH DETECTION
