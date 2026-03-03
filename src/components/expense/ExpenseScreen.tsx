@@ -613,7 +613,7 @@ export default function ExpenseScreen({
 
               {/* Amount + Payer avatar */}
               <div className="flex items-center justify-center gap-2 py-2 flex-shrink-0">
-                {splitMode !== "custom" && <AmountDisplay amount={amount} size="medium" />}
+                <AmountDisplay amount={amount} size="medium" />
                 {payerMember && (
                   <PayerAvatar
                     payer={payerMember}
