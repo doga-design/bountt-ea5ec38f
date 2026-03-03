@@ -1,200 +1,78 @@
-# Bountt Cost Logging Flow Rebuild
+# Bountt — Numpad & Cost Log Fixes
 
-## Overview
+## Fix 1: Placeholder ghost avatars
 
-Complete rebuild of the expense entry system from a single full-screen view into a two-slide bottom drawer with new visual design matching the provided reference images. Includes adding SVG avatar assets, new member selection grid, and payer avatar component.
+`getAvatarImage` in `src/lib/avatar-utils.ts` already uses `member.id` only and has no ghost/placeholder fallback. All consuming components (`MemberAvatarGrid`, `PayerAvatar`, `CustomSplitRows`, `SplitSentence`) call `getAvatarImage(m)` directly with no conditional fallback. No changes needed here — already clean.
 
-## Files to Delete
+## Fix 2: Payer avatar tap opens payer selector
 
-- `src/components/expense/ExpenseSheet.tsx` (dead code)
+**File**: `src/components/expense/ExpenseScreen.tsx` (lines 612-617)
 
-## Files to Create
+Currently the PayerAvatar onClick only shows a toast in edit mode and does nothing in create mode. The payer selector drawer lives inside `SplitSentence.tsx` as internal state (`payerSheetOpen`).
 
-### 1. Avatar Assets (`src/assets/avatars/`)
+**Solution**: Lift the payer drawer state out of `SplitSentence` and into `ExpenseScreen`:
 
-Copy all 5 uploaded PNG files into `src/assets/avatars/` as `avatar1.png` through `avatar5.png`. Import them as static assets: `import Avatar1 from './avatar1.png'`. Do not use SVG component imports or `?react` pattern anywhere.
+- Add `payerDrawerOpen` state to `ExpenseScreen`
+- Pass it down to `SplitSentence` as a controlled prop
+- Wire PayerAvatar's `onClick` to set `payerDrawerOpen(true)` (or show locked toast in edit mode)
+- Wire the "you" button on Slide 1 to the same function
 
-### 2. `src/components/expense/MemberAvatarGrid.tsx` (New)
+**Changes to `SplitSentence.tsx**`:
 
-Horizontal row of tappable circular avatars for Slide 2:
+- Replace internal `payerSheetOpen` state with props: `payerDrawerOpen` and `onPayerDrawerChange`
+- Payer name tap calls `onPayerDrawerChange(true)` instead of `setPayerSheetOpen(true)`
 
-- Receives all active members EXCEPT the current payer
-- Each avatar: circular image using the member's assigned avatar asset, with their `avatar_color` as background
-- Deselected state: grayscale filter on avatar
-- Selected state: full color, white border ring
-- Name label below each avatar (bold)
-- Dynamic sizing: avatars shrink as member count increases (fit single row, no wrapping)
-- "+" button rendered at the end of the row (visual only, no handler)
-- Tapping toggles `activeIds` via parent callback
+**Changes to `ExpenseScreen.tsx**`:
 
-### 3. `src/components/expense/PayerAvatar.tsx` (New)
+- Add `const [payerDrawerOpen, setPayerDrawerOpen] = useState(false)`
+- Create `openPayerDrawer` function that checks edit mode (toast) or opens drawer
+- Wire PayerAvatar onClick to `openPayerDrawer`
+- Wire Slide 1 "you" button onClick to `openPayerDrawer`
+- Pass `payerDrawerOpen` and `setPayerDrawerOpen` to SplitSentence
 
-Small circular avatar (44px) displayed next to the amount on Slide 2:
+## Fix 3: "You" tap on Slide 1 opens payer selector
 
-- Shows the current payer's assigned avatar image with their `avatar_color` background
-- Tappable: opens payer selector drawer (disabled in edit mode)
+Covered by Fix 2 above — the Slide 1 "you" button (line 544) will call the same `openPayerDrawer` function.
 
-### 4. Avatar Assignment Utility
+## Fix 4: Remove duplicate total in custom mode
 
-Add to `src/lib/avatar-utils.ts`:
+**File**: `src/components/expense/ExpenseScreen.tsx` (lines 648-657)
 
-- `AVATAR_IMAGES`: array of the 5 imported PNG paths in order. `getAvatarImage(member)`: returns `AVATAR_IMAGES[parseInt(member.id.replace(/-/g,'').slice(0,8), 16) % AVATAR_IMAGES.length]` — this is the exact formula, do not deviate. Return type is a string (image src). This function must be used everywhere avatars render: MemberAvatarGrid, PayerAvatar, ExpenseDetailSheet, ActivityLog, MemberCards. Same member always gets same avatar on every device and session.
+Remove the second `AmountDisplay` component rendered inside the custom mode block. The distribute/remaining pill will move into the `CustomSplitRows` area or be rendered separately without a duplicate amount display.
 
-## Files to Rebuild
+**Solution**: Remove the `<AmountDisplay>` on lines 649-657. Keep only the status pill (distribute button / "perfectly split" indicator). Extract the status pill logic from `AmountDisplay` into a small inline block or a dedicated component rendered above `CustomSplitRows`.
 
-### 5. `src/components/expense/ExpenseScreen.tsx` (Delete + Rebuild)
+## Fix 5: Hide MemberAvatarGrid in custom mode
 
-Complete rewrite. New architecture:
+**File**: `src/components/expense/ExpenseScreen.tsx` (lines 638-644)
 
-**Props**: Same interface (`open`, `onOpenChange`, `isFirstExpense`, `editExpense`, `editSplits`)
+Wrap `MemberAvatarGrid` in a conditional: only render when `splitMode === "equal"`. The grid is already not rendered in custom mode's `CustomSplitRows` block, but it's currently always visible above it.
 
-**State**:
+**Change**: `{splitMode === "equal" && <MemberAvatarGrid ... />}`
 
-- `slide`: 1 or 2 (current visible slide)
-- `amount`, `splitMode`, `activeIds`, `focusedMemberId`, `customAmounts`, `freshFocus`, `shakeMemberId`, `payerId`, `loading` -- all carried over
-- `prevAmount`: tracks amount when leaving Slide 1, used to detect changes on return
-- Remove: `description`, `editingTotal` (no longer needed)
-- Member list snapshot: `useRef` capturing `activeMembers` when drawer opens, not updating mid-session
+## Fix 6: "+" button overlay positioning
 
-**Layout**: Fixed-height drawer overlay (not full screen), approximately 85dvh:
+**File**: `src/components/expense/MemberAvatarGrid.tsx` (lines 74-95)
 
-- Dark backdrop (`#000000` at 60% opacity, `backdrop-blur-sm`), tapping closes drawer
-- White rounded-top container with slide content
-- CSS transition: slides move horizontally via `translateX`
+Currently the "+" button is a separate item at the end of the flex row. Redesign it to overlay on the top-right corner of the last member avatar, as shown in img3.
 
-**Slide 1** (Amount Entry):
+**Solution**:
 
-- Drag handle pill centered at top
-- "What did **you** pay?" headline ("you" in orange `#D94F00`, dotted underline, tappable to open payer drawer)
-- Amount display: large `$XX` with blinking orange cursor, Sora font
-- "I am covering for someone" text with circular arrow icon (visual only)
-- "Log cost +" / "Log cost ->" button:
-  - Disabled (amount=0): gray `#EAEAE6`, arrow icon, shake on tap
-  - Active (amount>0): orange `#D94F00`, "+" icon, navigates to Slide 2
-- NumpadGrid at bottom
+- Remove the standalone "+" flex item
+- Wrap the last member avatar in a `relative` container
+- Add a small circular "+" button (approximately 28px) positioned `absolute` at top-right, slightly overlapping the avatar circle
+- Style: light gray background, subtle border/shadow, "+" icon inside
+- No click handler (visual only)
 
-**Slide 2** (Split Config):
+---
 
-- Back arrow (top-left, circular border) -> returns to Slide 1, preserves amount
-- Drag handle pill
-- Amount display (slightly smaller) + PayerAvatar to the right
-- Split sentence: "[Payer] paid, splitting [equally/custom] with [names]"
-- MemberAvatarGrid (all members except payer)
-- In custom mode: CustomSplitRows replaces/appears below the avatar grid, numpad visible at bottom
-- "I am covering for someone" (visual only)
-- "Log cost +" button:
-  - Disabled (no members selected): gray, non-interactive, no animation
-  - Active (1+ selected): orange, saves expense on tap
+## Files Modified
 
-**Slide transitions**:
 
-- Slide 1 -> 2: triggered by "Log cost +" when active. Amount is snapshotted in `prevAmount`
-- Slide 2 -> 1: back arrow. On return to Slide 2, if amount changed, custom amounts reset to equal, selected members preserved
-- Payer change on Slide 2: old payer re-enters grid, new payer exits grid, if new payer was selected as split member they get deselected
-
-**Save logic**: Identical to current -- calls `create_expense_with_splits` or `edit_expense` RPC. Description hardcoded to "Quick Expense". All existing confetti, toast, error handling, no-change detection preserved.
-
-**Edit mode specifics**: Payer locked (toast on tap), settled check on open, pre-fill amount and members, save label unchanged.
-
-**Bug fixes included**:
-
-- `handleKey` dependency array: add `customAmounts` and `activeIds`
-- Remove `isSingleUser` path (impossible state in new flow)
-
-### 6. `src/components/expense/SplitSentence.tsx` (Rebuild)
-
-Simplified for Slide 2 context:
-
-- No more drawer-based member selection (that's now the avatar grid)
-- Renders: "[Payer] paid, splitting [mode] with [names]"
-- Payer name: orange, dotted underline, tappable -> opens payer drawer
-- Mode toggle: orange "equally" / blue "custom", tappable
-- Names list: bold black, "No one" when empty
-- Payer selector drawer stays inside this component (reuse existing drawer pattern)
-
-### 7. `src/components/expense/SaveButton.tsx` (Rebuild)
-
-Two distinct states matching the designs:
-
-- **Disabled**: gray background `#EAEAE6`, muted text, arrow icon "->", no tap response (completely inert on Slide 2; shake animation on Slide 1)
-- **Active**: orange `#D94F00` background, white text, "+" icon, full interaction
-- Label: "Log cost" (not "Save")
-- Edit mode label: "Save changes"
-- Rounded pill shape (18px border radius), full width
-
-### 8. `src/components/expense/NumpadGrid.tsx` (Update Visual Style)
-
-Keep all key logic unchanged. Update styling:
-
-- Keys: light gray rounded rectangles with soft shadow (not flat grid cells)
-- More padding/spacing between keys
-- Maintain sub-letters on 2-9 keys
-- Backspace icon stays
-
-### 9. `src/components/expense/AmountDisplay.tsx` (Update)
-
-- Remove the custom-mode "TOTAL" variant (that's handled differently now)
-- Keep the distribute/remaining pill for custom mode on Slide 2
-- Add blinking orange cursor on Slide 1
-
-### 10. `src/components/expense/CustomSplitRows.tsx` (Update)
-
-### Avatar files are PNGs. Use `<img src={getAvatarImage(member)} />` inside a circular div with `member.avatar_color` as background. Do not change any custom split logic, math, or state management.
-
-Update to match Image 5 design:
-
-- Large circular avatar (~80px) on the left using the SVG avatar images
-- Amount in a rounded box to the right
-- Rows separated by hairline dividers
-- Member name below avatar (orange for "You", black for others)
-
-## AppContext Fix (Minimal Change)
-
-In the expense_splits realtime channel handler, add a client-side guard after receiving any INSERT/UPDATE/DELETE event: check if `payload.new?.expense_id` or `payload.old?.expense_id` exists in the current local `expenseSplits` array. If not found, ignore the event entirely. Do not add `filter: 'group_id=eq.${groupId}'` to the channel — expense_splits has no group_id column and this will silently fail.
-
-## Technical Details
-
-### Avatar Assignment Strategy
-
-- 5 avatar images, assigned deterministically via hash of member ID
-- `getAvatarImage(member)` returns the import path
-- Avatar color (existing `avatar_color` field) used as the circular background behind the avatar image
-
-### Member Snapshot
-
-- When drawer opens (`open` changes to `true`), snapshot `activeMembers` into a ref
-- All member operations within the drawer use this snapshot
-- Prevents mid-session member additions from appearing
-
-### State Flow for Payer Change
-
-1. User taps payer name/avatar -> payer drawer opens
-2. Selects new payer (member B)
-3. `payerId` updates to B's member ID
-4. B removed from avatar grid (grid shows everyone except payer)
-5. If B was in `activeIds`, remove B from `activeIds`
-6. Old payer A re-appears in grid (default: deselected/grayscale)
-7. Split sentence updates
-
-### Slide Navigation State Machine
-
-```text
-[CLOSED] --open=true--> [SLIDE 1: AMOUNT]
-[SLIDE 1] --"Log cost+" (amount>0)--> [SLIDE 2: SPLIT]
-[SLIDE 1] --"Log cost+" (amount=0)--> [SHAKE, stay on SLIDE 1]
-[SLIDE 2] --back arrow--> [SLIDE 1] (amount preserved)
-[SLIDE 1] --amount changed, go to SLIDE 2--> [custom amounts reset to equal]
-[SLIDE 2] --"Log cost+" (members selected)--> [SAVING] --> [CLOSED]
-[SLIDE 2] --"Log cost+" (no members)--> [NO RESPONSE]
-[ANY] --backdrop tap--> [CLOSED]
-```
-
-### Edge Cases Handled
-
-- Amount 0 + tap button on Slide 1: shake animation, no navigation
-- No members selected on Slide 2: button fully disabled, no response
-- Back to Slide 1 then change amount: custom amounts reset on return to Slide 2
-- Payer was a selected split member: auto-deselect on payer change
-- Edit mode settled expense: toast + close immediately on open
-- Double tap save: `loading` state prevents
-- Network error: destructive toast, stay on Slide 2
+| File                                          | Changes                                                                                                                                                          |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/components/expense/ExpenseScreen.tsx`    | Add `payerDrawerOpen` state, wire payer avatar + "you" button, conditionally render MemberAvatarGrid (equal only), remove duplicate AmountDisplay in custom mode |
+| `src/components/expense/SplitSentence.tsx`    | Accept controlled drawer props (`payerDrawerOpen`, `onPayerDrawerChange`) instead of internal state                                                              |
+| &nbsp;                                        | &nbsp;                                                                                                                                                           |
+| `src/components/expense/MemberAvatarGrid.tsx` | Reposition "+" button to overlay top-right of last member avatar                                                                                                 |
+| `src/components/expense/AmountDisplay.tsx`    | Extract status pill as a standalone export or keep the distribute pill renderable without the amount display                                                     |
