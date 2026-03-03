@@ -1,4 +1,18 @@
 import { Expense, ExpenseSplit, GroupMember } from "@/types";
+import Avatar1 from "@/assets/avatars/avatar1.png";
+import Avatar2 from "@/assets/avatars/avatar2.png";
+import Avatar3 from "@/assets/avatars/avatar3.png";
+import Avatar4 from "@/assets/avatars/avatar4.png";
+import Avatar5 from "@/assets/avatars/avatar5.png";
+
+const AVATAR_IMAGES = [Avatar1, Avatar2, Avatar3, Avatar4, Avatar5];
+
+/**
+ * Returns a deterministic avatar image for a member based on their ID hash.
+ */
+export function getAvatarImage(member: GroupMember): string {
+  return AVATAR_IMAGES[parseInt(member.id.replace(/-/g, '').slice(0, 8), 16) % AVATAR_IMAGES.length];
+}
 
 // 10-color avatar palette
 const AVATAR_COLORS = [
