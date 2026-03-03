@@ -1,97 +1,83 @@
-# Bountt — MemberAvatarGrid + Custom Mode Fixes
+# Bountt — Ghost Emoji Elimination + "+" Button Redesign
 
-## Fix 1: "+" as standalone button
+## Fix 1: Ghost emoji elimination (global)
 
-**File**: `src/components/expense/MemberAvatarGrid.tsx`
+Five files currently render ghost emojis or generic `User` icons instead of the deterministic PNG avatars. Each must be updated to use `getAvatarImage(member)` from `@/lib/avatar-utils`.
 
-- Remove the `{isLast && ...}` overlay block (lines 58-72) from inside the member map loop
-- Add a new prop: `onAddMember?: () => void`
-- After the `.map()`, render a standalone `<button>` in the same flex row:
-  - Same `avatarSize` as the member avatars (uses the sizing tier)
-  - Circular, `backgroundColor: "#EAEAE6"`, centered `Plus` icon in `color: "#888"`
-  - `onClick` calls `onAddMember`
-  - Has its own name label below: "Add" in muted text
+### 1a. `src/components/dashboard/MemberCard.tsx` (line 42-46)
 
-**File**: `src/components/expense/ExpenseScreen.tsx`
+- Remove `Ghost` and `User` imports from lucide
+- Import `getAvatarImage` from `@/lib/avatar-utils`
+- Replace the conditional ghost/User icon block with an `<img>` tag using `getAvatarImage(member)`, styled as a circular avatar (same 40x40 size, `object-contain`, ~75% inner size)
 
-- Import `AddMemberSheet` from `@/components/group-settings/AddMemberSheet`
-- Add state: `const [showAddMember, setShowAddMember] = useState(false)`
-- Pass `onAddMember={() => setShowAddMember(true)}` to `MemberAvatarGrid`
-- Render `<AddMemberSheet>` with `open={showAddMember}`, wired to `addPlaceholderMember` from `useApp()` context
-- After adding, refresh members and auto-select the new member in the grid (After `addPlaceholderMember` resolves successfully, add the new member's id to `activeIds` automatically so they appear selected in the grid immediately without requiring a manual tap.)
+### 1b. `src/components/dashboard/DashboardHeader.tsx` (line 61-67)
 
-## Fix 2: Sizing tiers and centered layout
+- Import `getAvatarImage` from `@/lib/avatar-utils`
+- Replace the three-way conditional (smiley for current user, ghost for placeholder, User icon for others) with a single `<img>` using `getAvatarImage(member)` for ALL members including current user
+- Keep the colored background circle
 
-**File**: `src/components/expense/MemberAvatarGrid.tsx`
+### 1c. `src/components/group-settings/MemberDetailSheet.tsx` (line 80-84)
 
-Replace the current sizing logic (lines 18-21) with a tier system based on `memberCount` (members array length, which excludes payer). The `totalSlots = memberCount + 1` (the "+" button occupies one slot).
+- Import `getAvatarImage` from `@/lib/avatar-utils`
+- Replace the ghost/User conditional with `<img src={getAvatarImage(member)}>`
+- Keep the 48x48 colored circle wrapper
 
+### 1d. `src/components/join/PlaceholderSelectDialog.tsx` (line 63-64)
 
-| memberCount | Avatar | Font | Gap  | Vertical |
-| ----------- | ------ | ---- | ---- | -------- |
-| 2           | 100px  | 18px | 16px | 10px     |
-| 3           | 92px   | 18px | 14px | 8px      |
-| 4           | 75px   | 16px | 12px | 6px      |
-| 5           | 60px   | 15px | 10px | 6px      |
-| 6+          | 48px   | 13px | 8px  | 4px      |
+- Import `getAvatarImage` from `@/lib/avatar-utils`
+- Replace the ghost emoji with `<img src={getAvatarImage(p)}>` (the placeholder objects have an `id` field, which is all `getAvatarImage` needs)
+- Use the member's `avatar_color` via `getAvatarColor` for the background circle
 
+In `ActivityLog.tsx` and `ExpenseDetailSheet.tsx`, where avatars are rendered from historical snapshots (deleted members, activity log entries), use `getAvatarImageFromName(snapshot.member_name)` instead of `getAvatarImage(member)`. Ensure `avatar-utils.ts` exports this function. If it doesn't exist yet, add it:
 
-Layout changes:
-
-- Container: `justify-center` (not `items-start`), remove `overflow-x-auto` and `scrollbarWidth: none`
-- Use dynamic gap from the tier table
-- Remove `flex-shrink-0` from individual items — allow natural centering
-- Each item width = `avatarSize`
-
-**Dashed arc**: Add an SVG element positioned above the avatar row. It draws a dashed quadratic bezier curve from the leftmost avatar area arcing up and over to the "+" button position. Stroke: `#D4D4D4`, `stroke-dasharray="4 4"`, no fill. This sits behind the avatars using `absolute` positioning within a `relative` container.
-
-## Fix 3: Remove duplicate total in custom mode
-
-**File**: `src/components/expense/ExpenseScreen.tsx` (lines 607-622)
-
-The `<AmountDisplay>` at line 609 renders on Slide 2 for BOTH equal and custom modes. In custom mode, the status pill at line 656 provides the split status. This creates two separate displays.
-
-**Change**: Hide the AmountDisplay row when `splitMode === "custom"`:
-
-```
-{splitMode !== "custom" && (
-  <div className="flex items-center justify-center gap-2 py-2 flex-shrink-0">
-    <AmountDisplay amount={amount} size="medium" />
-    {payerMember && <PayerAvatar ... />}
-  </div>
-)}
+```ts
+export function getAvatarImageFromName(name: string): string {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return AVATAR_IMAGES[Math.abs(hash) % AVATAR_IMAGES.length]
+}
+```"
 ```
 
-The status pill in the custom block (lines 656-703) remains as the only amount-related indicator. **In custom mode, hide AmountDisplay only. Keep PayerAvatar visible. The payer avatar next to the total must remain accessible in both equal and custom modes.**
+  
+  
+Fix 2: "+" button redesign
 
-## Fix 4: Redistribute excludes focused member
+### 2a. `src/components/expense/MemberAvatarGrid.tsx`
 
-**File**: `src/components/expense/ExpenseScreen.tsx` (lines 213-241)
+- Remove the standalone "+" button block entirely (lines 112-136)
+- Remove `onAddMember` from props interface
+- Remove `Plus` import from lucide
+- Remove `totalSlots` calculation (revert to just `memberCount` for arc width)
+- The dashed arc SVG width should use `memberCount` slots only (not memberCount + 1) The dashed arc SVG should span from the leftmost avatar to the rightmost avatar only. Its width = `(memberCount * (avatarSize + gap)) - gap`. Do not include the "+" button slot in this calculation.
 
-Current behavior when `remaining > 0.01`: adds the entire remaining to `focusedMemberId`. This is wrong — it should distribute to all OTHER members.
+### 2b. `src/components/expense/ExpenseScreen.tsx` (around line 649-658)
 
-**New logic for `remaining > 0.01**`:
-
-```
-const others = splitMembers.filter(m => m.id !== focusedMemberId);
-if (others.length === 0) return;
-const shares = distributeCents(remaining, others.length);
-others.forEach((m, i) => {
-  const current = parseFloat(newAmounts.get(m.id) || "0") || 0;
-  newAmounts.set(m.id, (current + shares[i]).toFixed(2));
-});
-```
-
-The `remaining < -0.01` (over-budget / "Remove") branch already correctly excludes focused — no change needed there.
-
-Edge case: if focused member is the only member, `others.length === 0`, function returns early (button does nothing).
+- Wrap the `MemberAvatarGrid` in a `<div className="relative">` container
+- Add an absolutely positioned "+" button as a sibling:
+  - 36x36px white circle
+  - `border: 1.5px solid #E2E2DE`
+  - `boxShadow: 0 2px 8px rgba(0,0,0,0.10)`
+  - Centered `Plus` icon, 18px, color `#888`
+  - `position: absolute`, `top: 0` (vertically at top of grid), `right: -10px`
+  - `z-index: 10`
+  - No label text
+  - `onClick={() => setShowAddMember(true)}`
+- The existing `AddMemberSheet` integration and auto-select logic stays as-is
+- Remove the `onAddMember` prop from the `MemberAvatarGrid` call
 
 ---
 
 ## Files Modified
 
 
-| File                                          | Changes                                                                                                                          |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `src/components/expense/MemberAvatarGrid.tsx` | Standalone "+" button after map, sizing tiers, centered layout, dashed arc SVG, `onAddMember` prop                               |
-| `src/components/expense/ExpenseScreen.tsx`    | Add `AddMemberSheet` integration, hide AmountDisplay in custom mode on Slide 2, fix `handleDistribute` to exclude focused member |
+| File                                                  | Changes                                                      |
+| ----------------------------------------------------- | ------------------------------------------------------------ |
+| `src/components/dashboard/MemberCard.tsx`             | Replace ghost/User icon with PNG avatar via `getAvatarImage` |
+| `src/components/dashboard/DashboardHeader.tsx`        | Replace ghost/smiley/User with PNG avatar for all members    |
+| `src/components/group-settings/MemberDetailSheet.tsx` | Replace ghost/User with PNG avatar                           |
+| `src/components/join/PlaceholderSelectDialog.tsx`     | Replace ghost emoji with PNG avatar                          |
+| `src/components/expense/MemberAvatarGrid.tsx`         | Remove "+" button, remove `onAddMember` prop, fix arc width  |
+| `src/components/expense/ExpenseScreen.tsx`            | Add absolute "+" button wrapper around MemberAvatarGrid      |
