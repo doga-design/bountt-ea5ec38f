@@ -1,3 +1,4 @@
+import { useRef, useState, useEffect } from "react";
 import { GroupMember } from "@/types";
 import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
 
@@ -16,6 +17,8 @@ function getSizingTier(memberCount: number) {
   return { avatarSize: 48, fontSize: 13, gap: 8, verticalSpacing: 4 };
 }
 
+const SVG_HEIGHT = 60;
+
 export default function MemberAvatarGrid({
   members,
   activeIds,
@@ -25,29 +28,79 @@ export default function MemberAvatarGrid({
   const memberCount = members.length;
   const { avatarSize, fontSize, gap, verticalSpacing } = getSizingTier(memberCount);
 
-  // Dashed arc SVG dimensions — spans member avatars only
-  const totalWidth = memberCount * avatarSize + (memberCount - 1) * gap;
-  const arcHeight = 24;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => setContainerWidth(el.offsetWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [memberCount]);
+
+  // Spoke calculations
+  const apexX = containerWidth / 2;
+  const totalSlots = memberCount;
+  const slotWidth = containerWidth / totalSlots;
 
   return (
-    <div className="relative px-4" style={{ paddingTop: arcHeight + 4 }}>
-      {/* Dashed arc SVG */}
-      {memberCount >= 2 && (
+    <div className="relative px-4" ref={containerRef} style={{ paddingTop: SVG_HEIGHT }}>
+      {/* Multi-spoke dashed arc SVG */}
+      {memberCount >= 2 && containerWidth > 0 && (
         <svg
-          className="absolute left-1/2 -translate-x-1/2"
-          style={{ top: 0 }}
-          width={totalWidth}
-          height={arcHeight}
-          viewBox={`0 0 ${totalWidth} ${arcHeight}`}
-          fill="none"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: SVG_HEIGHT,
+            overflow: "visible",
+            pointerEvents: "none",
+          }}
         >
-          <path
-            d={`M ${avatarSize / 2} ${arcHeight} Q ${totalWidth / 2} ${-arcHeight * 0.6} ${totalWidth - avatarSize / 2} ${arcHeight}`}
-            stroke="#D4D4D4"
-            strokeWidth="1.5"
-            strokeDasharray="4 4"
-            fill="none"
-          />
+          {members.map((_, i) => {
+            const endX = slotWidth * i + slotWidth / 2;
+            const endY = SVG_HEIGHT;
+            const ctrlX = endX;
+            const ctrlY = 0;
+            const d = `M ${apexX} 0 Q ${ctrlX} ${ctrlY} ${endX} ${endY}`;
+            const dur = `${1.2 + (i * 0.3) % 1.2}s`;
+            const begin = `${i * 0.4}s`;
+
+            return (
+              <g key={i}>
+                <path
+                  d={d}
+                  stroke="#D4D4D4"
+                  strokeWidth="1.5"
+                  strokeDasharray="4 4"
+                  fill="none"
+                />
+                <circle r="4" fill="#D4D4D4">
+                  <animateMotion
+                    path={d}
+                    dur={dur}
+                    begin={begin}
+                    repeatCount="indefinite"
+                    calcMode="spline"
+                    keySplines="0.4 0 0.6 1"
+                    keyTimes="0;1"
+                  />
+                  <animate
+                    attributeName="opacity"
+                    values="1;1;0"
+                    keyTimes="0;0.7;1"
+                    dur={dur}
+                    begin={begin}
+                    repeatCount="indefinite"
+                  />
+                </circle>
+              </g>
+            );
+          })}
         </svg>
       )}
 
