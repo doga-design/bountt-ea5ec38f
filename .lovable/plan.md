@@ -1,78 +1,97 @@
-# Bountt — Numpad & Cost Log Fixes
+# Bountt — MemberAvatarGrid + Custom Mode Fixes
 
-## Fix 1: Placeholder ghost avatars
+## Fix 1: "+" as standalone button
 
-`getAvatarImage` in `src/lib/avatar-utils.ts` already uses `member.id` only and has no ghost/placeholder fallback. All consuming components (`MemberAvatarGrid`, `PayerAvatar`, `CustomSplitRows`, `SplitSentence`) call `getAvatarImage(m)` directly with no conditional fallback. No changes needed here — already clean.
+**File**: `src/components/expense/MemberAvatarGrid.tsx`
 
-## Fix 2: Payer avatar tap opens payer selector
+- Remove the `{isLast && ...}` overlay block (lines 58-72) from inside the member map loop
+- Add a new prop: `onAddMember?: () => void`
+- After the `.map()`, render a standalone `<button>` in the same flex row:
+  - Same `avatarSize` as the member avatars (uses the sizing tier)
+  - Circular, `backgroundColor: "#EAEAE6"`, centered `Plus` icon in `color: "#888"`
+  - `onClick` calls `onAddMember`
+  - Has its own name label below: "Add" in muted text
 
-**File**: `src/components/expense/ExpenseScreen.tsx` (lines 612-617)
+**File**: `src/components/expense/ExpenseScreen.tsx`
 
-Currently the PayerAvatar onClick only shows a toast in edit mode and does nothing in create mode. The payer selector drawer lives inside `SplitSentence.tsx` as internal state (`payerSheetOpen`).
+- Import `AddMemberSheet` from `@/components/group-settings/AddMemberSheet`
+- Add state: `const [showAddMember, setShowAddMember] = useState(false)`
+- Pass `onAddMember={() => setShowAddMember(true)}` to `MemberAvatarGrid`
+- Render `<AddMemberSheet>` with `open={showAddMember}`, wired to `addPlaceholderMember` from `useApp()` context
+- After adding, refresh members and auto-select the new member in the grid (After `addPlaceholderMember` resolves successfully, add the new member's id to `activeIds` automatically so they appear selected in the grid immediately without requiring a manual tap.)
 
-**Solution**: Lift the payer drawer state out of `SplitSentence` and into `ExpenseScreen`:
+## Fix 2: Sizing tiers and centered layout
 
-- Add `payerDrawerOpen` state to `ExpenseScreen`
-- Pass it down to `SplitSentence` as a controlled prop
-- Wire PayerAvatar's `onClick` to set `payerDrawerOpen(true)` (or show locked toast in edit mode)
-- Wire the "you" button on Slide 1 to the same function
+**File**: `src/components/expense/MemberAvatarGrid.tsx`
 
-**Changes to `SplitSentence.tsx**`:
+Replace the current sizing logic (lines 18-21) with a tier system based on `memberCount` (members array length, which excludes payer). The `totalSlots = memberCount + 1` (the "+" button occupies one slot).
 
-- Replace internal `payerSheetOpen` state with props: `payerDrawerOpen` and `onPayerDrawerChange`
-- Payer name tap calls `onPayerDrawerChange(true)` instead of `setPayerSheetOpen(true)`
 
-**Changes to `ExpenseScreen.tsx**`:
+| memberCount | Avatar | Font | Gap  | Vertical |
+| ----------- | ------ | ---- | ---- | -------- |
+| 2           | 100px  | 18px | 16px | 10px     |
+| 3           | 92px   | 18px | 14px | 8px      |
+| 4           | 75px   | 16px | 12px | 6px      |
+| 5           | 60px   | 15px | 10px | 6px      |
+| 6+          | 48px   | 13px | 8px  | 4px      |
 
-- Add `const [payerDrawerOpen, setPayerDrawerOpen] = useState(false)`
-- Create `openPayerDrawer` function that checks edit mode (toast) or opens drawer
-- Wire PayerAvatar onClick to `openPayerDrawer`
-- Wire Slide 1 "you" button onClick to `openPayerDrawer`
-- Pass `payerDrawerOpen` and `setPayerDrawerOpen` to SplitSentence
 
-## Fix 3: "You" tap on Slide 1 opens payer selector
+Layout changes:
 
-Covered by Fix 2 above — the Slide 1 "you" button (line 544) will call the same `openPayerDrawer` function.
+- Container: `justify-center` (not `items-start`), remove `overflow-x-auto` and `scrollbarWidth: none`
+- Use dynamic gap from the tier table
+- Remove `flex-shrink-0` from individual items — allow natural centering
+- Each item width = `avatarSize`
 
-## Fix 4: Remove duplicate total in custom mode
+**Dashed arc**: Add an SVG element positioned above the avatar row. It draws a dashed quadratic bezier curve from the leftmost avatar area arcing up and over to the "+" button position. Stroke: `#D4D4D4`, `stroke-dasharray="4 4"`, no fill. This sits behind the avatars using `absolute` positioning within a `relative` container.
 
-**File**: `src/components/expense/ExpenseScreen.tsx` (lines 648-657)
+## Fix 3: Remove duplicate total in custom mode
 
-Remove the second `AmountDisplay` component rendered inside the custom mode block. The distribute/remaining pill will move into the `CustomSplitRows` area or be rendered separately without a duplicate amount display.
+**File**: `src/components/expense/ExpenseScreen.tsx` (lines 607-622)
 
-**Solution**: Remove the `<AmountDisplay>` on lines 649-657. Keep only the status pill (distribute button / "perfectly split" indicator). Extract the status pill logic from `AmountDisplay` into a small inline block or a dedicated component rendered above `CustomSplitRows`.
+The `<AmountDisplay>` at line 609 renders on Slide 2 for BOTH equal and custom modes. In custom mode, the status pill at line 656 provides the split status. This creates two separate displays.
 
-## Fix 5: Hide MemberAvatarGrid in custom mode
+**Change**: Hide the AmountDisplay row when `splitMode === "custom"`:
 
-**File**: `src/components/expense/ExpenseScreen.tsx` (lines 638-644)
+```
+{splitMode !== "custom" && (
+  <div className="flex items-center justify-center gap-2 py-2 flex-shrink-0">
+    <AmountDisplay amount={amount} size="medium" />
+    {payerMember && <PayerAvatar ... />}
+  </div>
+)}
+```
 
-Wrap `MemberAvatarGrid` in a conditional: only render when `splitMode === "equal"`. The grid is already not rendered in custom mode's `CustomSplitRows` block, but it's currently always visible above it.
+The status pill in the custom block (lines 656-703) remains as the only amount-related indicator. **In custom mode, hide AmountDisplay only. Keep PayerAvatar visible. The payer avatar next to the total must remain accessible in both equal and custom modes.**
 
-**Change**: `{splitMode === "equal" && <MemberAvatarGrid ... />}`
+## Fix 4: Redistribute excludes focused member
 
-## Fix 6: "+" button overlay positioning
+**File**: `src/components/expense/ExpenseScreen.tsx` (lines 213-241)
 
-**File**: `src/components/expense/MemberAvatarGrid.tsx` (lines 74-95)
+Current behavior when `remaining > 0.01`: adds the entire remaining to `focusedMemberId`. This is wrong — it should distribute to all OTHER members.
 
-Currently the "+" button is a separate item at the end of the flex row. Redesign it to overlay on the top-right corner of the last member avatar, as shown in img3.
+**New logic for `remaining > 0.01**`:
 
-**Solution**:
+```
+const others = splitMembers.filter(m => m.id !== focusedMemberId);
+if (others.length === 0) return;
+const shares = distributeCents(remaining, others.length);
+others.forEach((m, i) => {
+  const current = parseFloat(newAmounts.get(m.id) || "0") || 0;
+  newAmounts.set(m.id, (current + shares[i]).toFixed(2));
+});
+```
 
-- Remove the standalone "+" flex item
-- Wrap the last member avatar in a `relative` container
-- Add a small circular "+" button (approximately 28px) positioned `absolute` at top-right, slightly overlapping the avatar circle
-- Style: light gray background, subtle border/shadow, "+" icon inside
-- No click handler (visual only)
+The `remaining < -0.01` (over-budget / "Remove") branch already correctly excludes focused — no change needed there.
+
+Edge case: if focused member is the only member, `others.length === 0`, function returns early (button does nothing).
 
 ---
 
 ## Files Modified
 
 
-| File                                          | Changes                                                                                                                                                          |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/components/expense/ExpenseScreen.tsx`    | Add `payerDrawerOpen` state, wire payer avatar + "you" button, conditionally render MemberAvatarGrid (equal only), remove duplicate AmountDisplay in custom mode |
-| `src/components/expense/SplitSentence.tsx`    | Accept controlled drawer props (`payerDrawerOpen`, `onPayerDrawerChange`) instead of internal state                                                              |
-| &nbsp;                                        | &nbsp;                                                                                                                                                           |
-| `src/components/expense/MemberAvatarGrid.tsx` | Reposition "+" button to overlay top-right of last member avatar                                                                                                 |
-| `src/components/expense/AmountDisplay.tsx`    | Extract status pill as a standalone export or keep the distribute pill renderable without the amount display                                                     |
+| File                                          | Changes                                                                                                                          |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `src/components/expense/MemberAvatarGrid.tsx` | Standalone "+" button after map, sizing tiers, centered layout, dashed arc SVG, `onAddMember` prop                               |
+| `src/components/expense/ExpenseScreen.tsx`    | Add `AddMemberSheet` integration, hide AmountDisplay in custom mode on Slide 2, fix `handleDistribute` to exclude focused member |
