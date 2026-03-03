@@ -1,6 +1,6 @@
-import { Ghost, User, Send, Pencil, Trash2, ArrowRight, HandCoins } from "lucide-react";
+import { Send, Pencil, Trash2, ArrowRight, HandCoins } from "lucide-react";
 import { GroupMember, Expense, ExpenseSplit } from "@/types";
-import { getAvatarColor, getMemberBalance } from "@/lib/avatar-utils";
+import { getAvatarColor, getAvatarImage, getMemberBalance } from "@/lib/avatar-utils";
 import { formatCurrency, generateJoinUrl } from "@/lib/bountt-utils";
 import { useApp } from "@/contexts/AppContext";
 import { useToast } from "@/hooks/use-toast";
@@ -74,14 +74,15 @@ export default function MemberDetailSheet({
         <DrawerHeader className="pb-2">
           <div className="flex items-center gap-3">
             <div
-              className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+              className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden"
               style={{ backgroundColor: avatarColor }}
             >
-              {isPlaceholder ? (
-                <span className="text-xl">👻</span>
-              ) : (
-                <User className="w-6 h-6 text-primary-foreground" />
-              )}
+              <img
+                src={getAvatarImage(member)}
+                alt={member.name}
+                className="w-[75%] h-[75%] object-contain"
+                draggable={false}
+              />
             </div>
             <div>
               <DrawerTitle>{member.name}</DrawerTitle>

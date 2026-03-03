@@ -1,7 +1,7 @@
-import { Settings, Plus, User } from "lucide-react";
+import { Settings, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
-import { getAvatarColor } from "@/lib/avatar-utils";
+import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
 import BalancePill from "./BalancePill";
 
 const GRADIENTS: Record<string, { from: string; to: string }> = {
@@ -49,7 +49,7 @@ export default function DashboardHeader({ onAddMember, showBalance = false }: Da
               return (
                 <div
                   key={member.id}
-                  className="w-10 h-10 rounded-full flex items-center justify-center border-2 border-primary-foreground"
+                  className="w-10 h-10 rounded-full flex items-center justify-center border-2 border-primary-foreground overflow-hidden"
                   style={{
                     marginLeft: i > 0 ? "-12px" : "0",
                     backgroundColor: isCurrentUser ? "hsl(var(--card))" : color,
@@ -58,13 +58,12 @@ export default function DashboardHeader({ onAddMember, showBalance = false }: Da
                   }}
                   title={member.name}
                 >
-                  {isCurrentUser ? (
-                    <span className="text-sm">😊</span>
-                  ) : isPlaceholder ? (
-                    <span className="text-sm">👻</span>
-                  ) : (
-                    <User className="w-4 h-4 text-primary-foreground" />
-                  )}
+                  <img
+                    src={getAvatarImage(member)}
+                    alt={member.name}
+                    className="w-[75%] h-[75%] object-contain"
+                    draggable={false}
+                  />
                 </div>
               );
             })}

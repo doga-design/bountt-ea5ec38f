@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { ArrowLeft, RotateCcw } from "lucide-react";
+import { ArrowLeft, RotateCcw, Plus } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -648,13 +648,32 @@ export default function ExpenseScreen({
 
                 {/* Member avatar grid — equal mode only */}
                 {splitMode === "equal" && (
-                  <MemberAvatarGrid
-                    members={gridMembers}
-                    activeIds={activeIds}
-                    onToggle={handleToggleGridMember}
-                    currentUserId={user?.id}
-                    onAddMember={() => setShowAddMember(true)}
-                  />
+                  <div className="relative">
+                    <MemberAvatarGrid
+                      members={gridMembers}
+                      activeIds={activeIds}
+                      onToggle={handleToggleGridMember}
+                      currentUserId={user?.id}
+                    />
+                    {/* Absolute "+" button */}
+                    <button
+                      onClick={() => setShowAddMember(true)}
+                      className="absolute flex items-center justify-center rounded-full"
+                      style={{
+                        width: 36,
+                        height: 36,
+                        top: 0,
+                        right: -10,
+                        zIndex: 10,
+                        backgroundColor: "white",
+                        border: "1.5px solid #E2E2DE",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
+                      }}
+                      aria-label="Add member"
+                    >
+                      <Plus className="w-[18px] h-[18px]" style={{ color: "#888" }} />
+                    </button>
+                  </div>
                 )}
 
                 {/* Custom split rows */}

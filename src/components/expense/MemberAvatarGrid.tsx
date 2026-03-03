@@ -1,4 +1,3 @@
-import { Plus } from "lucide-react";
 import { GroupMember } from "@/types";
 import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
 
@@ -7,7 +6,6 @@ interface MemberAvatarGridProps {
   activeIds: Set<string>;
   onToggle: (memberId: string) => void;
   currentUserId: string | undefined;
-  onAddMember?: () => void;
 }
 
 function getSizingTier(memberCount: number) {
@@ -23,20 +21,18 @@ export default function MemberAvatarGrid({
   activeIds,
   onToggle,
   currentUserId,
-  onAddMember,
 }: MemberAvatarGridProps) {
   const memberCount = members.length;
   const { avatarSize, fontSize, gap, verticalSpacing } = getSizingTier(memberCount);
-  const totalSlots = memberCount + 1; // +1 for the "+" button
 
-  // Dashed arc SVG dimensions
-  const totalWidth = totalSlots * avatarSize + (totalSlots - 1) * gap;
+  // Dashed arc SVG dimensions — spans member avatars only
+  const totalWidth = memberCount * avatarSize + (memberCount - 1) * gap;
   const arcHeight = 24;
 
   return (
     <div className="relative px-4" style={{ paddingTop: arcHeight + 4 }}>
       {/* Dashed arc SVG */}
-      {memberCount >= 1 && (
+      {memberCount >= 2 && (
         <svg
           className="absolute left-1/2 -translate-x-1/2"
           style={{ top: 0 }}
@@ -108,32 +104,6 @@ export default function MemberAvatarGrid({
             </button>
           );
         })}
-
-        {/* Standalone "+" button */}
-        {onAddMember && (
-          <button
-            onClick={onAddMember}
-            className="flex flex-col items-center transition-all active:scale-95"
-            style={{ width: avatarSize }}
-          >
-            <div
-              className="rounded-full flex items-center justify-center"
-              style={{
-                width: avatarSize,
-                height: avatarSize,
-                backgroundColor: "#EAEAE6",
-              }}
-            >
-              <Plus style={{ width: avatarSize * 0.35, height: avatarSize * 0.35, color: "#888" }} strokeWidth={2.5} />
-            </div>
-            <span
-              className="mt-1 font-bold text-center truncate w-full"
-              style={{ fontSize, color: "hsl(var(--muted-foreground))" }}
-            >
-              Add
-            </span>
-          </button>
-        )}
       </div>
     </div>
   );

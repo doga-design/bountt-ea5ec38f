@@ -1,6 +1,6 @@
-import { Ghost, User, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { GroupMember } from "@/types";
-import { getAvatarColor, MemberBalance } from "@/lib/avatar-utils";
+import { getAvatarColor, getAvatarImage, MemberBalance } from "@/lib/avatar-utils";
 import { formatCurrency } from "@/lib/bountt-utils";
 
 interface MemberCardProps {
@@ -36,14 +36,15 @@ export default function MemberCard({ member, balance, isCurrentUser, onClick }: 
     >
       {/* Avatar */}
       <div
-        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden"
         style={{ backgroundColor: avatarColor }}
       >
-        {isPlaceholder ? (
-          <span className="text-lg">👻</span>
-        ) : (
-          <User className="w-5 h-5 text-primary-foreground" />
-        )}
+        <img
+          src={getAvatarImage(member)}
+          alt={member.name}
+          className="w-[75%] h-[75%] object-contain"
+          draggable={false}
+        />
       </div>
 
       {/* Text */}
