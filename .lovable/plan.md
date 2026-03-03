@@ -1,74 +1,119 @@
-# Move "+" Button Inside MemberAvatarGrid
 
-## Problem
 
-Using a fixed `top` pixel value is fragile -- it only works for one avatar size tier. The button needs to be vertically centered on the avatar row regardless of tier or SVG height.
+# Root Cause Analysis: Stale Builds and Intermittent Boot Failures
 
-## Solution
+## Ranked Root Causes
 
-Move the "+" button into `MemberAvatarGrid.tsx`, positioned inside the avatar row `div` with `top: 50%; transform: translateY(-50%)` so it always centers on the avatars.
+### 1. PWA Service Worker Serving Cached Stale Builds (HIGH PROBABILITY)
 
-## Changes
+**Evidence:**
+- `vite.config.ts` lines 20-39: VitePWA with `registerType: "autoUpdate"` and Workbox navigation fallback
+- `public/manifest.json`: standalone PWA config
+- The Workbox default precaching strategy caches all build assets. When new code deploys, the old service worker continues serving cached JS bundles until the new SW activates -- which only happens on the NEXT navigation/reload after download
+- `registerType: "autoUpdate"` calls `skipWaiting()` but the old cached responses can still be served from the HTTP cache or Workbox precache until the new SW fully controls the page
 
-### 1. `src/components/expense/MemberAvatarGrid.tsx`
+**Why this causes stale preview:**
+The service worker intercepts all navigation requests and serves cached HTML/JS. Even after a new build deploys, the first load gets the old cached version. The update only takes effect on the second load. In a preview iframe that may not get a hard refresh, this means persistently stale content.
 
-- Add optional prop `onAddMember?: () => void`
-- Make the avatar row div `position: relative`
-- When `onAddMember` is provided, render the "+" button inside the avatar row div with:
-  ```
-  position: absolute, right: -18px, top: 50%, transform: translateY(-50%), zIndex: 10
-  ```
-  The `position: relative` must be on the same div that contains the avatar map — the inner avatar row div. Not the outer container div that holds the SVG and the avatar row together. If `relative` is on the wrong parent, `top: 50%` will reference the full component height including the SVG, and the button will be misaligned again.  
+**Fix:**
+- Add `skipWaiting: true` and `clientsClaim: true` to the workbox config so new service workers activate immediately
+- Add a `cleanupOutdatedCaches: true` option to purge old precache entries
+- Consider adding a reload prompt or auto-reload on SW update detection
 
-- Import `Plus` from lucide-react
+### 2. Auth Race Condition: Double State Setting (MEDIUM-HIGH PROBABILITY)
 
-### 2. `src/components/expense/ExpenseScreen.tsx`
+**Evidence:**
+- `AppContext.tsx` lines 99-145: Both `onAuthStateChange` callback AND `getSession().then()` set `setUser`, `setSession`, `setAuthLoading(false)`, and trigger `fetchGroups`
+- The `groupsFetchedForRef` guard prevents double-fetch of groups, but the auth state itself gets set twice in rapid succession
+- `onAuthStateChange` fires with `INITIAL_SESSION` event, and then `getSession()` resolves -- both calling `setAuthLoading(false)` and `setUser`
+- This causes two render cycles. If the second one arrives slightly late, downstream components (Splash, AuthGuard) may briefly see `user = null` then `user = object`, causing a flash or incorrect redirect
 
-- Remove the standalone `<button>` for "+" from the `splitMode === "equal"` block
-- Pass `onAddMember={() => setShowAddMember(true)}` to `MemberAvatarGrid`
-- Keep the outer `flex justify-center` and inner `relative` + `width: fit-content` wrapper (needed so the button doesn't escape to screen edge)
+**Why this causes intermittent boot failures:**
+- Splash.tsx has a 2200ms timer. If auth resolves quickly (user is null), it navigates to `/auth`. Then `onAuthStateChange` fires with a valid session, but the navigation already happened. User sees auth page despite being logged in.
+- Conversely, if `getSession` resolves with a session but `groupsLoading` is still true, the Splash timer keeps waiting. If groups fetch fails silently or takes too long, the user is stuck on splash.
 
-### Result
+**Fix:**
+- Remove the manual `getSession()` call entirely. The `onAuthStateChange` listener with `INITIAL_SESSION` event (added in Supabase JS v2.39+) already handles the initial session. The current code double-processes it.
+- Alternatively, use a ref to track whether the initial session has already been processed, and skip the duplicate.
 
-```text
-ExpenseScreen.tsx:
-  <div className="flex justify-center">
-    <div className="relative" style={{ width: 'fit-content' }}>
-      <MemberAvatarGrid
-        members={gridMembers}
-        activeIds={activeIds}
-        onToggle={handleToggleGridMember}
-        currentUserId={user?.id}
-        onAddMember={() => setShowAddMember(true)}
-      />
-    </div>
-  </div>
+### 3. Splash Timer Race Condition (MEDIUM PROBABILITY)
 
-MemberAvatarGrid.tsx (avatar row div):
-  <div
-    className="flex justify-center relative"
-    style={{ gap, paddingTop: verticalSpacing, paddingBottom: verticalSpacing }}
-  >
-    {members.map(...)}
-    {onAddMember && (
-      <button
-        onClick={onAddMember}
-        className="absolute flex items-center justify-center rounded-full"
-        style={{
-          width: 36, height: 36,
-          top: '50%', right: -18,
-          transform: 'translateY(-50%)',
-          zIndex: 10,
-          backgroundColor: 'white',
-          border: '1.5px solid #E2E2DE',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
-        }}
-        aria-label="Add member"
-      >
-        <Plus className="w-[18px] h-[18px]" style={{ color: '#888' }} />
-      </button>
-    )}
-  </div>
+**Evidence:**
+- `Splash.tsx` lines 14-29: A `setTimeout(2200)` gates navigation, but the conditions inside check `authLoading`, `groupsLoading`, `user`, and `userGroups`
+- The timer fires once after 2200ms. If `groupsLoading` is still `true` at that moment, none of the navigation branches execute, and the user is permanently stuck on the splash screen
+- There is no fallback or retry. If the timeout fires while data is loading, the app never navigates
+
+**Why this causes app failing to boot:**
+User opens app -> splash shows -> 2200ms later, groups are still loading from the database -> none of the if/else branches match -> splash stays forever. The `useEffect` dependency array includes `groupsLoading` and `userGroups`, so when those eventually update, the effect re-runs and sets ANOTHER 2200ms timer. But by then the user may have already force-refreshed or assumed it's broken.
+
+**Fix:**
+- Separate the splash animation delay from the navigation logic. Show splash for 2200ms, then wait for data to be ready (with a max timeout), then navigate.
+- Or: Remove the fixed timer entirely and navigate as soon as `authLoading === false && groupsLoading === false`.
+
+### 4. Stale Closure in Realtime Splits Handler (LOW-MEDIUM)
+
+**Evidence:**
+- `AppContext.tsx` line 483: `expenses.some((e) => e.id === expenseId)` captures a stale `expenses` array from closure, then line 485 has `|| true` which bypasses the check entirely
+- This means every single realtime event on `expense_splits` triggers `fetchExpenseSplits` AND `fetchExpenses` for the current group, regardless of relevance
+- This creates unnecessary API calls that can slow boot and cause state churn
+
+**Fix:**
+- Remove the `|| true` bypass or move the check into the callback properly using a ref
+
+---
+
+## Exact Fix Steps
+
+### Fix 1: Service Worker Config (vite.config.ts)
+Add `skipWaiting`, `clientsClaim`, and `cleanupOutdatedCaches` to the workbox config:
+```js
+workbox: {
+  navigateFallbackDenylist: [/^\/~oauth/],
+  skipWaiting: true,
+  clientsClaim: true,
+  cleanupOutdatedCaches: true,
+}
 ```
 
-Two files, clean separation. The button always centers on the avatar row via CSS, no pixel guessing.
+### Fix 2: Eliminate Auth Double-Processing (AppContext.tsx)
+Remove the `supabase.auth.getSession()` block (lines 129-142). The `onAuthStateChange` listener already fires with the initial session via the `INITIAL_SESSION` event. This eliminates the race condition.
+
+### Fix 3: Fix Splash Navigation Logic (Splash.tsx)
+Replace the single-fire timer with a two-phase approach:
+- Phase 1: Show splash for minimum 2200ms (animation)
+- Phase 2: Once both `authLoading === false` AND `groupsLoading === false` AND minimum time has passed, navigate immediately
+
+```tsx
+const [minTimePassed, setMinTimePassed] = useState(false);
+
+useEffect(() => {
+  const timer = setTimeout(() => setMinTimePassed(true), 2200);
+  return () => clearTimeout(timer);
+}, []);
+
+useEffect(() => {
+  if (!minTimePassed || authLoading) return;
+  if (user) {
+    if (groupsLoading) return; // wait for groups
+    if (userGroups.length > 0) {
+      navigate(`/dashboard/${userGroups[0].id}`, { replace: true });
+    } else {
+      navigate("/groups/empty", { replace: true });
+    }
+  } else {
+    navigate("/auth", { replace: true });
+  }
+}, [minTimePassed, authLoading, user, groupsLoading, userGroups]);
+```
+
+### Fix 4: Clean Up Stale Closure (AppContext.tsx)
+Remove `|| true` on line 485 of the splits realtime handler, or replace the `expenses.some()` check with a ref-based check.
+
+---
+
+## Preventative Safeguards
+
+1. Add a global loading timeout (e.g. 10s) that shows an error state if the app hasn't finished booting
+2. Add `console.warn` logging for auth state transitions in development mode to catch future race conditions
+3. Consider adding a "New version available" toast using the PWA update lifecycle instead of silent auto-update
+
