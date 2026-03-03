@@ -14,6 +14,7 @@ import NumpadGrid from "./NumpadGrid";
 import SaveButton from "./SaveButton";
 import MemberAvatarGrid from "./MemberAvatarGrid";
 import PayerAvatar from "./PayerAvatar";
+import AddMemberSheet from "@/components/group-settings/AddMemberSheet";
 
 interface ExpenseScreenProps {
   open: boolean;
@@ -30,8 +31,9 @@ export default function ExpenseScreen({
   editExpense,
   editSplits,
 }: ExpenseScreenProps) {
-  const { currentGroup, user, profile, groupMembers, fetchExpenses, fetchExpenseSplits } = useApp();
+  const { currentGroup, user, profile, groupMembers, fetchExpenses, fetchExpenseSplits, addPlaceholderMember } = useApp();
   const { toast } = useToast();
+  const [showAddMember, setShowAddMember] = useState(false);
 
   const [slide, setSlide] = useState<1 | 2>(1);
   const [amount, setAmount] = useState("0");
@@ -215,8 +217,13 @@ export default function ExpenseScreen({
     const newAmounts = new Map(customAmounts);
 
     if (remaining > 0.01) {
-      const current = parseFloat(newAmounts.get(focusedMemberId) || "0") || 0;
-      newAmounts.set(focusedMemberId, (current + remaining).toFixed(2));
+      const others = splitMembers.filter((m) => m.id !== focusedMemberId);
+      if (others.length === 0) return;
+      const shares = distributeCents(remaining, others.length);
+      others.forEach((m, i) => {
+        const current = parseFloat(newAmounts.get(m.id) || "0") || 0;
+        newAmounts.set(m.id, (current + shares[i]).toFixed(2));
+      });
     } else {
       const others = splitMembers.filter((m) => m.id !== focusedMemberId);
       if (others.length === 0) return;
@@ -606,7 +613,7 @@ export default function ExpenseScreen({
 
               {/* Amount + Payer avatar */}
               <div className="flex items-center justify-center gap-2 py-2 flex-shrink-0">
-                <AmountDisplay amount={amount} size="medium" />
+                {splitMode !== "custom" && <AmountDisplay amount={amount} size="medium" />}
                 {payerMember && (
                   <PayerAvatar
                     payer={payerMember}
@@ -646,6 +653,7 @@ export default function ExpenseScreen({
                     activeIds={activeIds}
                     onToggle={handleToggleGridMember}
                     currentUserId={user?.id}
+                    onAddMember={() => setShowAddMember(true)}
                   />
                 )}
 
@@ -742,6 +750,21 @@ export default function ExpenseScreen({
           </div>
         </div>
       </div>
+
+      {/* Add member sheet */}
+      <AddMemberSheet
+        open={showAddMember}
+        onOpenChange={setShowAddMember}
+        groupName={currentGroup?.name ?? ""}
+        onAdd={async (name) => {
+          if (!currentGroup) return;
+          const member = await addPlaceholderMember(currentGroup.id, name);
+          if (member) {
+            membersSnapshot.current = [...membersSnapshot.current, member];
+            setActiveIds((prev) => new Set([...prev, member.id]));
+          }
+        }}
+      />
     </div>
   );
 }
