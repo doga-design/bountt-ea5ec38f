@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import splashHand from "@/assets/bountt-splash-hand.png";
@@ -6,25 +6,28 @@ import splashHand from "@/assets/bountt-splash-hand.png";
 export default function Splash() {
   const navigate = useNavigate();
   const { user, authLoading, userGroups, groupsLoading } = useApp();
+  const [minTimePassed, setMinTimePassed] = useState(false);
 
+  // Phase 1: minimum splash animation time
   useEffect(() => {
-    // Wait for auth to resolve before deciding where to go
-    if (authLoading) return;
-
-    const timer = setTimeout(() => {
-      if (user) {
-        // If user has groups, go to their first group's dashboard
-        if (!groupsLoading && userGroups.length > 0) {
-          navigate(`/dashboard/${userGroups[0].id}`, { replace: true });
-        } else if (!groupsLoading) {
-          navigate("/groups/empty", { replace: true });
-        }
-      } else {
-        navigate("/auth", { replace: true });
-      }
-    }, 2200);
+    const timer = setTimeout(() => setMinTimePassed(true), 2200);
     return () => clearTimeout(timer);
-  }, [navigate, user, authLoading, userGroups, groupsLoading]);
+  }, []);
+
+  // Phase 2: navigate once data is ready AND min time has passed
+  useEffect(() => {
+    if (!minTimePassed || authLoading) return;
+    if (user) {
+      if (groupsLoading) return; // wait for groups to resolve
+      if (userGroups.length > 0) {
+        navigate(`/dashboard/${userGroups[0].id}`, { replace: true });
+      } else {
+        navigate("/groups/empty", { replace: true });
+      }
+    } else {
+      navigate("/auth", { replace: true });
+    }
+  }, [minTimePassed, authLoading, user, groupsLoading, userGroups, navigate]);
 
   return (
     <div className="screen-container bg-background overflow-hidden">

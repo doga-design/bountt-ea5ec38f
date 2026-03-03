@@ -126,21 +126,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-      setSession(initialSession);
-      setUser(initialSession?.user ?? null);
-      setAuthLoading(false);
-      if (initialSession?.user) {
-        fetchProfile(initialSession.user.id);
-        if (groupsFetchedForRef.current !== initialSession.user.id) {
-          groupsFetchedForRef.current = initialSession.user.id;
-          fetchGroups(initialSession.user.id);
-        }
-      } else {
-        setGroupsLoading(false);
-      }
-    });
-
     return () => subscription.unsubscribe();
   }, []);
 
@@ -480,10 +465,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           // Check if the split belongs to an expense we know about
           const expenseId = (payload.new as any)?.expense_id || (payload.old as any)?.expense_id;
           if (expenseId) {
-            const belongsToGroup = expenses.some((e) => e.id === expenseId) ||
-              // Also accept if we don't know the expense yet (new expense flow)
-              true;
-            if (belongsToGroup) {
+            // Always refetch for current group — the filter is the group channel itself
+            {
               fetchExpenseSplits(groupId);
               fetchExpenses(groupId);
             }
