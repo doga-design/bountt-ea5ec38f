@@ -655,25 +655,8 @@ export default function ExpenseScreen({
                         activeIds={activeIds}
                         onToggle={handleToggleGridMember}
                         currentUserId={user?.id}
+                        onAddMember={() => setShowAddMember(true)}
                       />
-                      {/* Absolute "+" button */}
-                      <button
-                        onClick={() => setShowAddMember(true)}
-                        className="absolute flex items-center justify-center rounded-full"
-                        style={{
-                          width: 36,
-                          height: 36,
-                          top: 0,
-                          right: -18,
-                          zIndex: 10,
-                          backgroundColor: "white",
-                          border: "1.5px solid #E2E2DE",
-                          boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
-                        }}
-                        aria-label="Add member"
-                      >
-                        <Plus className="w-[18px] h-[18px]" style={{ color: "#888" }} />
-                      </button>
                     </div>
                   </div>
                 )}

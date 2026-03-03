@@ -1,12 +1,14 @@
 import { useRef, useState, useEffect } from "react";
 import { GroupMember } from "@/types";
 import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
+import { Plus } from "lucide-react";
 
 interface MemberAvatarGridProps {
   members: GroupMember[];
   activeIds: Set<string>;
   onToggle: (memberId: string) => void;
   currentUserId: string | undefined;
+  onAddMember?: () => void;
 }
 
 function getSizingTier(memberCount: number) {
@@ -24,6 +26,7 @@ export default function MemberAvatarGrid({
   activeIds,
   onToggle,
   currentUserId,
+  onAddMember,
 }: MemberAvatarGridProps) {
   const memberCount = members.length;
   const { avatarSize, fontSize, gap, verticalSpacing } = getSizingTier(memberCount);
@@ -106,7 +109,7 @@ export default function MemberAvatarGrid({
 
       {/* Avatar row */}
       <div
-        className="flex justify-center"
+        className="flex justify-center relative"
         style={{ gap, paddingTop: verticalSpacing, paddingBottom: verticalSpacing }}
       >
         {members.map((m) => {
@@ -157,6 +160,26 @@ export default function MemberAvatarGrid({
             </button>
           );
         })}
+        {onAddMember && (
+          <button
+            onClick={onAddMember}
+            className="absolute flex items-center justify-center rounded-full"
+            style={{
+              width: 36,
+              height: 36,
+              top: '50%',
+              right: -18,
+              transform: 'translateY(-50%)',
+              zIndex: 10,
+              backgroundColor: 'white',
+              border: '1.5px solid #E2E2DE',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+            }}
+            aria-label="Add member"
+          >
+            <Plus className="w-[18px] h-[18px]" style={{ color: '#888' }} />
+          </button>
+        )}
       </div>
     </div>
   );
