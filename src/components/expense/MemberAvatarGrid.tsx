@@ -15,24 +15,25 @@ export default function MemberAvatarGrid({
   onToggle,
   currentUserId,
 }: MemberAvatarGridProps) {
-  // Dynamic sizing based on member count
-  const count = members.length + 1; // +1 for the "+" button
+  const count = members.length;
   const avatarSize = count <= 3 ? 72 : count <= 5 ? 64 : count <= 7 ? 56 : 48;
   const fontSize = count <= 3 ? 13 : count <= 5 ? 12 : 11;
+  const plusSize = 24;
 
   return (
     <div className="flex items-start gap-3 px-4 py-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-      {members.map((m) => {
+      {members.map((m, idx) => {
         const isActive = activeIds.has(m.id);
         const color = getAvatarColor(m);
         const isSelf = m.user_id === currentUserId;
         const avatarImg = getAvatarImage(m);
+        const isLast = idx === members.length - 1;
 
         return (
           <button
             key={m.id}
             onClick={() => onToggle(m.id)}
-            className="flex flex-col items-center flex-shrink-0 transition-all active:scale-95"
+            className="flex flex-col items-center flex-shrink-0 transition-all active:scale-95 relative"
             style={{ width: avatarSize + 8 }}
           >
             <div
@@ -54,6 +55,21 @@ export default function MemberAvatarGrid({
                 draggable={false}
               />
             </div>
+            {/* "+" overlay on last member avatar */}
+            {isLast && (
+              <div
+                className="absolute flex items-center justify-center rounded-full border-2 border-card"
+                style={{
+                  width: plusSize,
+                  height: plusSize,
+                  top: -2,
+                  right: 0,
+                  backgroundColor: "#EAEAE6",
+                }}
+              >
+                <Plus className="text-muted-foreground" style={{ width: 14, height: 14 }} strokeWidth={2.5} />
+              </div>
+            )}
             <span
               className="mt-1 font-bold text-center truncate w-full"
               style={{
@@ -70,29 +86,6 @@ export default function MemberAvatarGrid({
           </button>
         );
       })}
-
-      {/* "+" button (visual only) */}
-      <div
-        className="flex flex-col items-center flex-shrink-0"
-        style={{ width: avatarSize + 8 }}
-      >
-        <div
-          className="rounded-full flex items-center justify-center border-2 border-dashed"
-          style={{
-            width: avatarSize,
-            height: avatarSize,
-            borderColor: "hsl(var(--border))",
-          }}
-        >
-          <Plus className="text-muted-foreground" style={{ width: avatarSize * 0.35, height: avatarSize * 0.35 }} />
-        </div>
-        <span
-          className="mt-1 font-bold text-muted-foreground text-center"
-          style={{ fontSize }}
-        >
-          Add
-        </span>
-      </div>
     </div>
   );
 }

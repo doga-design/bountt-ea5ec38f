@@ -45,6 +45,7 @@ export default function ExpenseScreen({
   const [payerId, setPayerId] = useState<string | null>(null);
   const [prevAmount, setPrevAmount] = useState("0");
   const [shakeButton, setShakeButton] = useState(false);
+  const [payerDrawerOpen, setPayerDrawerOpen] = useState(false);
 
   // Snapshot members when drawer opens
   const membersSnapshot = useRef<GroupMember[]>([]);
@@ -546,7 +547,7 @@ export default function ExpenseScreen({
                         toast({ title: "To change the payer, delete this expense and log a new one" });
                         return;
                       }
-                      // Open payer drawer via SplitSentence mechanism — we'll do it inline
+                      setPayerDrawerOpen(true);
                     }}
                     className="font-extrabold underline decoration-dotted underline-offset-4"
                     style={{ color: "#D94F00" }}
@@ -612,8 +613,9 @@ export default function ExpenseScreen({
                     onClick={() => {
                       if (isEditMode) {
                         toast({ title: "To change the payer, delete this expense and log a new one" });
+                        return;
                       }
-                      // Payer drawer opens via SplitSentence
+                      setPayerDrawerOpen(true);
                     }}
                   />
                 )}
@@ -632,29 +634,73 @@ export default function ExpenseScreen({
                     onSetPayer={handleSetPayer}
                     allActiveMembers={activeMembers}
                     hidePayerDrawer={isEditMode}
+                    payerDrawerOpen={payerDrawerOpen}
+                    onPayerDrawerChange={setPayerDrawerOpen}
                   />
                 </div>
 
-                {/* Member avatar grid */}
-                <MemberAvatarGrid
-                  members={gridMembers}
-                  activeIds={activeIds}
-                  onToggle={handleToggleGridMember}
-                  currentUserId={user?.id}
-                />
+                {/* Member avatar grid — equal mode only */}
+                {splitMode === "equal" && (
+                  <MemberAvatarGrid
+                    members={gridMembers}
+                    activeIds={activeIds}
+                    onToggle={handleToggleGridMember}
+                    currentUserId={user?.id}
+                  />
+                )}
 
                 {/* Custom split rows */}
                 {splitMode === "custom" && (
                   <div className="mt-1">
-                    <AmountDisplay
-                      amount={amount}
-                      size="medium"
-                      splitMode="custom"
-                      remaining={remaining}
-                      isBalanced={isBalanced}
-                      onDistribute={handleDistribute}
-                      canDistribute={canDistribute}
-                    />
+                    {/* Status pill only — no duplicate amount display */}
+                    <div className="flex justify-center mb-2">
+                      {(() => {
+                        const overBudget = remaining < -0.01;
+                        const unassigned = remaining > 0.01;
+                        const showButton = canDistribute && Math.abs(remaining) > 0.01 && totalNum > 0;
+
+                        if (showButton) {
+                          const buttonLabel = overBudget
+                            ? `Remove $${Math.abs(remaining).toFixed(2)} →`
+                            : `Distribute $${remaining.toFixed(2)} →`;
+                          return (
+                            <button
+                              type="button"
+                              onClick={handleDistribute}
+                              className="px-4 py-1.5 rounded-full font-bold transition-transform active:scale-[0.96]"
+                              style={{
+                                background: "#FFF0E8",
+                                border: "1.5px solid rgba(217, 79, 0, 0.6)",
+                                color: "#D94F00",
+                                fontSize: "13px",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {buttonLabel}
+                            </button>
+                          );
+                        }
+
+                        let statusText = "assign to everyone";
+                        let statusColor = "hsl(var(--muted-foreground))";
+                        if (totalNum === 0) {
+                          statusText = "assign to everyone";
+                        } else if (isBalanced) {
+                          statusText = "perfectly split ✓";
+                          statusColor = "#22C55E";
+                        } else if (overBudget) {
+                          statusText = `$${Math.abs(remaining).toFixed(2)} over total`;
+                          statusColor = "#EF4444";
+                        } else if (unassigned) {
+                          statusText = `$${remaining.toFixed(2)} left to assign`;
+                        }
+                        return (
+                          <span className="text-xs font-semibold" style={{ color: statusColor }}>
+                            {statusText}
+                          </span>
+                        );
+                      })()}
+                    </div>
                     <CustomSplitRows
                       members={splitMembers}
                       currentUserId={user?.id}
