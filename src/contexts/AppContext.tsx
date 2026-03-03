@@ -468,25 +468,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .subscribe();
 
     // Realtime subscription for expense_splits (settlement updates)
-    // Client-side guard: only react to events for splits belonging to current group's expenses
     splitsChannelRef.current = supabase
       .channel(`splits:${currentGroup.id}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "expense_splits" },
-        (payload) => {
+        { event: "UPDATE", schema: "public", table: "expense_splits" },
+        () => {
           const groupId = currentGroupRef.current?.id;
-          if (!groupId) return;
-          // Check if the split belongs to an expense we know about
-          const expenseId = (payload.new as any)?.expense_id || (payload.old as any)?.expense_id;
-          if (expenseId) {
-            const belongsToGroup = expenses.some((e) => e.id === expenseId) ||
-              // Also accept if we don't know the expense yet (new expense flow)
-              true;
-            if (belongsToGroup) {
-              fetchExpenseSplits(groupId);
-              fetchExpenses(groupId);
-            }
+          if (groupId) {
+            fetchExpenseSplits(groupId);
+            fetchExpenses(groupId);
           }
         }
       )

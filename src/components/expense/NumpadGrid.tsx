@@ -24,37 +24,42 @@ export default function NumpadGrid({ onKey }: NumpadGridProps) {
   ];
 
   return (
-    <div className="grid grid-cols-3 gap-[1px] bg-border/50 px-1 pb-1">
-      {keys.flat().map((key) => (
-        <button
-          key={key}
-          onClick={() => onKey(key)}
-          className="flex flex-col items-center justify-center font-sora transition-colors active:bg-muted rounded-xl min-h-[62px]"
-          style={{
-            backgroundColor: "hsl(var(--card))",
-            boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-          }}
-          aria-label={key === "del" ? "Delete" : key}
-        >
-          {key === "del" ? (
-            <Delete className="w-6 h-6 text-foreground" />
-          ) : (
-            <>
-              <span className="text-[28px] font-semibold text-foreground leading-tight">
-                {key}
-              </span>
-              {SUB_LETTERS[key] && (
-                <span
-                  className="text-[8px] font-bold leading-none mt-0"
-                  style={{ color: "#C8C8C4" }}
-                >
-                  {SUB_LETTERS[key]}
+    <div
+      className="grid grid-cols-3"
+      style={{ gap: "1px", backgroundColor: "#DDDDD9", borderTop: "1px solid #DDDDD9", marginTop: "4px" }}
+    >
+      {keys.flat().map((key) => {
+        const isFunction = key === "." || key === "del";
+        return (
+          <button
+            key={key}
+            onClick={() => onKey(key)}
+            className="flex flex-col items-center justify-center font-sora transition-colors active:bg-[#EAEAE6] min-h-[72px]"
+            style={{
+              backgroundColor: isFunction ? "#EEEEE9" : "#F5F5F1",
+            }}
+            aria-label={key === "del" ? "Delete" : key}
+          >
+            {key === "del" ? (
+              <Delete className="w-7 h-7 text-foreground" />
+            ) : (
+              <>
+                <span className="text-[36px] font-semibold text-foreground leading-tight">
+                  {key}
                 </span>
-              )}
-            </>
-          )}
-        </button>
-      ))}
+                {SUB_LETTERS[key] && (
+                  <span
+                    className="text-[9px] font-bold leading-none mt-0.5"
+                    style={{ color: "#C8C8C4" }}
+                  >
+                    {SUB_LETTERS[key]}
+                  </span>
+                )}
+              </>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

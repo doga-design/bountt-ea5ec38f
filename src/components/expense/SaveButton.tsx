@@ -1,48 +1,47 @@
-import { Plus, ArrowRight } from "lucide-react";
-
 interface SaveButtonProps {
-  active: boolean;
+  splitMode: "equal" | "custom";
+  canSave: boolean;
+  isBalanced: boolean;
   loading: boolean;
   onClick: () => void;
+  isSingleUser?: boolean;
   label?: string;
-  /** If true, shake on tap when disabled (Slide 1 behavior) */
-  shakeOnDisabled?: boolean;
 }
 
 export default function SaveButton({
-  active,
+  splitMode,
+  canSave,
+  isBalanced,
   loading,
   onClick,
-  label = "Log cost",
-  shakeOnDisabled = false,
+  isSingleUser = false,
+  label = "Save",
 }: SaveButtonProps) {
-  const handleClick = () => {
-    if (loading) return;
-    if (!active && !shakeOnDisabled) return;
-    onClick();
-  };
+  const isCustomReady = splitMode === "custom" && isBalanced && canSave && !isSingleUser;
+  const isDefaultReady = splitMode === "equal" && canSave && !isSingleUser;
+  const enabled = isCustomReady || isDefaultReady;
 
   return (
     <div className="px-4 pb-2 pt-3">
       <button
-        onClick={handleClick}
-        disabled={loading}
-        className="w-full rounded-[18px] py-4 font-sora text-[17px] font-extrabold transition-all active:scale-[0.985] flex items-center justify-center gap-2"
+        onClick={onClick}
+        disabled={!enabled || loading}
+        className="w-full rounded-[18px] py-4 font-sora text-[17px] font-extrabold transition-all active:scale-[0.985]"
         style={{
-          backgroundColor: active ? "#D94F00" : "#EAEAE6",
-          color: active ? "#FFFFFF" : "#C0C0BC",
-          boxShadow: active ? "0 4px 14px rgba(217,79,0,0.3)" : "none",
-          cursor: !active && !shakeOnDisabled ? "default" : "pointer",
+          backgroundColor: !enabled
+            ? "#EAEAE6"
+            : isCustomReady
+            ? "#3B82F6"
+            : "hsl(var(--primary))",
+          color: !enabled ? "#C0C0BC" : "#FFFFFF",
+          boxShadow: !enabled
+            ? "none"
+            : isCustomReady
+            ? "0 4px 14px rgba(37,99,235,0.28)"
+            : "0 4px 14px rgba(217,79,0,0.3)",
         }}
       >
         {loading ? "Saving..." : label}
-        {!loading && (
-          active ? (
-            <Plus className="w-5 h-5" strokeWidth={3} />
-          ) : (
-            <ArrowRight className="w-5 h-5" strokeWidth={3} />
-          )
-        )}
       </button>
     </div>
   );
