@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Check } from "lucide-react";
 import { GroupMember } from "@/types";
 import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
@@ -18,6 +17,8 @@ interface SplitSentenceProps {
   onSetPayer: (memberId: string) => void;
   allActiveMembers: GroupMember[];
   hidePayerDrawer?: boolean;
+  payerDrawerOpen: boolean;
+  onPayerDrawerChange: (open: boolean) => void;
 }
 
 export default function SplitSentence({
@@ -29,8 +30,9 @@ export default function SplitSentence({
   onSetPayer,
   allActiveMembers,
   hidePayerDrawer = false,
+  payerDrawerOpen,
+  onPayerDrawerChange,
 }: SplitSentenceProps) {
-  const [payerSheetOpen, setPayerSheetOpen] = useState(false);
 
   const payerIsYou = payerMember?.user_id === currentUserId;
   const payerDisplay = payerIsYou ? "You" : payerMember?.name ?? "You";
@@ -83,7 +85,7 @@ export default function SplitSentence({
         <button
           onClick={() => {
             if (hidePayerDrawer) return;
-            setPayerSheetOpen(true);
+            onPayerDrawerChange(true);
           }}
           className="font-extrabold underline decoration-dotted underline-offset-4"
           style={{ color: "#D94F00" }}
@@ -102,7 +104,7 @@ export default function SplitSentence({
       </p>
 
       {/* Payer selection drawer */}
-      <Drawer open={payerSheetOpen} onOpenChange={setPayerSheetOpen}>
+      <Drawer open={payerDrawerOpen} onOpenChange={onPayerDrawerChange}>
         <DrawerContent>
           <DrawerHeader>
             <DrawerTitle className="font-sora">Who paid?</DrawerTitle>
@@ -120,7 +122,7 @@ export default function SplitSentence({
                   key={m.id}
                   onClick={() => {
                     onSetPayer(m.id);
-                    setPayerSheetOpen(false);
+                    onPayerDrawerChange(false);
                   }}
                   className="flex items-center justify-between w-full rounded-xl px-4 py-3 transition-colors active:bg-muted/50"
                 >

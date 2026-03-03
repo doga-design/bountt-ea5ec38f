@@ -38,9 +38,9 @@ export default function SaveButton({
         {loading ? "Saving..." : label}
         {!loading && (
           active ? (
-            <Plus className="w-5 h-5" strokeWidth={3} />
-          ) : (
             <ArrowRight className="w-5 h-5" strokeWidth={3} />
+          ) : (
+            <Plus className="w-5 h-5" strokeWidth={3} />
           )
         )}
       </button>
