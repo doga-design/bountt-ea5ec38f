@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Loader2, UserPlus } from "lucide-react";
 import { formatCurrency } from "@/lib/bountt-utils";
+import { getAvatarImageFromName, getAvatarColor } from "@/lib/avatar-utils";
+import { GroupMember } from "@/types";
 import {
   Dialog,
   DialogContent,
@@ -60,8 +62,14 @@ export default function PlaceholderSelectDialog({
                   : "bg-muted/50 hover:bg-muted"
               }`}
             >
-              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                <span className="text-lg">👻</span>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden"
+                style={{ backgroundColor: getAvatarColor({ id: p.id, avatar_color: null } as GroupMember) }}>
+                <img
+                  src={getAvatarImageFromName(p.name)}
+                  alt={p.name}
+                  className="w-[75%] h-[75%] object-contain"
+                  draggable={false}
+                />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>

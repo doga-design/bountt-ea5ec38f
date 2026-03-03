@@ -14,6 +14,17 @@ export function getAvatarImage(member: GroupMember): string {
   return AVATAR_IMAGES[parseInt(member.id.replace(/-/g, '').slice(0, 8), 16) % AVATAR_IMAGES.length];
 }
 
+/**
+ * Returns a deterministic avatar image based on a name string (for historical snapshots).
+ */
+export function getAvatarImageFromName(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_IMAGES[Math.abs(hash) % AVATAR_IMAGES.length];
+}
+
 // 10-color avatar palette
 const AVATAR_COLORS = [
   "#3B82F6", // Blue
