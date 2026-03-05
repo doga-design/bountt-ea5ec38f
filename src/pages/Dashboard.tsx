@@ -10,11 +10,10 @@ import AddExpensePrompt from "@/components/dashboard/AddExpensePrompt";
 import ExpenseScreen from "@/components/expense/ExpenseScreen";
 import ExpenseCard from "@/components/dashboard/ExpenseCard";
 import ExpenseDetailSheet from "@/components/dashboard/ExpenseDetailSheet";
-import MemberCardScroll from "@/components/dashboard/MemberCardScroll";
+import MemberAvatarRow from "@/components/dashboard/MemberAvatarRow";
 import BottomNav from "@/components/BottomNav";
 import { formatRelativeDate } from "@/lib/bountt-utils";
-import { GroupMember, Expense, ExpenseSplit } from "@/types";
-import MemberDetailSheet from "@/components/group-settings/MemberDetailSheet";
+import { Expense, ExpenseSplit } from "@/types";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export default function Dashboard() {
@@ -32,11 +31,10 @@ export default function Dashboard() {
     membersLoading,
     expensesLoading,
     groupsLoading,
-    removeMember,
+    
   } = useApp();
 
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<GroupMember | null>(null);
   const [detailExpense, setDetailExpense] = useState<Expense | null>(null);
   const [editExpense, setEditExpense] = useState<Expense | undefined>(undefined);
   const [editSplits, setEditSplits] = useState<ExpenseSplit[] | undefined>(undefined);
@@ -126,14 +124,12 @@ export default function Dashboard() {
 
       {mode === "normal" && (
         <>
-          {/* Member cards horizontal scroll */}
-          <div className="mt-8">
-            <MemberCardScroll
+          {/* Member avatar row */}
+          <div className="mt-4">
+            <MemberAvatarRow
               members={groupMembers}
-              expenses={expenses}
-              splits={expenseSplits}
               currentUserId={user?.id ?? ""}
-              onCardClick={setSelectedMember}
+              groupInviteCode={currentGroup?.invite_code}
             />
           </div>
 
@@ -209,22 +205,6 @@ export default function Dashboard() {
             }}
           />
 
-          <MemberDetailSheet
-            open={!!selectedMember}
-            onOpenChange={(o) => !o && setSelectedMember(null)}
-            member={selectedMember}
-            expenses={expenses}
-            splits={expenseSplits}
-            currentUserId={user?.id ?? ""}
-            isAdmin={isAdmin}
-            groupInviteCode={currentGroup?.invite_code}
-            onRemove={async () => {
-              if (selectedMember) {
-                await removeMember(selectedMember.id);
-                setSelectedMember(null);
-              }
-            }}
-          />
         </>
       )}
     </div>
