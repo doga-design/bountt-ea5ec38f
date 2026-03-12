@@ -66,23 +66,23 @@ export default function ExpenseDetailSheet({
 
 
   // Build subtitle
-  const payerLabel = isPayer ? "You" : expense.paid_by_name;
+  const payerLabel = isPayer ? "You" : (expense?.paid_by_name ?? "");
   const otherSplitNames = expenseSplits
-    .filter((s) => s.user_id !== expense.paid_by_user_id)
+    .filter((s) => s.user_id !== expense?.paid_by_user_id)
     .map((s) => (s.user_id === user?.id ? "You" : s.member_name));
   const subtitle = `${payerLabel} paid, splitting with ${otherSplitNames.join(" & ")}`;
 
   // Creator label
-  const isCreatorMe = expense.created_by === user?.id;
-  const creatorMember = groupMembers.find((m) => m.user_id === expense.created_by && m.status === "active");
+  const isCreatorMe = expense?.created_by === user?.id;
+  const creatorMember = groupMembers.find((m) => m.user_id === expense?.created_by && m.status === "active");
   const creatorLabel = isCreatorMe ? "you" : (creatorMember?.name ?? "Unknown");
 
   // Date formatted
-  const dateStr = new Date(expense.date).toLocaleDateString("en-US", {
+  const dateStr = expense ? new Date(expense.date).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
-  });
+  }) : "";
 
   // Build spoke members
   const spokeMembers: SpokeMember[] = expenseSplits.map((s) => {
@@ -103,7 +103,7 @@ export default function ExpenseDetailSheet({
 
   // Payer member
   const payerMember = groupMembers.find(
-    (m) => m.user_id === expense.paid_by_user_id && m.status === "active"
+    (m) => m.user_id === expense?.paid_by_user_id && m.status === "active"
   ) ?? null;
 
   // Settled state members
