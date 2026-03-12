@@ -32,6 +32,7 @@ export default function ExpenseDetailSheet({
   splits,
   groupMembers,
   onEdit,
+  onSettled,
 }: ExpenseDetailSheetProps) {
   const { user, profile, currentGroup, fetchExpenses, fetchExpenseSplits } = useApp();
   const { toast } = useToast();
