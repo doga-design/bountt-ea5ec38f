@@ -152,10 +152,15 @@ export default function ExpenseScreen({
     [activeMembers, activeIds]
   );
 
-  // For the split, only include non-payer members (people who owe money).
-  // The payer is represented by paid_by_user_id on the expense row, not a split row.
+  // splitMembers includes payer + selected members for calculation (equal distribution).
+  // The payer is filtered out at payload time before sending to the RPC.
   const splitMembers = useMemo(() => {
-    return selectedMembers.filter((m) => m.id !== payerMember?.id);
+    const members: GroupMember[] = [];
+    if (payerMember) members.push(payerMember);
+    selectedMembers.forEach((m) => {
+      if (m.id !== payerMember?.id) members.push(m);
+    });
+    return members;
   }, [payerMember, selectedMembers]);
 
   const distributeEqually = useCallback(
