@@ -1,88 +1,57 @@
-# Redesign "ALL MEMBERS" Section — Circular Avatar Row
 
-## Overview
 
-Replace the current wide card-based `MemberCardScroll` with a circular avatar row matching the reference screenshots. Add inline placeholder invite card with slide-down animation.
+# Bug Assessment: Three Active Bugs in Expense Detail Sheet
 
-## Files to Change
+## Bug 1: Settled expenses auto-close immediately on open
 
-### 1. New: `src/components/dashboard/MemberAvatarRow.tsx`
+**Root cause:** `ExpenseDetailSheet.tsx` lines 75-89.
 
-Complete replacement for `MemberCardScroll`. Contains all logic for the new row.
+When the drawer closes, `Dashboard.tsx` line 61 sets `detailExpenseId = null`. This makes `detailExpense = null` and `expenseFullySettled = false`. The cleanup branch at line 87 (`if (!open) { prevSettledRef.current = expenseFullySettled }`) then resets the ref to `false`.
 
-**Structure:**
+Next time the user opens the same settled expense, the effect sees `open && expenseFullySettled && !prevSettledRef.current` → `true && true && !false` → fires auto-close. Every open triggers a close. The ref never remembers the expense was already settled because the expense is nulled between opens.
 
-```text
-┌─ "ALL MEMBERS" label (tracking-wider, text-xs, muted, uppercase) ─┐
-│                                                                     │
-│  ○ You    ○ Kyle    ○ Matt    ◐ (pie icon, disabled)               │
-│  (green   (ghost   (green                                           │
-│   dot)    emoji)    dot)                                            │
-│                                                                     │
-│  ┌─ Inline invite card (slide-down, only for placeholders) ──────┐ │
-│  │ 👻  "Kyle is still a placeholder..."                          │ │
-│  │     [ Invite Kyle → ]                                         │ │
-│  └───────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────┘
-```
+**Fix:** Snapshot the settled state when the drawer *opens*. Add a `settledAtOpenRef` that captures whether the expense is already settled at open time. Only trigger auto-close if `settledAtOpenRef.current === false` (it was unsettled when opened) AND `expenseFullySettled` is now true. If the expense was already settled when opened, skip auto-close entirely.
 
-**Props:** `members`, `currentUserId`, `groupInviteCode?`
+**File:** `ExpenseDetailSheet.tsx` lines 74-89.
 
-**Key implementation details:**
+---
 
-- Sort members: current user first, then real (non-placeholder active) members, then placeholders
-- Each avatar: 56px circle with `getAvatarColor` background, `getAvatarImage` PNG inside  
-Use the existing avatar utilities:
-  - getAvatarImage(member) → returns the PNG import for that member
-  - member.avatar_color → the hex color string for the circle background
-  Both are already in src/lib/avatar-utils.ts — do not create new functions.
-- Name label below: 12px, current user shows "You"
-- Green dot (10px, `#22C55E`): positioned top-right for real joined members
-- Ghost emoji overlay: positioned top-right for placeholder members (small, ~16px badge)
-- Active/selected state: `#D94F00` ring border (2.5px) — "You" selected by default
-- Pie chart icon at end: 56px circle, light gray border, clock/pie icon inside, `opacity: 0.4`, `pointer-events: none`
-- `useState` for `selectedMemberId` (defaults to current user's member ID)
-- `useState` for `inviteCardMemberId` (null by default)
-- Tapping placeholder: set as selected + show invite card with CSS transition (`max-height` + `opacity` animation)
-- Tapping real member: set as selected, clear invite card
-- Tapping outside (click-away): dismiss invite card
-- `// TODO: filter feed by selected member`
+## Bug 2: Confetti never fires
 
-**Invite card (inline, not modal):**
+**Root cause:** `ExpenseDetailSheet.tsx` line 82.
 
-- Rounded card, light background, padding
-- Ghost icon on left
-- Text: `<span className="text-orange-600 font-semibold">{name}</span> is still a placeholder...`
-- Button: dark navy (`#1E293B`), full-width, "Invite {name} →"
-- Button copies invite link or navigates to invite flow; The "Invite [Name] →" button should copy the group invite link to clipboard (using navigator.clipboard.writeText) 
-  and show a brief toast: "Invite link copied!". 
-  Do not open a new sheet or navigate away.
-- Slide-down animation: `transition-all duration-300` with conditional `max-height`/`opacity`
+The auto-close effect calls `onOpenChange(false)` — this is the **prop** from Dashboard (`handleDetailOpenChange`), which directly sets `detailExpenseId = null`. It bypasses `handleClose` (line 268-283), where `celebratePendingRef` is read and `onSettled?.()` is called.
 
-### 2. Modify: `src/pages/Dashboard.tsx`
+Vaul's Drawer does NOT call its `onOpenChange` callback when the `open` prop is changed externally by the parent. So `handleClose` never runs during auto-close, `onSettled` is never called, and Dashboard's `pendingConfettiRef` is never set to `true`.
 
-- Replace `MemberCardScroll` import with `MemberAvatarRow`
-- Replace the `<MemberCardScroll ... />` usage (lines 130-138) with:
+**Fix:** In the auto-close effect (line 79-82), call `onSettled?.()` directly before calling `onOpenChange(false)`. This sets Dashboard's `pendingConfettiRef.current = true` so that when `handleDetailOpenChange(false)` runs, it finds the flag and fires confetti.
 
-```tsx
-<div className="mt-4">
-  <MemberAvatarRow
-    members={groupMembers}
-    currentUserId={user?.id ?? ""}
-    groupInviteCode={currentGroup?.invite_code}
-  />
-</div>
-```
+**File:** `ExpenseDetailSheet.tsx` line 79-82.
 
-- Remove `MemberDetailSheet` trigger from member tap (the old `onCardClick={setSelectedMember}` flow is replaced by the new inline selection)
-- Keep `MemberDetailSheet` available but don't wire it to the new row (the new row handles its own interaction) In Dashboard.tsx, remove the selectedMember useState and 
-  setSelectedMember calls entirely if they were only used 
-  by MemberCardScroll. Do not leave orphaned state.
+---
 
-### 3. Keep (no changes): `MemberCardScroll.tsx`, `MemberCard.tsx`
+## Bug 3: Activity log shows "You Settled Share" instead of member's name
 
-These files become unused by the dashboard but are left in place in case other screens reference them. Can be cleaned up later.
+**Root cause:** `ExpenseDetailSheet.tsx` lines 462-473.
 
-### Not touched
+For all `settled` actions, the code uses `actorLabel` (line 464: the person who clicked the button, derived from `actor_id`) and a generic `"Settled Share"` label (line 473). When the payer settles Matt's share via `settle_member_share`, the `actor_id` is the payer, so the log shows "You Settled Share".
 
-ExpenseScreen, numpad, expense logic, AppContext, Supabase queries, feed cards — none modified.
+The member's name IS stored in the database — `settle_member_share` RPC writes `change_detail` with `field: 'settled_member'` and `new_value: v_split.member_name`. But the rendering code ignores `change_detail` for settled actions entirely.
+
+**Fix:** In the settled action branch (line 472), check `log.change_detail?.[0]?.field`:
+- If `'settled_member'`: display `"Settled [change_detail[0].new_value]'s Share"` (shows the member name, not the actor)
+- If `'settled_by'`: display `actorLabel + " Settled Share"` (member settling their own)
+- If `'settled_all'`: display `actorLabel + " Settled All"`
+
+**File:** `ExpenseDetailSheet.tsx` lines 472-473.
+
+---
+
+## Fix Order
+
+1. **Bug 1 first** — the auto-close loop makes settled expenses unusable and blocks testing Bug 2.
+2. **Bug 2 second** — depends on auto-close working correctly (Bug 1 fix).
+3. **Bug 3 third** — independent rendering fix, no dependencies.
+
+All three fixes are in `ExpenseDetailSheet.tsx`. No database or RPC changes needed.
+
