@@ -140,9 +140,9 @@ export default function Dashboard() {
                 <p className="text-xs font-medium text-muted-foreground tracking-wider mb-2 px-1">
                   {group.label}
                 </p>
-                <div className="space-y-3">
+                <div className="divide-y divide-border">
                   {group.items.map((expense) => (
-                    <ExpenseCard
+                    <ExpenseFeedItem
                       key={expense.id}
                       expense={expense}
                       splits={expenseSplits.filter((s) => s.expense_id === expense.id)}
