@@ -1,114 +1,88 @@
-Expense Detail Sheet Rebuild — Implementation Plan
+# Redesign "ALL MEMBERS" Section — Circular Avatar Row
 
-## DB Migration (Step 1)
+## Overview
 
-Two changes in one migration:
+Replace the current wide card-based `MemberCardScroll` with a circular avatar row matching the reference screenshots. Add inline placeholder invite card with slide-down animation.
 
-**New RPC: `settle_member_share**`
+## Files to Change
 
-- Parameters: `p_expense_id UUID`, `p_split_id UUID`
-- Verifies `auth.uid() = expenses.paid_by_user_id` (payer only)
-- Verifies split belongs to this expense and `is_settled = false`
-- Sets `is_settled = true, settled_at = now()` on that split
-- Checks if all splits now settled → if so, sets `expense.is_settled = true`
-- Writes activity_log entry with settled member's name and share amount
-- `LANGUAGE plpgsql SECURITY DEFINER SET search_path = public`
+### 1. New: `src/components/dashboard/MemberAvatarRow.tsx`
 
-**Index on activity_log for per-expense queries:**
+Complete replacement for `MemberCardScroll`. Contains all logic for the new row.
 
-```sql
-CREATE INDEX idx_activity_log_expense_id
-ON activity_log (group_id, ((expense_snapshot->>'expense_id')));
+**Structure:**
+
+```text
+┌─ "ALL MEMBERS" label (tracking-wider, text-xs, muted, uppercase) ─┐
+│                                                                     │
+│  ○ You    ○ Kyle    ○ Matt    ◐ (pie icon, disabled)               │
+│  (green   (ghost   (green                                           │
+│   dot)    emoji)    dot)                                            │
+│                                                                     │
+│  ┌─ Inline invite card (slide-down, only for placeholders) ──────┐ │
+│  │ 👻  "Kyle is still a placeholder..."                          │ │
+│  │     [ Invite Kyle → ]                                         │ │
+│  └───────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-This prevents full table scans when fetching activity entries for a specific expense.
+**Props:** `members`, `currentUserId`, `groupInviteCode?`
 
-## New Component: `src/components/dashboard/ExpenseSpokeViz.tsx` (Step 2)
+**Key implementation details:**
 
-Props: `payer` (GroupMember or null), `payerName`, `totalAmount`, `members` (array of `{splitId, name, userId, shareAmount, iSettled, member: GroupMember | null}`), `currentUserId`, `isPayer`, `onMemberTap(splitId, memberName, shareAmount)`.
+- Sort members: current user first, then real (non-placeholder active) members, then placeholders
+- Each avatar: 56px circle with `getAvatarColor` background, `getAvatarImage` PNG inside  
+Use the existing avatar utilities:
+  - getAvatarImage(member) → returns the PNG import for that member
+  - member.avatar_color → the hex color string for the circle background
+  Both are already in src/lib/avatar-utils.ts — do not create new functions.
+- Name label below: 12px, current user shows "You"
+- Green dot (10px, `#22C55E`): positioned top-right for real joined members
+- Ghost emoji overlay: positioned top-right for placeholder members (small, ~16px badge)
+- Active/selected state: `#D94F00` ring border (2.5px) — "You" selected by default
+- Pie chart icon at end: 56px circle, light gray border, clock/pie icon inside, `opacity: 0.4`, `pointer-events: none`
+- `useState` for `selectedMemberId` (defaults to current user's member ID)
+- `useState` for `inviteCardMemberId` (null by default)
+- Tapping placeholder: set as selected + show invite card with CSS transition (`max-height` + `opacity` animation)
+- Tapping real member: set as selected, clear invite card
+- Tapping outside (click-away): dismiss invite card
+- `// TODO: filter feed by selected member`
 
-Layout:
+**Invite card (inline, not modal):**
 
-- Payer avatar (56px) centered at top with label "You paid · $X" or "[Name] paid · $X"
-- Dashed SVG lines radiating to member avatars below
-- Member avatars (48px) positioned on a 160° arc using `Math.cos`/`Math.sin` with even angular distribution
-- Arc radius scales to fit 320px min width; works for 1–6 members
-- Settled members: checkmark badge (dark navy circle, white check icon), `opacity-60` on avatar
-- Unsettled members: full opacity, tappable per rules
+- Rounded card, light background, padding
+- Ghost icon on left
+- Text: `<span className="text-orange-600 font-semibold">{name}</span> is still a placeholder...`
+- Button: dark navy (`#1E293B`), full-width, "Invite {name} →"
+- Button copies invite link or navigates to invite flow; The "Invite [Name] →" button should copy the group invite link to clipboard (using navigator.clipboard.writeText) 
+  and show a brief toast: "Invite link copied!". 
+  Do not open a new sheet or navigate away.
+- Slide-down animation: `transition-all duration-300` with conditional `max-height`/`opacity`
 
-Tap rules (enforced in component):
+### 2. Modify: `src/pages/Dashboard.tsx`
 
-- `currentUserId === member.userId && !settled` → fires `onMemberTap` immediately
-- `isPayer && member.userId !== currentUserId && !settled` → fires `onMemberTap` 
-- All other cases → no action, no pointer cursor
+- Replace `MemberCardScroll` import with `MemberAvatarRow`
+- Replace the `<MemberCardScroll ... />` usage (lines 130-138) with:
 
-Colors: uses `getAvatarColor`/`getAvatarImage` from avatar-utils. No red/green anywhere.
+```tsx
+<div className="mt-4">
+  <MemberAvatarRow
+    members={groupMembers}
+    currentUserId={user?.id ?? ""}
+    groupInviteCode={currentGroup?.invite_code}
+  />
+</div>
+```
 
-## New Component: `src/components/dashboard/ExpenseSettledState.tsx` (Step 3)
+- Remove `MemberDetailSheet` trigger from member tap (the old `onCardClick={setSelectedMember}` flow is replaced by the new inline selection)
+- Keep `MemberDetailSheet` available but don't wire it to the new row (the new row handles its own interaction) In Dashboard.tsx, remove the selectedMember useState and 
+  setSelectedMember calls entirely if they were only used 
+  by MemberCardScroll. Do not leave orphaned state.
 
-Props: `members` (array of `{name, member: GroupMember | null}`).
+### 3. Keep (no changes): `MemberCardScroll.tsx`, `MemberCard.tsx`
 
-- Large circle (80px) with dark navy/foreground background, white checkmark icon centered
-- Bold "All settled up!" text below
-- Horizontal avatar stack: 40px circles, overlapping with `-ml-3`, using member colors/images
-- Replaces spoke viz when `expense.is_settled === true`
+These files become unused by the dashboard but are left in place in case other screens reference them. Can be cleaned up later.
 
-## Per-Expense Activity Log (Step 4, inside ExpenseDetailSheet)
+### Not touched
 
-- On sheet open, query `activity_log` where `group_id = currentGroup.id` and `expense_snapshot->>'expense_id' = expense.id`, ordered by `created_at DESC`
-- Renders at bottom of sheet in all states
-- Settlement rows: `[date] · [Name] Settled Share · $[amount]` — "You" for current user
-- Original payment row at bottom: `[date] · [Payer] Paid · $[total]`
-- Realtime: subscribe to `activity_log` INSERT events filtered by group_id; append matching entries live
-
-## Rebuild `ExpenseDetailSheet.tsx` (Step 5)
-
-**Keep:** Drawer container, delete flow + confirmation, `handleSettleMyShare`, `handleSettleAll`, props interface, state reset on close.
-
-**New layout (top to bottom):**
-
-1. **Header row:** `[description] · $[amount]` — edit + delete icons top-right
-  - Edit: hidden when `expense.is_settled`
-  - Delete: visible to creator only (always, even when settled)
-2. **Subtitle:** "[Payer] paid, splitting with [M1] & [M2]" — "You" for current user
-3. **Date + creator:** "[date] · Added by [name]" — "Added by you" if current user
-4. **Divider**
-5. **Visualization:** `ExpenseSettledState` if fully settled, else `ExpenseSpokeViz`
-6. **Confirmation modal** (When the payer taps an unsettled member's avatar, show a popover anchored directly below that avatar — not a full-screen modal overlay, not an inline card in the sheet layout. The popover floats above the content, positioned under the tapped avatar. ): triggered when payer taps another member's avatar via `onMemberTap`. Shows "[Name] still owes $[amount], do you want to settle it up?" with Confirm (calls new `settle_member_share` RPC) and Cancel buttons.  
-
-7. **Slide-to-settle / Hold-to-settle:** Payer-only, hidden when fully settled. For the slide-to-settle interaction, build a custom swipe gesture component — do not substitute hold-to-confirm. The UI shows a pill-shaped track with a draggable button (>> arrow) on the left. User drags it to the right edge to confirm. On release before the right edge, it snaps back. On reaching the right edge, it locks and calls settle_all. This is pure CSS + pointer/touch events, no library needed., then calls `settle_all`
-8. **Activity log section** at bottom
-
-**Tap flow for current user's own avatar:** calls `handleSettleMyShare` directly (no modal, per spec). This is intentional — one-way, no undo. 
-
-## Step 6 — Cleanup
-
-Remove from the rebuilt `ExpenseDetailSheet`:
-
-- Old flat-list split breakdown (colored dots + rows)
-- Old "Settle my share" button + confirmation flow
-- Old "Settle all" button
-- Green `emerald` checkmark badge + "Settled" text
-- `settleConfirm` state (replaced by avatar tap)
-
-`ExpenseCard.tsx` left untouched (unused by Dashboard but may be referenced elsewhere).
-
-## Risk Flags
-
-- `**settle_member_share` is new** — SECURITY DEFINER, same pattern as existing RPCs. Low risk.
-- **Activity log JSONB index** — expression index on `expense_snapshot->>'expense_id'` handles the performance concern raised. Must be created before the query goes live.
-- **No undo on self-settlement** — confirmed as spec-intended. One-way action via avatar tap.
-- **Spoke layout at 320px** — arc radius of ~100px with 48px avatars fits 6 members. Will need testing at boundary.
-
-## Files Changed
-
-
-| File                                               | Action          |
-| -------------------------------------------------- | --------------- |
-| `supabase/migrations/[new].sql`                    | New RPC + index |
-| `src/components/dashboard/ExpenseSpokeViz.tsx`     | Create          |
-| `src/components/dashboard/ExpenseSettledState.tsx` | Create          |
-| `src/components/dashboard/ExpenseDetailSheet.tsx`  | Full rebuild    |
-
-
-No changes to: AppContext, Dashboard.tsx, RPCs (settle_my_share, settle_all, delete_expense), types, avatar-utils, bountt-utils.
+ExpenseScreen, numpad, expense logic, AppContext, Supabase queries, feed cards — none modified.
