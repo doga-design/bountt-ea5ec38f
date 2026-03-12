@@ -252,7 +252,9 @@ export default function ExpenseDetailSheet({
       // Don't call onSettled here — auto-close effect handles it via celebratePendingRef
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Something went wrong.", variant: "destructive" });
-    } finally {
+      // Reset slider so user can retry
+      setSlideCompleted(false);
+      setSlideX(0);
       setSettleAllLoading(false);
     }
   };
