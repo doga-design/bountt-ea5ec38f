@@ -22,6 +22,7 @@ interface ExpenseDetailSheetProps {
   splits: ExpenseSplit[];
   groupMembers: GroupMember[];
   onEdit: (expense: Expense, splits: ExpenseSplit[]) => void;
+  onSettled?: () => void;
 }
 
 export default function ExpenseDetailSheet({
@@ -31,6 +32,7 @@ export default function ExpenseDetailSheet({
   splits,
   groupMembers,
   onEdit,
+  onSettled,
 }: ExpenseDetailSheetProps) {
   const { user, profile, currentGroup, fetchExpenses, fetchExpenseSplits } = useApp();
   const { toast } = useToast();
@@ -64,6 +66,21 @@ export default function ExpenseDetailSheet({
   const expenseSplits = expense ? splits.filter((s) => s.expense_id === expense.id) : [];
   const expenseFullySettled = expense?.is_settled === true;
 
+  // Auto-close on full settlement
+  const prevSettledRef = useRef(false);
+  useEffect(() => {
+    if (open && expenseFullySettled && !prevSettledRef.current) {
+      prevSettledRef.current = true;
+      const timer = setTimeout(() => {
+        onOpenChange(false);
+        onSettled?.();
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+    if (!open) {
+      prevSettledRef.current = false;
+    }
+  }, [open, expenseFullySettled]);
 
   // Build subtitle
   const payerLabel = isPayer ? "You" : (expense?.paid_by_name ?? "");
@@ -84,8 +101,9 @@ export default function ExpenseDetailSheet({
     year: "numeric",
   }) : "";
 
-  // Build spoke members
-  const spokeMembers: SpokeMember[] = expenseSplits.map((s) => {
+  // Build spoke members — exclude payer (they already paid)
+  const nonPayerSplits = expenseSplits.filter((s) => s.user_id !== expense?.paid_by_user_id);
+  const spokeMembers: SpokeMember[] = nonPayerSplits.map((s) => {
     const member = groupMembers.find(
       (m) =>
         (s.user_id && m.user_id === s.user_id) ||
@@ -106,8 +124,8 @@ export default function ExpenseDetailSheet({
     (m) => m.user_id === expense?.paid_by_user_id && m.status === "active"
   ) ?? null;
 
-  // Settled state members
-  const settledMembers = expenseSplits.map((s) => {
+  // Settled state members — exclude payer
+  const settledMembers = nonPayerSplits.map((s) => {
     const member = groupMembers.find(
       (m) =>
         (s.user_id && m.user_id === s.user_id) ||
@@ -186,6 +204,7 @@ export default function ExpenseDetailSheet({
       if (error) throw error;
       await Promise.all([fetchExpenses(currentGroup.id), fetchExpenseSplits(currentGroup.id)]);
       toast({ title: "Share settled ✓" });
+      onSettled?.();
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Something went wrong.", variant: "destructive" });
     } finally {
@@ -205,6 +224,7 @@ export default function ExpenseDetailSheet({
       await Promise.all([fetchExpenses(currentGroup.id), fetchExpenseSplits(currentGroup.id)]);
       setConfirmSplit(null);
       toast({ title: "Share settled ✓" });
+      onSettled?.();
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Something went wrong.", variant: "destructive" });
     } finally {
@@ -220,6 +240,7 @@ export default function ExpenseDetailSheet({
       if (error) throw error;
       await Promise.all([fetchExpenses(currentGroup.id), fetchExpenseSplits(currentGroup.id)]);
       toast({ title: "Expense fully settled" });
+      onSettled?.();
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Something went wrong.", variant: "destructive" });
     } finally {
@@ -293,13 +314,13 @@ export default function ExpenseDetailSheet({
     avatarRefs.current[splitId] = el;
   }, []);
 
-  const hasUnsettledSplits = expenseSplits.some((s) => !s.is_settled);
+  const hasUnsettledSplits = nonPayerSplits.some((s) => !s.is_settled);
 
   if (!expense) return null;
 
   return (
     <Drawer open={open} onOpenChange={handleClose}>
-      <DrawerContent>
+      <DrawerContent className="max-h-[92dvh]">
         <DrawerHeader className="relative pb-2">
           {/* Header: description · amount */}
           <DrawerTitle className="font-sora text-lg pr-20">
@@ -469,7 +490,8 @@ export default function ExpenseDetailSheet({
                       if (log.action_type === "settled") {
                         actionLabel = "Settled Share";
                       } else if (log.action_type === "added") {
-                        actionLabel = "Paid";
+                        const isLogActorPayer = log.actor_id === expense?.paid_by_user_id;
+                        actionLabel = isLogActorPayer ? "Paid & Settled Share" : "Paid";
                       } else if (log.action_type === "edited") {
                         const detail = log.change_detail?.[0];
                         actionLabel = detail ? `Edited ${detail.field}` : "Edited";

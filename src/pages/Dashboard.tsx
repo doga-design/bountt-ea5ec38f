@@ -15,6 +15,7 @@ import BottomNav from "@/components/BottomNav";
 import { formatRelativeDate } from "@/lib/bountt-utils";
 import { Expense, ExpenseSplit } from "@/types";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import confetti from "canvas-confetti";
 
 export default function Dashboard() {
   const { groupId } = useParams<{ groupId: string }>();
@@ -38,6 +39,12 @@ export default function Dashboard() {
   const [detailExpense, setDetailExpense] = useState<Expense | null>(null);
   const [editExpense, setEditExpense] = useState<Expense | undefined>(undefined);
   const [editSplits, setEditSplits] = useState<ExpenseSplit[] | undefined>(undefined);
+
+  const handleSettled = () => {
+    setTimeout(() => {
+      confetti({ particleCount: 200, spread: 120, origin: { y: 0.4 } });
+    }, 300);
+  };
 
   useEffect(() => {
     if (groupId) {
@@ -198,6 +205,7 @@ export default function Dashboard() {
             expense={detailExpense}
             splits={expenseSplits}
             groupMembers={groupMembers}
+            onSettled={handleSettled}
             onEdit={(exp, splits) => {
               setEditExpense(exp);
               setEditSplits(splits);
