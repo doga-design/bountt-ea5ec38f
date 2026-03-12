@@ -22,6 +22,7 @@ interface ExpenseDetailSheetProps {
   splits: ExpenseSplit[];
   groupMembers: GroupMember[];
   onEdit: (expense: Expense, splits: ExpenseSplit[]) => void;
+  onSettled?: () => void;
 }
 
 export default function ExpenseDetailSheet({
