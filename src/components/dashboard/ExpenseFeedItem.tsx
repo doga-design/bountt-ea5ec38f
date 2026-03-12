@@ -124,9 +124,8 @@ export default function ExpenseFeedItem({
     expense.is_settled ||
     (nonPayerSplits.length > 0 && unsettledNonPayerSplits.length === 0);
 
-  // --- Solo check ---
-  const isSolo =
-    isPayer && splits.length === 1 && splits[0].user_id === currentUserId;
+  // --- Solo check (payer has no split row, so solo = 0 splits) ---
+  const isSolo = isPayer && splits.length === 0;
 
   // --- Amounts ---
   const totalOwedToMe = unsettledNonPayerSplits.reduce(

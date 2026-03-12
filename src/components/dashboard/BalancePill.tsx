@@ -5,26 +5,35 @@ import { formatCurrency } from "@/lib/bountt-utils";
 export default function BalancePill() {
   const { expenses, user, expenseSplits } = useApp();
 
-  // Calculate net balance for current user
-  let totalPaid = 0;
-  let totalOwed = 0;
+  // Calculate net balance using the correct model:
+  // - "Owed to me": sum of unsettled non-payer splits on expenses I paid
+  // - "I owe": sum of my unsettled splits on expenses others paid
+  let owedToMe = 0;
+  let iOwe = 0;
 
   for (const expense of expenses) {
     if (expense.is_settled) continue;
+
     if (expense.paid_by_user_id === user?.id) {
-      totalPaid += Number(expense.amount);
+      // I paid — others' unsettled splits = money owed to me
+      for (const split of expenseSplits) {
+        if (split.expense_id !== expense.id) continue;
+        if (split.user_id === user?.id) continue; // defensive: skip payer's own split
+        if (split.is_settled) continue;
+        owedToMe += Number(split.share_amount);
+      }
+    } else {
+      // Someone else paid — my unsettled split = money I owe
+      for (const split of expenseSplits) {
+        if (split.expense_id !== expense.id) continue;
+        if (split.user_id !== user?.id) continue;
+        if (split.is_settled) continue;
+        iOwe += Number(split.share_amount);
+      }
     }
   }
 
-  for (const split of expenseSplits) {
-    const expense = expenses.find((e) => e.id === split.expense_id);
-    if (!expense || expense.is_settled) continue;
-    if (split.user_id === user?.id) {
-      totalOwed += Number(split.share_amount);
-    }
-  }
-
-  const net = totalPaid - totalOwed;
+  const net = owedToMe - iOwe;
 
   if (net === 0) return null;
 
