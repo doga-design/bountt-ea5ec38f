@@ -1,85 +1,88 @@
+# Redesign "ALL MEMBERS" Section — Circular Avatar Row
 
+## Overview
 
-# Implementation Plan: Settle on Member Removal + Auto-Settle Two-Person UI
+Replace the current wide card-based `MemberCardScroll` with a circular avatar row matching the reference screenshots. Add inline placeholder invite card with slide-down animation.
 
-## Step 1 — New RPC: `settle_member_and_remove`
+## Files to Change
 
-Create a database migration with a `SECURITY DEFINER` function:
+### 1. New: `src/components/dashboard/MemberAvatarRow.tsx`
 
-- **Parameters:** `p_group_id uuid`, `p_member_id uuid` (the `group_members.id`)
-- **Logic:**
-  1. Verify `auth.uid()` is the group creator (`groups.created_by`)
-  2. Get the member's `user_id` and `name` from `group_members` where `id = p_member_id`
-  3. Find all unsettled splits for that member across the group: join `expense_splits` on `expenses.group_id = p_group_id` where `expense_splits.user_id = v_member_user_id` (or `member_name = v_member_name AND user_id IS NULL` for placeholders) and `is_settled = false`
-  4. Settle each: `UPDATE expense_splits SET is_settled = true, settled_at = now()`
-  5. For each affected expense, check if all splits are now settled → mark `expenses.is_settled = true`
-  6. Write one activity log entry with action_type `'member_settled_and_removed'`
-  7. Update `group_members SET status = 'left', left_at = now()` where `id = p_member_id`
-  8. Return `jsonb_build_object('splits_settled', v_count, 'total_amount', v_total)`
-- All within one transaction — if any step fails, everything rolls back.
+Complete replacement for `MemberCardScroll`. Contains all logic for the new row.
 
-## Step 2 — AppContext: Add `settleAndRemoveMember`
+**Structure:**
 
-In `AppContext.tsx`:
-- Add `settleAndRemoveMember(groupId: string, memberId: string)` that calls the new RPC
-- On success: refetch members, expenses, and splits
-- On error: show toast, no state changes
-- Add to context value and `AppContextValue` type
-
-## Step 3 — Feature 1 UI: Member removal with settlement prompt
-
-### MemberCard.tsx changes
-- Accept new props: `hasUnsettledSplits: boolean`, `onSettleAndRemove: () => void`
-- When swipe confirms:
-  - If `hasUnsettledSplits`: show enhanced AlertDialog with title "[Name] still has unsettled costs in this group. Settle everything before they leave?" and two actions: "Yes, settle all" (calls `onSettleAndRemove`) and "Remove anyway" (calls `onRemove`)
-  - If no unsettled splits: show current simple confirmation
-
-### MembersList.tsx changes
-- Import `settleAndRemoveMember` from AppContext
-- For each member, compute `hasUnsettledSplits` by checking `expenseSplits` from context
-- Pass `hasUnsettledSplits` and `onSettleAndRemove` handler to each `MemberCard`
-- Need `expenses` and `expenseSplits` — these are available via `useApp()`
-
-### MemberDetailSheet.tsx changes
-- Accept new props: `hasUnsettledSplits: boolean`, `onSettleAndRemove: () => void`
-- Replace the direct `onClick={onRemove}` on the Remove button with opening an AlertDialog:
-  - If unsettled: enhanced dialog with "Yes, settle all" / "Remove anyway"
-  - If no unsettled: simple "Remove [Name]?" confirmation with Confirm/Cancel
-
-### GroupSettings.tsx changes
-- Compute `hasUnsettledSplits` for `selectedMember`
-- Pass `settleAndRemoveMember` from context, wire up `onSettleAndRemove` prop to `MemberDetailSheet`
-- Pass unsettled check data to determine which dialog variant to show
-
-### Data freshness note
-`expenseSplits` in AppContext is kept up-to-date via realtime subscriptions on `expense_splits` (the `splitsChannelRef`). The check is reliable at the moment of removal — any splits added by other members in real time will already be reflected.
-
-## Step 4 — Feature 2 UI: Hide slider on two-split expenses
-
-In `ExpenseDetailSheet.tsx`, the slider renders at line 505 with condition:
-```
-{isPayer && hasUnsettledSplits && !expenseFullySettled && (
+```text
+┌─ "ALL MEMBERS" label (tracking-wider, text-xs, muted, uppercase) ─┐
+│                                                                     │
+│  ○ You    ○ Kyle    ○ Matt    ◐ (pie icon, disabled)               │
+│  (green   (ghost   (green                                           │
+│   dot)    emoji)    dot)                                            │
+│                                                                     │
+│  ┌─ Inline invite card (slide-down, only for placeholders) ──────┐ │
+│  │ 👻  "Kyle is still a placeholder..."                          │ │
+│  │     [ Invite Kyle → ]                                         │ │
+│  └───────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-Add one more condition: `expenseSplits.length > 2`. When there are exactly 2 splits (payer + one other), the non-payer settling their share auto-settles the expense via the existing `settle_my_share` RPC logic. The slider is redundant.
+**Props:** `members`, `currentUserId`, `groupInviteCode?`
 
-Updated condition:
+**Key implementation details:**
+
+- Sort members: current user first, then real (non-placeholder active) members, then placeholders
+- Each avatar: 56px circle with `getAvatarColor` background, `getAvatarImage` PNG inside  
+Use the existing avatar utilities:
+  - getAvatarImage(member) → returns the PNG import for that member
+  - member.avatar_color → the hex color string for the circle background
+  Both are already in src/lib/avatar-utils.ts — do not create new functions.
+- Name label below: 12px, current user shows "You"
+- Green dot (10px, `#22C55E`): positioned top-right for real joined members
+- Ghost emoji overlay: positioned top-right for placeholder members (small, ~16px badge)
+- Active/selected state: `#D94F00` ring border (2.5px) — "You" selected by default
+- Pie chart icon at end: 56px circle, light gray border, clock/pie icon inside, `opacity: 0.4`, `pointer-events: none`
+- `useState` for `selectedMemberId` (defaults to current user's member ID)
+- `useState` for `inviteCardMemberId` (null by default)
+- Tapping placeholder: set as selected + show invite card with CSS transition (`max-height` + `opacity` animation)
+- Tapping real member: set as selected, clear invite card
+- Tapping outside (click-away): dismiss invite card
+- `// TODO: filter feed by selected member`
+
+**Invite card (inline, not modal):**
+
+- Rounded card, light background, padding
+- Ghost icon on left
+- Text: `<span className="text-orange-600 font-semibold">{name}</span> is still a placeholder...`
+- Button: dark navy (`#1E293B`), full-width, "Invite {name} →"
+- Button copies invite link or navigates to invite flow; The "Invite [Name] →" button should copy the group invite link to clipboard (using navigator.clipboard.writeText) 
+  and show a brief toast: "Invite link copied!". 
+  Do not open a new sheet or navigate away.
+- Slide-down animation: `transition-all duration-300` with conditional `max-height`/`opacity`
+
+### 2. Modify: `src/pages/Dashboard.tsx`
+
+- Replace `MemberCardScroll` import with `MemberAvatarRow`
+- Replace the `<MemberCardScroll ... />` usage (lines 130-138) with:
+
+```tsx
+<div className="mt-4">
+  <MemberAvatarRow
+    members={groupMembers}
+    currentUserId={user?.id ?? ""}
+    groupInviteCode={currentGroup?.invite_code}
+  />
+</div>
 ```
-{isPayer && hasUnsettledSplits && !expenseFullySettled && expenseSplits.length > 2 && (
-```
 
-No RPC changes. No auto-close or confetti changes needed.
+- Remove `MemberDetailSheet` trigger from member tap (the old `onCardClick={setSelectedMember}` flow is replaced by the new inline selection)
+- Keep `MemberDetailSheet` available but don't wire it to the new row (the new row handles its own interaction) In Dashboard.tsx, remove the selectedMember useState and 
+  setSelectedMember calls entirely if they were only used 
+  by MemberCardScroll. Do not leave orphaned state.
 
-## Files changed
+### 3. Keep (no changes): `MemberCardScroll.tsx`, `MemberCard.tsx`
 
-| File | Change |
-|---|---|
-| New migration | `settle_member_and_remove` RPC |
-| `src/types/index.ts` | Add `settleAndRemoveMember` to `AppContextValue` |
-| `src/contexts/AppContext.tsx` | Add `settleAndRemoveMember` function + expose in context |
-| `src/components/group-settings/MemberCard.tsx` | Accept `hasUnsettledSplits` + `onSettleAndRemove`, show conditional dialog |
-| `src/components/group-settings/MembersList.tsx` | Compute unsettled check, pass new props |
-| `src/components/group-settings/MemberDetailSheet.tsx` | Add confirmation AlertDialog with settlement option |
-| `src/pages/GroupSettings.tsx` | Wire up `settleAndRemoveMember`, pass unsettled data |
-| `src/components/dashboard/ExpenseDetailSheet.tsx` | Hide slider when `expenseSplits.length <= 2` |
+These files become unused by the dashboard but are left in place in case other screens reference them. Can be cleaned up later.
 
+### Not touched
+
+ExpenseScreen, numpad, expense logic, AppContext, Supabase queries, feed cards — none modified.

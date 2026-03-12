@@ -4,6 +4,7 @@ import MemberCard from "./MemberCard";
 import { ChevronDown, Plus } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/bountt-utils";
 
 interface MembersListProps {
   members: GroupMember[];
@@ -16,12 +17,23 @@ export default function MembersList({ members, currentUserId, isAdmin, groupId }
   const [showFormer, setShowFormer] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
   const [newName, setNewName] = useState("");
-  const { addPlaceholderMember, removeMember } = useApp();
+  const { addPlaceholderMember, removeMember, settleAndRemoveMember, expenses, expenseSplits } = useApp();
   const { toast } = useToast();
 
   const active = members.filter((m) => m.status === "active" && !m.is_placeholder);
   const placeholders = members.filter((m) => m.status === "active" && m.is_placeholder);
   const former = members.filter((m) => m.status === "left");
+
+  const memberHasUnsettledSplits = (member: GroupMember): boolean => {
+    const groupExpenseIds = new Set(expenses.filter((e) => e.group_id === groupId && !e.is_settled).map((e) => e.id));
+    return expenseSplits.some((s) => {
+      if (s.is_settled) return false;
+      if (!groupExpenseIds.has(s.expense_id)) return false;
+      if (member.user_id && s.user_id === member.user_id) return true;
+      if (!member.user_id && s.member_name === member.name && !s.user_id) return true;
+      return false;
+    });
+  };
 
   const handleAddMember = async () => {
     if (!newName.trim()) return;
@@ -34,6 +46,16 @@ export default function MembersList({ members, currentUserId, isAdmin, groupId }
   const handleRemove = async (member: GroupMember) => {
     await removeMember(member.id);
     toast({ title: `${member.name} removed` });
+  };
+
+  const handleSettleAndRemove = async (member: GroupMember) => {
+    const result = await settleAndRemoveMember(groupId, member.id);
+    if (result) {
+      toast({
+        title: `${member.name} removed`,
+        description: `Settled ${result.splits_settled} split${result.splits_settled !== 1 ? "s" : ""} (${formatCurrency(result.total_amount)})`,
+      });
+    }
   };
 
   return (
@@ -77,6 +99,8 @@ export default function MembersList({ members, currentUserId, isAdmin, groupId }
               currentUserId={currentUserId}
               isAdmin={isAdmin}
               onRemove={() => handleRemove(m)}
+              onSettleAndRemove={() => handleSettleAndRemove(m)}
+              hasUnsettledSplits={memberHasUnsettledSplits(m)}
               type="active"
             />
           ))}
@@ -94,6 +118,8 @@ export default function MembersList({ members, currentUserId, isAdmin, groupId }
               currentUserId={currentUserId}
               isAdmin={isAdmin}
               onRemove={() => handleRemove(m)}
+              onSettleAndRemove={() => handleSettleAndRemove(m)}
+              hasUnsettledSplits={memberHasUnsettledSplits(m)}
               type="placeholder"
             />
           ))}

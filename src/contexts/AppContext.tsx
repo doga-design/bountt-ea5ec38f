@@ -355,6 +355,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const settleAndRemoveMember = useCallback(async (groupId: string, memberId: string): Promise<{ splits_settled: number; total_amount: number } | null> => {
+    try {
+      const { data, error: rpcError } = await supabase.rpc("settle_member_and_remove", {
+        p_group_id: groupId,
+        p_member_id: memberId,
+      });
+      if (rpcError) throw rpcError;
+      const result = data as unknown as { success: boolean; splits_settled: number; total_amount: number };
+      // Refetch all relevant data
+      await Promise.all([fetchMembers(groupId), fetchExpenses(groupId), fetchExpenseSplits(groupId)]);
+      return { splits_settled: result.splits_settled, total_amount: result.total_amount };
+    } catch (err) {
+      toast({ title: err instanceof Error ? err.message : "Failed to settle and remove member", variant: "destructive" });
+      return null;
+    }
+  }, [fetchMembers, fetchExpenses, fetchExpenseSplits]);
+
   const leaveGroup = useCallback(async (groupId: string) => {
     if (!user) return;
     try {
@@ -504,6 +521,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     fetchMembers,
     addPlaceholderMember,
     removeMember,
+    settleAndRemoveMember,
     leaveGroup,
     fetchExpenses,
     addExpense,
