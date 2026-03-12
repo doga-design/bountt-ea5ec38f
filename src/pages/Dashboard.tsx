@@ -162,9 +162,9 @@ export default function Dashboard() {
                   <ChevronDown className="w-3.5 h-3.5" />
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <div className="space-y-3">
+                  <div className="divide-y divide-border">
                     {settledExpenses.map((expense) => (
-                      <ExpenseCard
+                      <ExpenseFeedItem
                         key={expense.id}
                         expense={expense}
                         splits={expenseSplits.filter((s) => s.expense_id === expense.id)}
