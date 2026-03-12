@@ -490,7 +490,8 @@ export default function ExpenseDetailSheet({
                       if (log.action_type === "settled") {
                         actionLabel = "Settled Share";
                       } else if (log.action_type === "added") {
-                        actionLabel = "Paid";
+                        const isLogActorPayer = log.actor_id === expense?.paid_by_user_id;
+                        actionLabel = isLogActorPayer ? "Paid & Settled Share" : "Paid";
                       } else if (log.action_type === "edited") {
                         const detail = log.change_detail?.[0];
                         actionLabel = detail ? `Edited ${detail.field}` : "Edited";
