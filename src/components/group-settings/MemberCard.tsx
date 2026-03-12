@@ -17,10 +17,12 @@ interface MemberCardProps {
   currentUserId: string;
   isAdmin: boolean;
   onRemove: () => void;
+  onSettleAndRemove?: () => void;
+  hasUnsettledSplits?: boolean;
   type: "active" | "placeholder" | "former";
 }
 
-export default function MemberCard({ member, currentUserId, isAdmin, onRemove, type }: MemberCardProps) {
+export default function MemberCard({ member, currentUserId, isAdmin, onRemove, onSettleAndRemove, hasUnsettledSplits = false, type }: MemberCardProps) {
   const [offsetX, setOffsetX] = useState(0);
   const [showConfirm, setShowConfirm] = useState(false);
   const startX = useRef(0);
@@ -108,15 +110,38 @@ export default function MemberCard({ member, currentUserId, isAdmin, onRemove, t
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove {member.name}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {hasUnsettledSplits
+                ? `${member.name} has unsettled costs`
+                : `Remove ${member.name}?`}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              They'll lose access to expenses in this group.
+              {hasUnsettledSplits
+                ? `${member.name} still has unsettled costs in this group. Settle everything before they leave?`
+                : "They'll lose access to expenses in this group."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={onRemove} className="bg-destructive text-destructive-foreground">
-              Remove
+            {hasUnsettledSplits && onSettleAndRemove && (
+              <AlertDialogAction
+                onClick={() => {
+                  setShowConfirm(false);
+                  onSettleAndRemove();
+                }}
+                className="bg-primary text-primary-foreground"
+              >
+                Yes, settle all
+              </AlertDialogAction>
+            )}
+            <AlertDialogAction
+              onClick={() => {
+                setShowConfirm(false);
+                onRemove();
+              }}
+              className="bg-destructive text-destructive-foreground"
+            >
+              {hasUnsettledSplits ? "Remove anyway" : "Remove"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
