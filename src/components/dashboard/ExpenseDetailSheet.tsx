@@ -63,9 +63,7 @@ export default function ExpenseDetailSheet({
   const isPayer = expense ? expense.paid_by_user_id === user?.id : false;
   const expenseSplits = expense ? splits.filter((s) => s.expense_id === expense.id) : [];
   const expenseFullySettled = expense?.is_settled === true;
-  const isPayer = expense.paid_by_user_id === user?.id;
-  const expenseSplits = splits.filter((s) => s.expense_id === expense.id);
-  const expenseFullySettled = expense.is_settled === true;
+
 
   // Build subtitle
   const payerLabel = isPayer ? "You" : expense.paid_by_name;
