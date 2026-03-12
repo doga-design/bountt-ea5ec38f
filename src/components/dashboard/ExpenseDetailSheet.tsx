@@ -475,7 +475,14 @@ export default function ExpenseDetailSheet({
 
                         let actionLabel = "";
                         if (log.action_type === "settled") {
-                          actionLabel = "Settled Share";
+                          const detail = log.change_detail?.[0] as { field?: string; new_value?: string } | undefined;
+                          if (detail?.field === "settled_member") {
+                            actionLabel = `Settled ${detail.new_value}'s Share`;
+                          } else if (detail?.field === "settled_all") {
+                            actionLabel = "Settled All";
+                          } else {
+                            actionLabel = "Settled Share";
+                          }
                         } else if (log.action_type === "added") {
                           const isLogActorPayer = log.actor_id === expense?.paid_by_user_id;
                           actionLabel = isLogActorPayer ? "Paid & Settled Share" : "Paid";
