@@ -86,7 +86,7 @@ export default function NetBalanceSlide({ netBalance, totalOwedToYou, totalYouOw
     try {
       const { error } = await supabase.rpc("settle_all", {
         p_expense_id: expenseId,
-      } as any);
+      });
 
       if (error) throw error;
 

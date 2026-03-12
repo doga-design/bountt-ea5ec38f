@@ -117,7 +117,7 @@ export default function ExpenseDetailSheet({
     try {
       const { error } = await supabase.rpc("settle_all", {
         p_expense_id: expense.id,
-      } as any);
+      });
 
       if (error) throw error;
 

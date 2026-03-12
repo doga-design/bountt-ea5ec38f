@@ -457,9 +457,10 @@ export default function ExpenseScreen({
           p_expense_id: editExpense.id,
           p_amount: numAmount,
           p_description: "Quick Expense",
-          p_splits: splits,
+          p_splits: splits as unknown as Record<string, unknown>,
           p_actor_name: actorName,
-        } as any);
+          p_expense_type: "split",
+        });
 
         if (rpcError) throw rpcError;
 

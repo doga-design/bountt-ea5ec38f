@@ -210,7 +210,7 @@ export default function Join() {
         await supabase.rpc("log_member_joined", {
           p_group_id: pendingGroup.id,
           p_actor_name: memberName,
-        } as any);
+        });
 
         toast({
           title: `Joined ${pendingGroup.name}!`,
