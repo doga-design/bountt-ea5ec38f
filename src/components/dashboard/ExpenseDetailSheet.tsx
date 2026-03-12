@@ -314,7 +314,7 @@ export default function ExpenseDetailSheet({
     avatarRefs.current[splitId] = el;
   }, []);
 
-  const hasUnsettledSplits = expenseSplits.some((s) => !s.is_settled);
+  const hasUnsettledSplits = nonPayerSplits.some((s) => !s.is_settled);
 
   if (!expense) return null;
 
