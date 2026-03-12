@@ -65,7 +65,7 @@ export default function ExpenseDetailSheet({
       const { error } = await supabase.rpc("delete_expense", {
         p_expense_id: expense.id,
         p_actor_name: actorName,
-      } as any);
+      });
 
       if (error) throw error;
 
