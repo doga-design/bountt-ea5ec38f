@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -32,20 +32,51 @@ export default function Dashboard() {
     membersLoading,
     expensesLoading,
     groupsLoading,
-    
   } = useApp();
 
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [detailExpense, setDetailExpense] = useState<Expense | null>(null);
+  // Store ID instead of full object so we always derive from live data
+  const [detailExpenseId, setDetailExpenseId] = useState<string | null>(null);
   const [editExpense, setEditExpense] = useState<Expense | undefined>(undefined);
   const [editSplits, setEditSplits] = useState<ExpenseSplit[] | undefined>(undefined);
 
-  const handleSettled = () => {
-    setTimeout(() => {
-      confetti({ particleCount: 200, spread: 120, origin: { y: 0.4 } });
-    }, 300);
-  };
+  // Confetti: only fire after drawer fully closes
+  const pendingConfettiRef = useRef(false);
 
+  // Derive live expense from expenses array
+  const detailExpense = detailExpenseId
+    ? expenses.find((e) => e.id === detailExpenseId) ?? null
+    : null;
+
+  const detailOpen = detailExpenseId !== null;
+
+  // Called by ExpenseDetailSheet when it auto-closes due to full settlement
+  const handleSettlementComplete = useCallback(() => {
+    pendingConfettiRef.current = true;
+  }, []);
+
+  // Called when the drawer open state changes
+  const handleDetailOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      setDetailExpenseId(null);
+      // Fire confetti after drawer close animation completes
+      if (pendingConfettiRef.current) {
+        pendingConfettiRef.current = false;
+        // Use requestAnimationFrame to ensure drawer is fully gone
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            // Multi-burst full-viewport confetti
+            const defaults = { origin: { y: 0.4 }, zIndex: 9999 };
+            confetti({ ...defaults, particleCount: 80, spread: 100, angle: 60 });
+            confetti({ ...defaults, particleCount: 80, spread: 100, angle: 120 });
+            confetti({ ...defaults, particleCount: 60, spread: 140, angle: 90 });
+          });
+        });
+      }
+    }
+  }, []);
+
+  // ... keep existing code
   useEffect(() => {
     if (groupId) {
       const group = userGroups.find((g) => g.id === groupId);
@@ -53,12 +84,10 @@ export default function Dashboard() {
     }
   }, [groupId, userGroups]);
 
-  // Bug 7 fix: Redirect if user is no longer a member
   useEffect(() => {
     if (groupId && !groupsLoading && userGroups.length >= 0) {
       const found = userGroups.find((g) => g.id === groupId);
       if (!found && !groupsLoading) {
-        // Only redirect after groups have loaded and group is not found
         const timer = setTimeout(() => {
           if (!userGroups.find((g) => g.id === groupId)) {
             navigate("/");
@@ -76,7 +105,6 @@ export default function Dashboard() {
   const latestMemberName = otherMembers[otherMembers.length - 1]?.name ?? "";
 
   const isLoading = membersLoading || expensesLoading;
-  const isAdmin = currentGroup?.created_by === user?.id;
 
   const { unsettledGroups, settledExpenses } = useMemo(() => {
     const unsettled = expenses.filter((e) => !e.is_settled);
@@ -131,7 +159,6 @@ export default function Dashboard() {
 
       {mode === "normal" && (
         <>
-          {/* Member avatar row */}
           <div className="mt-4">
             <MemberAvatarRow
               members={groupMembers}
@@ -154,7 +181,7 @@ export default function Dashboard() {
                       expense={expense}
                       splits={expenseSplits.filter((s) => s.expense_id === expense.id)}
                       groupMembers={groupMembers}
-                      onClick={() => setDetailExpense(expense)}
+                      onClick={() => setDetailExpenseId(expense.id)}
                     />
                   ))}
                 </div>
@@ -176,7 +203,7 @@ export default function Dashboard() {
                         expense={expense}
                         splits={expenseSplits.filter((s) => s.expense_id === expense.id)}
                         groupMembers={groupMembers}
-                        onClick={() => setDetailExpense(expense)}
+                        onClick={() => setDetailExpenseId(expense.id)}
                       />
                     ))}
                   </div>
@@ -200,19 +227,18 @@ export default function Dashboard() {
           />
 
           <ExpenseDetailSheet
-            open={!!detailExpense}
-            onOpenChange={(o) => !o && setDetailExpense(null)}
+            open={detailOpen}
+            onOpenChange={handleDetailOpenChange}
             expense={detailExpense}
             splits={expenseSplits}
             groupMembers={groupMembers}
-            onSettled={handleSettled}
+            onSettled={handleSettlementComplete}
             onEdit={(exp, splits) => {
               setEditExpense(exp);
               setEditSplits(splits);
               setSheetOpen(true);
             }}
           />
-
         </>
       )}
     </div>
