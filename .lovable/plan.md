@@ -1,88 +1,65 @@
-# Redesign "ALL MEMBERS" Section — Circular Avatar Row
+# Three Fixes: Auto-Close, Hide Payer from Spokes, Settlement Confetti
 
-## Overview
+## 1. Auto-close on full settlement
 
-Replace the current wide card-based `MemberCardScroll` with a circular avatar row matching the reference screenshots. Add inline placeholder invite card with slide-down animation.
+**File:** `ExpenseDetailSheet.tsx`
 
-## Files to Change
+Add a `useEffect` watching `expenseFullySettled`. When it transitions to `true` while the drawer is open, close the drawer after a short delay (~800ms so the user sees the settled state briefly).
 
-### 1. New: `src/components/dashboard/MemberAvatarRow.tsx`
+The `onOpenChange(false)` call will close the drawer. A callback prop or state flag will signal Dashboard to fire confetti (see fix 3).
 
-Complete replacement for `MemberCardScroll`. Contains all logic for the new row.
+## 2. Hide payer from spoke visualization
 
-**Structure:**
+**Files:** `ExpenseDetailSheet.tsx`, `ExpenseSpokeViz.tsx`
 
-```text
-┌─ "ALL MEMBERS" label (tracking-wider, text-xs, muted, uppercase) ─┐
-│                                                                     │
-│  ○ You    ○ Kyle    ○ Matt    ◐ (pie icon, disabled)               │
-│  (green   (ghost   (green                                           │
-│   dot)    emoji)    dot)                                            │
-│                                                                     │
-│  ┌─ Inline invite card (slide-down, only for placeholders) ──────┐ │
-│  │ 👻  "Kyle is still a placeholder..."                          │ │
-│  │     [ Invite Kyle → ]                                         │ │
-│  └───────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────┘
+Currently `spokeMembers` is built from ALL `expenseSplits`. The payer's own split should be filtered out:
+
+```
+const spokeMembers = expenseSplits
+  .filter(s => s.user_id !== expense.paid_by_user_id)
+  .map(...)
 ```
 
-**Props:** `members`, `currentUserId`, `groupInviteCode?`
+Same filter for `settledMembers` (used by `ExpenseSettledState`).
 
-**Key implementation details:**
+For the subtitle, `otherSplitNames` already filters out the payer — no change needed there.
 
-- Sort members: current user first, then real (non-placeholder active) members, then placeholders
-- Each avatar: 56px circle with `getAvatarColor` background, `getAvatarImage` PNG inside  
-Use the existing avatar utilities:
-  - getAvatarImage(member) → returns the PNG import for that member
-  - member.avatar_color → the hex color string for the circle background
-  Both are already in src/lib/avatar-utils.ts — do not create new functions.
-- Name label below: 12px, current user shows "You"
-- Green dot (10px, `#22C55E`): positioned top-right for real joined members
-- Ghost emoji overlay: positioned top-right for placeholder members (small, ~16px badge)
-- Active/selected state: `#D94F00` ring border (2.5px) — "You" selected by default
-- Pie chart icon at end: 56px circle, light gray border, clock/pie icon inside, `opacity: 0.4`, `pointer-events: none`
-- `useState` for `selectedMemberId` (defaults to current user's member ID)
-- `useState` for `inviteCardMemberId` (null by default)
-- Tapping placeholder: set as selected + show invite card with CSS transition (`max-height` + `opacity` animation)
-- Tapping real member: set as selected, clear invite card
-- Tapping outside (click-away): dismiss invite card
-- `// TODO: filter feed by selected member`
+**Activity log:** When `action_type === "added"` and the actor is the payer, change label to "Paid & Settled Share" instead of just "Paid". This is display-only in `ExpenseDetailSheet.tsx` line ~471.
 
-**Invite card (inline, not modal):**
+Also filter the payer out of `hasUnsettledSplits` check (line 296) so the slide-to-settle only considers non-payer splits.
 
-- Rounded card, light background, padding
-- Ghost icon on left
-- Text: `<span className="text-orange-600 font-semibold">{name}</span> is still a placeholder...`
-- Button: dark navy (`#1E293B`), full-width, "Invite {name} →"
-- Button copies invite link or navigates to invite flow; The "Invite [Name] →" button should copy the group invite link to clipboard (using navigator.clipboard.writeText) 
-  and show a brief toast: "Invite link copied!". 
-  Do not open a new sheet or navigate away.
-- Slide-down animation: `transition-all duration-300` with conditional `max-height`/`opacity`
+## 3. Confetti on settlement (fires on feed after drawer closes)
 
-### 2. Modify: `src/pages/Dashboard.tsx`
+**Files:** `ExpenseDetailSheet.tsx`, `Dashboard.tsx`
 
-- Replace `MemberCardScroll` import with `MemberAvatarRow`
-- Replace the `<MemberCardScroll ... />` usage (lines 130-138) with:
+Add an `onSettled` callback prop to `ExpenseDetailSheet`. When any settlement succeeds (settle_my_share, settle_member_share, settle_all), call `onSettled()` right before/after the toast.
 
-```tsx
-<div className="mt-4">
-  <MemberAvatarRow
-    members={groupMembers}
-    currentUserId={user?.id ?? ""}
-    groupInviteCode={currentGroup?.invite_code}
-  />
-</div>
+When full settlement triggers auto-close (fix 1), also call `onSettled()`.
+
+In `Dashboard.tsx`, the `onSettled` handler fires a large `canvas-confetti` burst (already installed as a dependency). The confetti fires after the drawer closes, so it covers the feed viewport.
+
+```ts
+import confetti from "canvas-confetti";
+
+const handleSettled = () => {
+  setTimeout(() => {
+    confetti({ particleCount: 200, spread: 120, origin: { y: 0.4 } });
+  }, 300); // slight delay for drawer close animation
+};
 ```
 
-- Remove `MemberDetailSheet` trigger from member tap (the old `onCardClick={setSelectedMember}` flow is replaced by the new inline selection)
-- Keep `MemberDetailSheet` available but don't wire it to the new row (the new row handles its own interaction) In Dashboard.tsx, remove the selectedMember useState and 
-  setSelectedMember calls entirely if they were only used 
-  by MemberCardScroll. Do not leave orphaned state.
+Pass `onSettled={handleSettled}` to `ExpenseDetailSheet`.
 
-### 3. Keep (no changes): `MemberCardScroll.tsx`, `MemberCard.tsx`
+## Files changed
 
-These files become unused by the dashboard but are left in place in case other screens reference them. Can be cleaned up later.
 
-### Not touched
+| File                     | Change                                                                                                                                  |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `ExpenseDetailSheet.tsx` | Filter payer from spokeMembers/settledMembers, auto-close on full settlement, add `onSettled` prop, update activity log label for payer |
+| `ExpenseSpokeViz.tsx`    | No changes needed (filtering happens in parent)                                                                                         |
+| `Dashboard.tsx`          | Add `onSettled` prop + confetti handler, pass to `ExpenseDetailSheet`                                                                   |
 
-ExpenseScreen, numpad, expense logic, AppContext, Supabase queries, feed cards — none modified.
+
+No DB changes required.  
+  
+(extra: 4. **Cost detail window size** — Make sure this "cost detail" window covers most of the viewport height so its way taller )
