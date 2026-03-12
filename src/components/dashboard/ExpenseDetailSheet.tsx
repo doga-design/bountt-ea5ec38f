@@ -9,8 +9,6 @@ import { Pencil, Trash2, Check } from "lucide-react";
 import {
   Drawer,
   DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
 } from "@/components/ui/drawer";
 import ExpenseSpokeViz, { SpokeMember } from "./ExpenseSpokeViz";
 import ExpenseSettledState from "./ExpenseSettledState";
@@ -24,6 +22,9 @@ interface ExpenseDetailSheetProps {
   onEdit: (expense: Expense, splits: ExpenseSplit[]) => void;
   onSettled?: () => void;
 }
+
+/* ───────────────────────── Fixed heights for stable layout ───────────────────────── */
+const VIZ_HEIGHT = 260; // spoke viz & settled state share the same height
 
 export default function ExpenseDetailSheet({
   open,
@@ -60,27 +61,32 @@ export default function ExpenseDetailSheet({
   // Activity log
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
 
-  // Derived values (safe even when expense is null)
+  // Celebrate pending flag — set true when settlement completes, read in close handler
+  const celebratePendingRef = useRef(false);
+
+  // Derived values
   const isCreator = expense ? expense.created_by === user?.id : false;
   const isPayer = expense ? expense.paid_by_user_id === user?.id : false;
   const expenseSplits = expense ? splits.filter((s) => s.expense_id === expense.id) : [];
   const expenseFullySettled = expense?.is_settled === true;
 
-  // Auto-close on full settlement
+  // Auto-close on full settlement — transition detection
   const prevSettledRef = useRef(false);
   useEffect(() => {
     if (open && expenseFullySettled && !prevSettledRef.current) {
+      // Expense just became fully settled while drawer is open
       prevSettledRef.current = true;
+      celebratePendingRef.current = true;
+      // Brief delay so user sees the settled state, then close
       const timer = setTimeout(() => {
         onOpenChange(false);
-        onSettled?.();
       }, 800);
       return () => clearTimeout(timer);
     }
     if (!open) {
-      prevSettledRef.current = false;
+      prevSettledRef.current = expenseFullySettled;
     }
-  }, [open, expenseFullySettled]);
+  }, [open, expenseFullySettled, onOpenChange]);
 
   // Build subtitle
   const payerLabel = isPayer ? "You" : (expense?.paid_by_name ?? "");
@@ -101,7 +107,7 @@ export default function ExpenseDetailSheet({
     year: "numeric",
   }) : "";
 
-  // Build spoke members — exclude payer (they already paid)
+  // Build spoke members — exclude payer
   const nonPayerSplits = expenseSplits.filter((s) => s.user_id !== expense?.paid_by_user_id);
   const spokeMembers: SpokeMember[] = nonPayerSplits.map((s) => {
     const member = groupMembers.find(
@@ -154,7 +160,6 @@ export default function ExpenseDetailSheet({
 
     fetchLogs();
 
-    // Realtime subscription
     const channel = supabase
       .channel(`activity-log-${expense.id}`)
       .on(
@@ -204,7 +209,6 @@ export default function ExpenseDetailSheet({
       if (error) throw error;
       await Promise.all([fetchExpenses(currentGroup.id), fetchExpenseSplits(currentGroup.id)]);
       toast({ title: "Share settled ✓" });
-      onSettled?.();
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Something went wrong.", variant: "destructive" });
     } finally {
@@ -224,7 +228,6 @@ export default function ExpenseDetailSheet({
       await Promise.all([fetchExpenses(currentGroup.id), fetchExpenseSplits(currentGroup.id)]);
       setConfirmSplit(null);
       toast({ title: "Share settled ✓" });
-      onSettled?.();
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Something went wrong.", variant: "destructive" });
     } finally {
@@ -240,7 +243,7 @@ export default function ExpenseDetailSheet({
       if (error) throw error;
       await Promise.all([fetchExpenses(currentGroup.id), fetchExpenseSplits(currentGroup.id)]);
       toast({ title: "Expense fully settled" });
-      onSettled?.();
+      // Don't call onSettled here — auto-close effect handles it via celebratePendingRef
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Something went wrong.", variant: "destructive" });
     } finally {
@@ -252,20 +255,23 @@ export default function ExpenseDetailSheet({
     const split = expenseSplits.find((s) => s.id === splitId);
     if (!split || split.is_settled) return;
 
-    // Current user tapping own avatar → settle immediately
     if (split.user_id === user?.id) {
       handleSettleMyShare();
       return;
     }
 
-    // Payer tapping another member → show confirmation popover
     if (isPayer) {
       setConfirmSplit({ splitId, name: memberName, amount: shareAmount });
     }
   };
 
-  const handleClose = (open: boolean) => {
-    if (!open) {
+  const handleClose = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      // Check if we should fire confetti
+      if (celebratePendingRef.current) {
+        celebratePendingRef.current = false;
+        onSettled?.();
+      }
       setConfirmDelete(false);
       setDeleteError(null);
       setConfirmSplit(null);
@@ -273,7 +279,7 @@ export default function ExpenseDetailSheet({
       setSliding(false);
       setSlideCompleted(false);
     }
-    onOpenChange(open);
+    onOpenChange(nextOpen);
   };
 
   // --- Slide to settle gesture ---
@@ -309,7 +315,6 @@ export default function ExpenseDetailSheet({
     }
   }, [sliding, slideX]);
 
-  // Ref callback for avatar positioning
   const setAvatarRef = useCallback((splitId: string, el: HTMLDivElement | null) => {
     avatarRefs.current[splitId] = el;
   }, []);
@@ -320,201 +325,212 @@ export default function ExpenseDetailSheet({
 
   return (
     <Drawer open={open} onOpenChange={handleClose}>
-      <DrawerContent className="max-h-[92dvh]">
-        <DrawerHeader className="relative pb-2">
-          {/* Header: description · amount */}
-          <DrawerTitle className="font-sora text-lg pr-20">
-            {expense.description} · {formatCurrency(Number(expense.amount))}
-          </DrawerTitle>
+      <DrawerContent className="h-[90dvh] max-h-[90dvh]">
+        {/* Full-height flex container with 3 sections */}
+        <div className="h-full flex flex-col min-h-0 px-4 pb-4 pt-2">
 
-          {/* Edit + Delete icons */}
-          <div className="absolute right-4 top-4 flex items-center gap-2">
-            {isCreator && !expenseFullySettled && (
-              <button
-                onClick={() => {
-                  onEdit(expense, expenseSplits);
-                  onOpenChange(false);
-                }}
-                className="w-9 h-9 rounded-full bg-muted flex items-center justify-center"
-              >
-                <Pencil className="w-4 h-4 text-foreground" />
-              </button>
-            )}
-            {isCreator && (
-              <button
-                onClick={() => setConfirmDelete(true)}
-                className="w-9 h-9 rounded-full bg-destructive/10 flex items-center justify-center"
-              >
-                <Trash2 className="w-4 h-4 text-destructive" />
-              </button>
-            )}
+          {/* ═══════════════ SECTION 1: TOP — Header ═══════════════ */}
+          <div className="flex items-start justify-between gap-3 shrink-0 pb-3">
+            {/* Left: title, subtitle, date */}
+            <div className="min-w-0 flex-1">
+              <h2 className="font-sora text-lg font-bold text-foreground truncate">
+                {expense.description} · {formatCurrency(Number(expense.amount))}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{subtitle}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {dateStr} · Added by {creatorLabel}
+              </p>
+            </div>
+
+            {/* Right: action buttons */}
+            <div className="flex items-center gap-2 shrink-0">
+              {isCreator && !expenseFullySettled && (
+                <button
+                  onClick={() => {
+                    onEdit(expense, expenseSplits);
+                    onOpenChange(false);
+                  }}
+                  className="w-9 h-9 rounded-full bg-muted flex items-center justify-center"
+                >
+                  <Pencil className="w-4 h-4 text-foreground" />
+                </button>
+              )}
+              {isCreator && (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="w-9 h-9 rounded-full bg-destructive/10 flex items-center justify-center"
+                >
+                  <Trash2 className="w-4 h-4 text-destructive" />
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Subtitle */}
-          <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>
+          {/* Divider between top and middle */}
+          <div className="h-px bg-border shrink-0" />
 
-          {/* Date + creator */}
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {dateStr} · Added by {creatorLabel}
-          </p>
-        </DrawerHeader>
-
-        <div className="px-4 pb-6">
           {confirmDelete ? (
-            /* Delete confirmation */
-            <div className="py-2">
-              <p className="text-base font-bold text-foreground mb-1">Delete this expense?</p>
-              <p className="text-sm font-semibold text-foreground mb-1">"{expense.description}"</p>
-              <p className="text-xs text-muted-foreground mb-4">
-                This can't be undone. All group members will see this in the activity log.
-              </p>
-              {deleteError && <p className="text-xs text-destructive mb-3">{deleteError}</p>}
-              <div className="flex gap-2">
-                <button
-                  onClick={handleDelete}
-                  disabled={deleteLoading}
-                  className="flex-1 bg-destructive text-destructive-foreground rounded-xl py-3 text-sm font-bold"
-                >
-                  {deleteLoading ? "Deleting..." : "Yes, delete it"}
-                </button>
-                <button
-                  onClick={() => { setConfirmDelete(false); setDeleteError(null); }}
-                  className="flex-1 bg-muted text-foreground rounded-xl py-3 text-sm font-bold"
-                >
-                  Keep it
-                </button>
+            /* Delete confirmation overlay */
+            <div className="flex-1 flex items-center justify-center">
+              <div className="w-full max-w-sm">
+                <p className="text-base font-bold text-foreground mb-1">Delete this expense?</p>
+                <p className="text-sm font-semibold text-foreground mb-1">"{expense.description}"</p>
+                <p className="text-xs text-muted-foreground mb-4">
+                  This can't be undone. All group members will see this in the activity log.
+                </p>
+                {deleteError && <p className="text-xs text-destructive mb-3">{deleteError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleteLoading}
+                    className="flex-1 bg-destructive text-destructive-foreground rounded-xl py-3 text-sm font-bold"
+                  >
+                    {deleteLoading ? "Deleting..." : "Yes, delete it"}
+                  </button>
+                  <button
+                    onClick={() => { setConfirmDelete(false); setDeleteError(null); }}
+                    className="flex-1 bg-muted text-foreground rounded-xl py-3 text-sm font-bold"
+                  >
+                    Keep it
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
             <>
-              {/* Divider */}
-              <div className="h-px bg-border mb-4" />
+              {/* ═══════════════ SECTION 2: MIDDLE — Interactive viz ═══════════════ */}
+              <div className="flex-1 min-h-0 flex items-center justify-center py-4">
+                <div className="w-full" style={{ height: VIZ_HEIGHT }}>
+                  {expenseFullySettled ? (
+                    <div className="h-full flex items-center justify-center">
+                      <ExpenseSettledState members={settledMembers} />
+                    </div>
+                  ) : (
+                    <div className="relative h-full">
+                      <ExpenseSpokeViz
+                        payer={payerMember}
+                        payerName={expense.paid_by_name}
+                        totalAmount={Number(expense.amount)}
+                        members={spokeMembers}
+                        currentUserId={user?.id ?? ""}
+                        isPayer={isPayer}
+                        onMemberTap={handleMemberTap}
+                        memberAvatarRef={setAvatarRef}
+                      />
 
-              {/* Visualization */}
-              {expenseFullySettled ? (
-                <ExpenseSettledState members={settledMembers} />
-              ) : (
-                <div className="relative">
-                  <ExpenseSpokeViz
-                    payer={payerMember}
-                    payerName={expense.paid_by_name}
-                    totalAmount={Number(expense.amount)}
-                    members={spokeMembers}
-                    currentUserId={user?.id ?? ""}
-                    isPayer={isPayer}
-                    onMemberTap={handleMemberTap}
-                    memberAvatarRef={setAvatarRef}
-                  />
-
-                  {/* Confirmation popover — anchored below tapped avatar */}
-                  {confirmSplit && (
-                    <div className="absolute left-1/2 -translate-x-1/2 bottom-0 z-50 w-[260px]">
-                      <div className="bg-card rounded-xl border border-border shadow-lg p-4 space-y-3">
-                        <p className="text-sm text-foreground">
-                          <span className="font-semibold">{confirmSplit.name}</span> still owes{" "}
-                          {formatCurrency(confirmSplit.amount)}, do you want to settle it up?
-                        </p>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleSettleMemberShare(confirmSplit.splitId)}
-                            disabled={confirmLoading}
-                            className="flex-1 bg-foreground text-background rounded-xl py-2.5 text-sm font-bold"
-                          >
-                            {confirmLoading ? "Settling..." : "Confirm"}
-                          </button>
-                          <button
-                            onClick={() => setConfirmSplit(null)}
-                            className="flex-1 bg-muted text-foreground rounded-xl py-2.5 text-sm font-bold"
-                          >
-                            Cancel
-                          </button>
+                      {/* Confirmation popover */}
+                      {confirmSplit && (
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-0 z-50 w-[260px]">
+                          <div className="bg-card rounded-xl border border-border shadow-lg p-4 space-y-3">
+                            <p className="text-sm text-foreground">
+                              <span className="font-semibold">{confirmSplit.name}</span> still owes{" "}
+                              {formatCurrency(confirmSplit.amount)}, do you want to settle it up?
+                            </p>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleSettleMemberShare(confirmSplit.splitId)}
+                                disabled={confirmLoading}
+                                className="flex-1 bg-foreground text-background rounded-xl py-2.5 text-sm font-bold"
+                              >
+                                {confirmLoading ? "Settling..." : "Confirm"}
+                              </button>
+                              <button
+                                onClick={() => setConfirmSplit(null)}
+                                className="flex-1 bg-muted text-foreground rounded-xl py-2.5 text-sm font-bold"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
+              </div>
 
-              {/* Slide to settle everyone — payer only */}
-              {isPayer && hasUnsettledSplits && !expenseFullySettled && (
-                <div className="mt-4">
-                  <div
-                    ref={slideTrackRef}
-                    className="relative h-14 rounded-full bg-muted overflow-hidden select-none touch-none"
-                    onPointerMove={handlePointerMove}
-                    onPointerUp={handlePointerUp}
-                  >
-                    {/* Track label */}
-                    <span className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-muted-foreground pointer-events-none">
-                      {slideCompleted ? "Settling..." : "Slide to settle everyone →"}
-                    </span>
+              {/* ═══════════════ SECTION 3: BOTTOM — Activity log + Slider ═══════════════ */}
+              <div className="shrink-0">
+                {/* Activity log */}
+                {activityLogs.length > 0 && (
+                  <div className="mb-3">
+                    <div className="h-px bg-border mb-3" />
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                      Activity
+                    </p>
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {activityLogs.map((log) => {
+                        const isMe = log.actor_id === user?.id;
+                        const actorLabel = isMe ? "You" : log.actor_name;
+                        const logDate = new Date(log.created_at).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        });
+                        const amount = log.expense_snapshot?.amount;
 
-                    {/* Progress fill */}
-                    <div
-                      className="absolute left-0 top-0 h-full bg-foreground/10 transition-none"
-                      style={{ width: slideX + 48 }}
-                    />
+                        let actionLabel = "";
+                        if (log.action_type === "settled") {
+                          actionLabel = "Settled Share";
+                        } else if (log.action_type === "added") {
+                          const isLogActorPayer = log.actor_id === expense?.paid_by_user_id;
+                          actionLabel = isLogActorPayer ? "Paid & Settled Share" : "Paid";
+                        } else if (log.action_type === "edited") {
+                          const detail = log.change_detail?.[0];
+                          actionLabel = detail ? `Edited ${detail.field}` : "Edited";
+                        } else if (log.action_type === "deleted") {
+                          actionLabel = "Deleted";
+                        }
 
-                    {/* Draggable thumb */}
-                    <div
-                      className="absolute top-1 left-1 w-12 h-12 rounded-full bg-foreground flex items-center justify-center cursor-grab active:cursor-grabbing"
-                      style={{
-                        transform: `translateX(${slideX}px)`,
-                        transition: sliding ? "none" : "transform 0.3s ease",
-                      }}
-                      onPointerDown={handlePointerDown}
-                    >
-                      <span className="text-background text-lg font-bold">»</span>
+                        return (
+                          <div key={log.id} className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              {logDate} · {actorLabel} {actionLabel}
+                            </span>
+                            {amount != null && (
+                              <span className="font-medium text-foreground">
+                                {formatCurrency(Number(amount))}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Per-expense activity log */}
-              {activityLogs.length > 0 && (
-                <div className="mt-6">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                    Activity
-                  </p>
-                  <div className="space-y-2">
-                    {activityLogs.map((log) => {
-                      const isMe = log.actor_id === user?.id;
-                      const actorLabel = isMe ? "You" : log.actor_name;
-                      const logDate = new Date(log.created_at).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      });
-                      const amount = log.expense_snapshot?.amount;
+                {/* Slide to settle — payer only, divider above */}
+                {isPayer && hasUnsettledSplits && !expenseFullySettled && (
+                  <>
+                    <div className="h-px bg-border mb-3" />
+                    <div
+                      ref={slideTrackRef}
+                      className="relative h-14 rounded-full bg-muted overflow-hidden select-none touch-none"
+                      onPointerMove={handlePointerMove}
+                      onPointerUp={handlePointerUp}
+                    >
+                      <span className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-muted-foreground pointer-events-none">
+                        {slideCompleted ? "Settling..." : "Slide to settle everyone →"}
+                      </span>
 
-                      let actionLabel = "";
-                      if (log.action_type === "settled") {
-                        actionLabel = "Settled Share";
-                      } else if (log.action_type === "added") {
-                        const isLogActorPayer = log.actor_id === expense?.paid_by_user_id;
-                        actionLabel = isLogActorPayer ? "Paid & Settled Share" : "Paid";
-                      } else if (log.action_type === "edited") {
-                        const detail = log.change_detail?.[0];
-                        actionLabel = detail ? `Edited ${detail.field}` : "Edited";
-                      } else if (log.action_type === "deleted") {
-                        actionLabel = "Deleted";
-                      }
+                      <div
+                        className="absolute left-0 top-0 h-full bg-foreground/10 transition-none"
+                        style={{ width: slideX + 48 }}
+                      />
 
-                      return (
-                        <div key={log.id} className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">
-                            {logDate} · {actorLabel} {actionLabel}
-                          </span>
-                          {amount != null && (
-                            <span className="font-medium text-foreground">
-                              {formatCurrency(Number(amount))}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+                      <div
+                        className="absolute top-1 left-1 w-12 h-12 rounded-full bg-foreground flex items-center justify-center cursor-grab active:cursor-grabbing"
+                        style={{
+                          transform: `translateX(${slideX}px)`,
+                          transition: sliding ? "none" : "transform 0.3s ease",
+                        }}
+                        onPointerDown={handlePointerDown}
+                      >
+                        <span className="text-background text-lg font-bold">»</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </>
           )}
         </div>
