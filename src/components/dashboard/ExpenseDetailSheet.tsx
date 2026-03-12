@@ -101,8 +101,9 @@ export default function ExpenseDetailSheet({
     year: "numeric",
   }) : "";
 
-  // Build spoke members
-  const spokeMembers: SpokeMember[] = expenseSplits.map((s) => {
+  // Build spoke members — exclude payer (they already paid)
+  const nonPayerSplits = expenseSplits.filter((s) => s.user_id !== expense?.paid_by_user_id);
+  const spokeMembers: SpokeMember[] = nonPayerSplits.map((s) => {
     const member = groupMembers.find(
       (m) =>
         (s.user_id && m.user_id === s.user_id) ||
