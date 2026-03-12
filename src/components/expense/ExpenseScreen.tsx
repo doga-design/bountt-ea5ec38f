@@ -457,7 +457,7 @@ export default function ExpenseScreen({
           p_expense_id: editExpense.id,
           p_amount: numAmount,
           p_description: "Quick Expense",
-          p_splits: splits as unknown as Record<string, unknown>,
+          p_splits: JSON.parse(JSON.stringify(splits)),
           p_actor_name: actorName,
           p_expense_type: "split",
         });
