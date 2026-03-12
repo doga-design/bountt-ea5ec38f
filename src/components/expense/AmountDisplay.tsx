@@ -49,7 +49,7 @@ export default function AmountDisplay({
 
     const buttonLabel = overBudget
       ? `Remove $${Math.abs(remaining).toFixed(2)} →`
-      : `Distribute others $${remaining.toFixed(2)} →`;
+      : `Distribute $${remaining.toFixed(2)} →`;
 
     statusNode = showButton ? (
       <button
