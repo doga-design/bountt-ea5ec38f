@@ -71,22 +71,27 @@ export default function ExpenseDetailSheet({
   const expenseFullySettled = expense?.is_settled === true;
 
   // Auto-close on full settlement — transition detection
-  const prevSettledRef = useRef(false);
+  // Snapshot whether expense was already settled when the drawer opened
+  const settledAtOpenRef = useRef(false);
   useEffect(() => {
-    if (open && expenseFullySettled && !prevSettledRef.current) {
-      // Expense just became fully settled while drawer is open
-      prevSettledRef.current = true;
+    if (open) {
+      settledAtOpenRef.current = expenseFullySettled;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  useEffect(() => {
+    // Only auto-close if it transitioned from unsettled→settled while open
+    if (open && expenseFullySettled && !settledAtOpenRef.current) {
+      settledAtOpenRef.current = true; // prevent re-trigger
       celebratePendingRef.current = true;
-      // Brief delay so user sees the settled state, then close
       const timer = setTimeout(() => {
+        onSettled?.(); // fire confetti flag before closing
         onOpenChange(false);
       }, 800);
       return () => clearTimeout(timer);
     }
-    if (!open) {
-      prevSettledRef.current = expenseFullySettled;
-    }
-  }, [open, expenseFullySettled, onOpenChange]);
+  }, [open, expenseFullySettled, onOpenChange, onSettled]);
 
   // Build subtitle
   const payerLabel = isPayer ? "You" : (expense?.paid_by_name ?? "");
@@ -470,7 +475,14 @@ export default function ExpenseDetailSheet({
 
                         let actionLabel = "";
                         if (log.action_type === "settled") {
-                          actionLabel = "Settled Share";
+                          const detail = log.change_detail?.[0] as { field?: string; new_value?: string } | undefined;
+                          if (detail?.field === "settled_member") {
+                            actionLabel = `Settled ${detail.new_value}'s Share`;
+                          } else if (detail?.field === "settled_all") {
+                            actionLabel = "Settled All";
+                          } else {
+                            actionLabel = "Settled Share";
+                          }
                         } else if (log.action_type === "added") {
                           const isLogActorPayer = log.actor_id === expense?.paid_by_user_id;
                           actionLabel = isLogActorPayer ? "Paid & Settled Share" : "Paid";
