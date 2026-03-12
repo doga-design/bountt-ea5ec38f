@@ -457,9 +457,10 @@ export default function ExpenseScreen({
           p_expense_id: editExpense.id,
           p_amount: numAmount,
           p_description: "Quick Expense",
-          p_splits: splits,
+          p_splits: JSON.parse(JSON.stringify(splits)),
           p_actor_name: actorName,
-        } as any);
+          p_expense_type: "split",
+        });
 
         if (rpcError) throw rpcError;
 
@@ -477,7 +478,7 @@ export default function ExpenseScreen({
           p_paid_by_user_id: paidByUserId as string,
           p_paid_by_name: paidByName,
           p_created_by: user.id,
-          p_splits: splits,
+          p_splits: JSON.parse(JSON.stringify(splits)),
           p_expense_type: "split",
         });
 

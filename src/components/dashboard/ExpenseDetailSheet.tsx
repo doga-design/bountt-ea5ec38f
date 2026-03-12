@@ -65,7 +65,7 @@ export default function ExpenseDetailSheet({
       const { error } = await supabase.rpc("delete_expense", {
         p_expense_id: expense.id,
         p_actor_name: actorName,
-      } as any);
+      });
 
       if (error) throw error;
 
@@ -92,7 +92,7 @@ export default function ExpenseDetailSheet({
     try {
       const { error } = await supabase.rpc("settle_my_share", {
         p_expense_id: expense.id,
-      } as any);
+      });
 
       if (error) throw error;
 
@@ -117,7 +117,7 @@ export default function ExpenseDetailSheet({
     try {
       const { error } = await supabase.rpc("settle_all", {
         p_expense_id: expense.id,
-      } as any);
+      });
 
       if (error) throw error;
 
