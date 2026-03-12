@@ -58,9 +58,11 @@ export default function ExpenseDetailSheet({
   // Activity log
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
 
-  if (!expense) return null;
-
-  const isCreator = expense.created_by === user?.id;
+  // Derived values (safe even when expense is null)
+  const isCreator = expense ? expense.created_by === user?.id : false;
+  const isPayer = expense ? expense.paid_by_user_id === user?.id : false;
+  const expenseSplits = expense ? splits.filter((s) => s.expense_id === expense.id) : [];
+  const expenseFullySettled = expense?.is_settled === true;
   const isPayer = expense.paid_by_user_id === user?.id;
   const expenseSplits = splits.filter((s) => s.expense_id === expense.id);
   const expenseFullySettled = expense.is_settled === true;
