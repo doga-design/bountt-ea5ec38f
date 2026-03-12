@@ -50,6 +50,7 @@ export interface Expense {
   created_by: string;
   created_at: string;
   updated_at: string;
+  expense_type: string;
 }
 
 export interface ExpenseSplit {

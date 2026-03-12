@@ -152,7 +152,8 @@ export default function ExpenseScreen({
     [activeMembers, activeIds]
   );
 
-  // For the split, include the payer + selected grid members
+  // splitMembers includes payer + selected members for calculation (equal distribution).
+  // The payer is filtered out at payload time before sending to the RPC.
   const splitMembers = useMemo(() => {
     const members: GroupMember[] = [];
     if (payerMember) members.push(payerMember);
@@ -450,6 +451,9 @@ export default function ExpenseScreen({
           }))
           .filter((s) => s.share_amount > 0);
       }
+
+      // Remove payer from splits — payer is represented by paid_by_user_id, not a split row
+      splits = splits.filter((s) => s.user_id !== paidByUserId);
 
       if (isEditMode && editExpense) {
         const actorName = profile?.display_name ?? user.email?.split("@")[0] ?? "Unknown";
