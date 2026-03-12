@@ -66,6 +66,21 @@ export default function ExpenseDetailSheet({
   const expenseSplits = expense ? splits.filter((s) => s.expense_id === expense.id) : [];
   const expenseFullySettled = expense?.is_settled === true;
 
+  // Auto-close on full settlement
+  const prevSettledRef = useRef(false);
+  useEffect(() => {
+    if (open && expenseFullySettled && !prevSettledRef.current) {
+      prevSettledRef.current = true;
+      const timer = setTimeout(() => {
+        onOpenChange(false);
+        onSettled?.();
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+    if (!open) {
+      prevSettledRef.current = false;
+    }
+  }, [open, expenseFullySettled]);
 
   // Build subtitle
   const payerLabel = isPayer ? "You" : (expense?.paid_by_name ?? "");
