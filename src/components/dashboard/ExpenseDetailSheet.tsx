@@ -502,7 +502,7 @@ export default function ExpenseDetailSheet({
                 )}
 
                 {/* Slide to settle — payer only, divider above */}
-                {isPayer && hasUnsettledSplits && !expenseFullySettled && expenseSplits.length > 2 && (
+                {isPayer && hasUnsettledSplits && !expenseFullySettled && (
                   <>
                     <div className="h-px bg-border mb-3" />
                     <div

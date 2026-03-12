@@ -10,7 +10,6 @@ import MemberDetailSheet from "@/components/group-settings/MemberDetailSheet";
 import SettingsCards from "@/components/group-settings/SettingsCards";
 import DangerZone from "@/components/group-settings/DangerZone";
 import { useToast } from "@/hooks/use-toast";
-import { formatCurrency } from "@/lib/bountt-utils";
 
 export default function GroupSettings() {
   const { groupId } = useParams<{ groupId: string }>();
@@ -26,7 +25,6 @@ export default function GroupSettings() {
     expenseSplits,
     addPlaceholderMember,
     removeMember,
-    settleAndRemoveMember,
     groupsLoading,
   } = useApp();
   const { toast } = useToast();
@@ -57,18 +55,6 @@ export default function GroupSettings() {
 
   const isAdmin = currentGroup.created_by === user?.id;
   const activeMembers = groupMembers.filter((m) => m.status === "active");
-
-  const selectedMemberHasUnsettledSplits = (() => {
-    if (!selectedMember) return false;
-    const groupExpenseIds = new Set(expenses.filter((e) => e.group_id === groupId && !e.is_settled).map((e) => e.id));
-    return expenseSplits.some((s) => {
-      if (s.is_settled) return false;
-      if (!groupExpenseIds.has(s.expense_id)) return false;
-      if (selectedMember.user_id && s.user_id === selectedMember.user_id) return true;
-      if (!selectedMember.user_id && s.member_name === selectedMember.name && !s.user_id) return true;
-      return false;
-    });
-  })();
 
   return (
     <div className="screen-container bg-background">
@@ -135,24 +121,11 @@ export default function GroupSettings() {
         currentUserId={user?.id ?? ""}
         isAdmin={isAdmin}
         groupInviteCode={currentGroup.invite_code}
-        hasUnsettledSplits={selectedMemberHasUnsettledSplits}
         onRemove={async () => {
           if (selectedMember) {
             await removeMember(selectedMember.id);
             setSelectedMember(null);
             toast({ title: `${selectedMember.name} removed` });
-          }
-        }}
-        onSettleAndRemove={async () => {
-          if (selectedMember && groupId) {
-            const result = await settleAndRemoveMember(groupId, selectedMember.id);
-            setSelectedMember(null);
-            if (result) {
-              toast({
-                title: `${selectedMember.name} removed`,
-                description: `Settled ${result.splits_settled} split${result.splits_settled !== 1 ? "s" : ""} (${formatCurrency(result.total_amount)})`,
-              });
-            }
           }
         }}
       />

@@ -413,10 +413,6 @@ export type Database = {
         }[]
       }
       settle_all: { Args: { p_expense_id: string }; Returns: Json }
-      settle_member_and_remove: {
-        Args: { p_group_id: string; p_member_id: string }
-        Returns: Json
-      }
       settle_member_share: {
         Args: { p_expense_id: string; p_split_id: string }
         Returns: Json
