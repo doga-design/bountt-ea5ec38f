@@ -182,7 +182,7 @@ export default function Join() {
     await supabase.rpc("log_member_joined", {
       p_group_id: groupId,
       p_actor_name: memberName,
-    } as any);
+    });
 
     await fetchGroups();
     toast({ title: `Joined ${groupName}!`, description: "Welcome to the group 🎉" });
