@@ -305,7 +305,6 @@ export default function ExpenseDetailSheet({
           <DrawerTitle className="font-sora text-lg pr-20">
             {expense.description} · {formatCurrency(Number(expense.amount))}
           </DrawerTitle>
-          </DrawerTitle>
 
           {/* Edit + Delete icons */}
           <div className="absolute right-4 top-4 flex items-center gap-2">
