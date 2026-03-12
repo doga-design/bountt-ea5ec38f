@@ -8,7 +8,7 @@ import HeroCarousel from "@/components/dashboard/HeroCarousel";
 import EmptyState from "@/components/dashboard/EmptyState";
 import AddExpensePrompt from "@/components/dashboard/AddExpensePrompt";
 import ExpenseScreen from "@/components/expense/ExpenseScreen";
-import ExpenseCard from "@/components/dashboard/ExpenseCard";
+import ExpenseFeedItem from "@/components/dashboard/ExpenseFeedItem";
 import ExpenseDetailSheet from "@/components/dashboard/ExpenseDetailSheet";
 import MemberAvatarRow from "@/components/dashboard/MemberAvatarRow";
 import BottomNav from "@/components/BottomNav";
@@ -140,9 +140,9 @@ export default function Dashboard() {
                 <p className="text-xs font-medium text-muted-foreground tracking-wider mb-2 px-1">
                   {group.label}
                 </p>
-                <div className="space-y-3">
+                <div className="divide-y divide-border">
                   {group.items.map((expense) => (
-                    <ExpenseCard
+                    <ExpenseFeedItem
                       key={expense.id}
                       expense={expense}
                       splits={expenseSplits.filter((s) => s.expense_id === expense.id)}
@@ -162,9 +162,9 @@ export default function Dashboard() {
                   <ChevronDown className="w-3.5 h-3.5" />
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <div className="space-y-3">
+                  <div className="divide-y divide-border">
                     {settledExpenses.map((expense) => (
-                      <ExpenseCard
+                      <ExpenseFeedItem
                         key={expense.id}
                         expense={expense}
                         splits={expenseSplits.filter((s) => s.expense_id === expense.id)}

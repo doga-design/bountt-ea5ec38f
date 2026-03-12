@@ -31,6 +31,20 @@ export function formatCurrency(amount: number, currency = "USD"): string {
   }).format(amount);
 }
 
+/**
+ * Format amount for feed display: drop .00 on round numbers,
+ * keep decimals otherwise, comma-format thousands.
+ */
+export function formatAmount(n: number): string {
+  if (Number.isInteger(n) || Math.abs(n - Math.round(n)) < 0.001) {
+    return Math.round(n).toLocaleString("en-US");
+  }
+  return n.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 // =====================================================
 // DATE FORMATTING
 // =====================================================
