@@ -40,6 +40,12 @@ export default function Dashboard() {
   const [editExpense, setEditExpense] = useState<Expense | undefined>(undefined);
   const [editSplits, setEditSplits] = useState<ExpenseSplit[] | undefined>(undefined);
 
+  const handleSettled = () => {
+    setTimeout(() => {
+      confetti({ particleCount: 200, spread: 120, origin: { y: 0.4 } });
+    }, 300);
+  };
+
   useEffect(() => {
     if (groupId) {
       const group = userGroups.find((g) => g.id === groupId);
