@@ -452,6 +452,9 @@ export default function ExpenseScreen({
           .filter((s) => s.share_amount > 0);
       }
 
+      // Remove payer from splits — payer is represented by paid_by_user_id, not a split row
+      splits = splits.filter((s) => s.user_id !== paidByUserId);
+
       if (isEditMode && editExpense) {
         const actorName = profile?.display_name ?? user.email?.split("@")[0] ?? "Unknown";
         const { error: rpcError } = await supabase.rpc("edit_expense", {
