@@ -106,17 +106,10 @@ export default function ExpenseFeedItem({
   const mySplit = splits.find((s) => s.user_id === currentUserId) ?? null;
   const isInvolved = isPayer || !!mySplit;
 
-  // --- Payer in splits? (cover detection) ---
-  const payerInSplits = splits.some(
-    (s) =>
-      (expense.paid_by_user_id && s.user_id === expense.paid_by_user_id) ||
-      (!expense.paid_by_user_id &&
-        s.member_name === expense.paid_by_name &&
-        !s.user_id)
-  );
-  const isCover = !payerInSplits && splits.length > 0;
+  // --- Cover detection via expense_type ---
+  const isCover = expense.expense_type === "cover";
 
-  // --- Non-payer splits ---
+  // --- Non-payer splits (defensive filter — payer should have no split row) ---
   const nonPayerSplits = splits.filter(
     (s) =>
       !(
