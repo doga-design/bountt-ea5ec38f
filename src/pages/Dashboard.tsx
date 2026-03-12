@@ -8,7 +8,7 @@ import HeroCarousel from "@/components/dashboard/HeroCarousel";
 import EmptyState from "@/components/dashboard/EmptyState";
 import AddExpensePrompt from "@/components/dashboard/AddExpensePrompt";
 import ExpenseScreen from "@/components/expense/ExpenseScreen";
-import ExpenseCard from "@/components/dashboard/ExpenseCard";
+import ExpenseFeedItem from "@/components/dashboard/ExpenseFeedItem";
 import ExpenseDetailSheet from "@/components/dashboard/ExpenseDetailSheet";
 import MemberAvatarRow from "@/components/dashboard/MemberAvatarRow";
 import BottomNav from "@/components/BottomNav";
