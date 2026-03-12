@@ -224,6 +224,7 @@ export default function ExpenseDetailSheet({
       await Promise.all([fetchExpenses(currentGroup.id), fetchExpenseSplits(currentGroup.id)]);
       setConfirmSplit(null);
       toast({ title: "Share settled ✓" });
+      onSettled?.();
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Something went wrong.", variant: "destructive" });
     } finally {
