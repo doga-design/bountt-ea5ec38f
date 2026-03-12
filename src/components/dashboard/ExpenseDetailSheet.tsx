@@ -295,6 +295,8 @@ export default function ExpenseDetailSheet({
 
   const hasUnsettledSplits = expenseSplits.some((s) => !s.is_settled);
 
+  if (!expense) return null;
+
   return (
     <Drawer open={open} onOpenChange={handleClose}>
       <DrawerContent>
@@ -302,6 +304,7 @@ export default function ExpenseDetailSheet({
           {/* Header: description · amount */}
           <DrawerTitle className="font-sora text-lg pr-20">
             {expense.description} · {formatCurrency(Number(expense.amount))}
+          </DrawerTitle>
           </DrawerTitle>
 
           {/* Edit + Delete icons */}
