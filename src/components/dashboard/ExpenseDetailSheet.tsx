@@ -70,29 +70,23 @@ export default function ExpenseDetailSheet({
   const expenseSplits = expense ? splits.filter((s) => s.expense_id === expense.id) : [];
   const expenseFullySettled = expense?.is_settled === true;
 
-  // Snapshot whether expense was already settled when drawer opened
-  const settledAtOpenRef = useRef(false);
+  // Auto-close on full settlement — transition detection
+  const prevSettledRef = useRef(false);
   useEffect(() => {
-    if (open) {
-      // Capture settled state at the moment the drawer opens
-      settledAtOpenRef.current = expenseFullySettled;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  // Auto-close on full settlement — only if it transitioned while open
-  useEffect(() => {
-    if (open && expenseFullySettled && !settledAtOpenRef.current) {
-      // Expense just became fully settled while drawer was open (genuine transition)
+    if (open && expenseFullySettled && !prevSettledRef.current) {
+      // Expense just became fully settled while drawer is open
+      prevSettledRef.current = true;
       celebratePendingRef.current = true;
       // Brief delay so user sees the settled state, then close
       const timer = setTimeout(() => {
-        onSettled?.(); // Signal confetti BEFORE closing
         onOpenChange(false);
       }, 800);
       return () => clearTimeout(timer);
     }
-  }, [open, expenseFullySettled, onOpenChange, onSettled]);
+    if (!open) {
+      prevSettledRef.current = expenseFullySettled;
+    }
+  }, [open, expenseFullySettled, onOpenChange]);
 
   // Build subtitle
   const payerLabel = isPayer ? "You" : (expense?.paid_by_name ?? "");
@@ -252,9 +246,7 @@ export default function ExpenseDetailSheet({
       // Don't call onSettled here — auto-close effect handles it via celebratePendingRef
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Something went wrong.", variant: "destructive" });
-      // Reset slider so user can retry
-      setSlideCompleted(false);
-      setSlideX(0);
+    } finally {
       setSettleAllLoading(false);
     }
   };
@@ -275,6 +267,11 @@ export default function ExpenseDetailSheet({
 
   const handleClose = (nextOpen: boolean) => {
     if (!nextOpen) {
+      // Check if we should fire confetti
+      if (celebratePendingRef.current) {
+        celebratePendingRef.current = false;
+        onSettled?.();
+      }
       setConfirmDelete(false);
       setDeleteError(null);
       setConfirmSplit(null);
