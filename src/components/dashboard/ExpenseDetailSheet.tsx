@@ -124,8 +124,8 @@ export default function ExpenseDetailSheet({
     (m) => m.user_id === expense?.paid_by_user_id && m.status === "active"
   ) ?? null;
 
-  // Settled state members
-  const settledMembers = expenseSplits.map((s) => {
+  // Settled state members — exclude payer
+  const settledMembers = nonPayerSplits.map((s) => {
     const member = groupMembers.find(
       (m) =>
         (s.user_id && m.user_id === s.user_id) ||
