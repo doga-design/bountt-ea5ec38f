@@ -320,7 +320,7 @@ export default function ExpenseDetailSheet({
 
   return (
     <Drawer open={open} onOpenChange={handleClose}>
-      <DrawerContent>
+      <DrawerContent className="max-h-[92dvh]">
         <DrawerHeader className="relative pb-2">
           {/* Header: description · amount */}
           <DrawerTitle className="font-sora text-lg pr-20">
