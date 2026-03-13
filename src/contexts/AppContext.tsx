@@ -504,6 +504,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     fetchMembers,
     addPlaceholderMember,
     removeMember,
+    settleAndRemoveMember,
     leaveGroup,
     fetchExpenses,
     addExpense,
