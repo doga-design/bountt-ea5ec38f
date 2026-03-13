@@ -66,7 +66,8 @@ export default function MemberAvatarGrid({
             pointerEvents: "none",
           }}
         >
-          {members.map((_, i) => {
+          {members.map((m, i) => {
+            if (!activeIds.has(m.id)) return null;
             const endX = slotWidth * i + slotWidth / 2;
             const endY = SVG_HEIGHT;
             const ctrlX = endX;
