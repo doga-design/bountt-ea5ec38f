@@ -122,6 +122,7 @@ export default function ExpenseScreen({
         // Create mode
         setAmount("0");
         setPrevAmount("0");
+        setDescription("");
         setSplitMode("equal");
         setSlide(1);
         const selfMember = members.find((m) => m.user_id === user?.id);
