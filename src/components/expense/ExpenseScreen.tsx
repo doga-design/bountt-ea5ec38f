@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { ArrowLeft, RotateCcw, Plus } from "lucide-react";
+import { ArrowLeft, RotateCcw, Plus, Camera } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,6 +37,7 @@ export default function ExpenseScreen({
 
   const [slide, setSlide] = useState<1 | 2>(1);
   const [amount, setAmount] = useState("0");
+  const [description, setDescription] = useState("");
   const [splitMode, setSplitMode] = useState<"equal" | "custom">("equal");
   const [activeIds, setActiveIds] = useState<Set<string>>(new Set());
   const [focusedMemberId, setFocusedMemberId] = useState<string | null>(null);
@@ -121,6 +122,7 @@ export default function ExpenseScreen({
         // Create mode
         setAmount("0");
         setPrevAmount("0");
+        setDescription("");
         setSplitMode("equal");
         setSlide(1);
         const selfMember = members.find((m) => m.user_id === user?.id);
@@ -212,6 +214,29 @@ export default function ExpenseScreen({
   const totalNum = parseFloat(amount) || 0;
   const remaining = totalNum - customSum;
   const isBalanced = Math.abs(remaining) < 0.01 && totalNum > 0;
+
+  // Live split amounts for grid display
+  const gridSplitAmounts = useMemo(() => {
+    const map = new Map<string, number>();
+    if (totalNum <= 0 || splitMembers.length === 0) return map;
+    if (splitMode === "equal") {
+      const shares = distributeCents(totalNum, splitMembers.length);
+      // Map only non-payer members shown in grid
+      splitMembers.forEach((m, i) => {
+        if (m.id !== payerMember?.id) {
+          map.set(m.id, shares[i]);
+        }
+      });
+    } else {
+      splitMembers.forEach((m) => {
+        if (m.id !== payerMember?.id) {
+          const val = parseFloat(customAmounts.get(m.id) || "0") || 0;
+          map.set(m.id, val);
+        }
+      });
+    }
+    return map;
+  }, [totalNum, splitMembers, splitMode, customAmounts, payerMember]);
 
   const handleDistribute = useCallback(() => {
     if (!focusedMemberId || Math.abs(remaining) < 0.01) return;
@@ -460,7 +485,7 @@ export default function ExpenseScreen({
         const { error: rpcError } = await supabase.rpc("edit_expense", {
           p_expense_id: editExpense.id,
           p_amount: numAmount,
-          p_description: "Quick Expense",
+           p_description: description.trim() || "Quick Expense",
           p_splits: JSON.parse(JSON.stringify(splits)),
           p_actor_name: actorName,
           p_expense_type: "split",
@@ -478,7 +503,7 @@ export default function ExpenseScreen({
         const { error: rpcError } = await supabase.rpc("create_expense_with_splits", {
           p_group_id: currentGroup.id,
           p_amount: numAmount,
-          p_description: "Quick Expense",
+          p_description: description.trim() || "Quick Expense",
           p_paid_by_user_id: paidByUserId as string,
           p_paid_by_name: paidByName,
           p_created_by: user.id,
@@ -530,8 +555,8 @@ export default function ExpenseScreen({
 
       {/* Drawer container */}
       <div
-        className="relative w-full max-w-[430px] bg-card rounded-t-[24px] overflow-hidden flex flex-col"
-        style={{ height: "85dvh" }}
+        className="relative w-full max-w-[430px] rounded-t-[24px] overflow-hidden flex flex-col"
+        style={{ height: "85dvh", backgroundColor: "#EFEFEF" }}
       >
         {/* Slide viewport */}
         <div className="flex-1 overflow-hidden min-h-0 relative">
@@ -583,6 +608,18 @@ export default function ExpenseScreen({
                 </span>
               </div>
 
+              {/* Description input */}
+              <div className="px-6 pb-2 flex-shrink-0">
+                <input
+                  type="text"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value.slice(0, 50))}
+                  placeholder="What is it? (e.g Ski Pass)"
+                  className="w-full px-4 py-3 rounded-xl text-sm font-medium text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  style={{ backgroundColor: "white", border: "1px solid #D4D4D4" }}
+                />
+              </div>
+
               {/* Log cost button */}
               <div className={`flex-shrink-0 ${shakeButton ? "animate-shake-x" : ""}`}>
                 <SaveButton
@@ -613,7 +650,12 @@ export default function ExpenseScreen({
                 <div className="flex-1 flex justify-center">
                   <div className="w-10 h-1 rounded-full bg-muted" />
                 </div>
-                <div className="w-9" /> {/* Spacer for centering */}
+                <button
+                  className="w-9 h-9 flex items-center justify-center rounded-full bg-muted"
+                  aria-label="Camera"
+                >
+                  <Camera className="w-5 h-5 text-muted-foreground" />
+                </button>
               </div>
 
               {/* Amount + Payer avatar */}
@@ -661,6 +703,7 @@ export default function ExpenseScreen({
                         onToggle={handleToggleGridMember}
                         currentUserId={user?.id}
                         onAddMember={() => setShowAddMember(true)}
+                        splitAmounts={gridSplitAmounts}
                       />
                     </div>
                   </div>
@@ -739,13 +782,25 @@ export default function ExpenseScreen({
                 </span>
               </div>
 
+              {/* Description input */}
+              <div className="px-6 pb-1 flex-shrink-0">
+                <input
+                  type="text"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value.slice(0, 50))}
+                  placeholder="What is it? (e.g Ski Pass)"
+                  className="w-full px-4 py-3 rounded-xl text-sm font-medium text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  style={{ backgroundColor: "white", border: "1px solid #D4D4D4" }}
+                />
+              </div>
+
               {/* Save button */}
               <div className="flex-shrink-0">
                 <SaveButton
                   active={slide2SaveActive}
                   loading={loading}
                   onClick={handleSave}
-                  label={isEditMode ? "Save changes" : "Log cost"}
+                  label={isEditMode ? "Save changes" : "Add shared expense"}
                 />
               </div>
 

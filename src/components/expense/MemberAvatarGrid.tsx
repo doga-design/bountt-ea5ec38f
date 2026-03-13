@@ -9,6 +9,7 @@ interface MemberAvatarGridProps {
   onToggle: (memberId: string) => void;
   currentUserId: string | undefined;
   onAddMember?: () => void;
+  splitAmounts?: Map<string, number>;
 }
 
 function getSizingTier(memberCount: number) {
@@ -27,6 +28,7 @@ export default function MemberAvatarGrid({
   onToggle,
   currentUserId,
   onAddMember,
+  splitAmounts,
 }: MemberAvatarGridProps) {
   const memberCount = members.length;
   const { avatarSize, fontSize, gap, verticalSpacing } = getSizingTier(memberCount);
@@ -64,7 +66,8 @@ export default function MemberAvatarGrid({
             pointerEvents: "none",
           }}
         >
-          {members.map((_, i) => {
+          {members.map((m, i) => {
+            if (!activeIds.has(m.id)) return null;
             const endX = slotWidth * i + slotWidth / 2;
             const endY = SVG_HEIGHT;
             const ctrlX = endX;
@@ -156,6 +159,15 @@ export default function MemberAvatarGrid({
                 }}
               >
                 {isSelf ? "You" : m.name}
+                {isActive && splitAmounts?.has(m.id) && (
+                  <span style={{ color: "hsl(var(--muted-foreground))", fontWeight: 500 }}>
+                    {" · $"}
+                    {(() => {
+                      const val = splitAmounts.get(m.id)!;
+                      return val % 1 === 0 ? val.toFixed(0) : val.toFixed(2);
+                    })()}
+                  </span>
+                )}
               </span>
             </button>
           );
