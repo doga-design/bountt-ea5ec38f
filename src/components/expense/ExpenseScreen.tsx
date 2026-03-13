@@ -215,6 +215,29 @@ export default function ExpenseScreen({
   const remaining = totalNum - customSum;
   const isBalanced = Math.abs(remaining) < 0.01 && totalNum > 0;
 
+  // Live split amounts for grid display
+  const gridSplitAmounts = useMemo(() => {
+    const map = new Map<string, number>();
+    if (totalNum <= 0 || splitMembers.length === 0) return map;
+    if (splitMode === "equal") {
+      const shares = distributeCents(totalNum, splitMembers.length);
+      // Map only non-payer members shown in grid
+      splitMembers.forEach((m, i) => {
+        if (m.id !== payerMember?.id) {
+          map.set(m.id, shares[i]);
+        }
+      });
+    } else {
+      splitMembers.forEach((m) => {
+        if (m.id !== payerMember?.id) {
+          const val = parseFloat(customAmounts.get(m.id) || "0") || 0;
+          map.set(m.id, val);
+        }
+      });
+    }
+    return map;
+  }, [totalNum, splitMembers, splitMode, customAmounts, payerMember]);
+
   const handleDistribute = useCallback(() => {
     if (!focusedMemberId || Math.abs(remaining) < 0.01) return;
     const newAmounts = new Map(customAmounts);
