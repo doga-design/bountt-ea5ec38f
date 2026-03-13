@@ -532,8 +532,8 @@ export default function ExpenseScreen({
 
       {/* Drawer container */}
       <div
-        className="relative w-full max-w-[430px] bg-card rounded-t-[24px] overflow-hidden flex flex-col"
-        style={{ height: "85dvh" }}
+        className="relative w-full max-w-[430px] rounded-t-[24px] overflow-hidden flex flex-col"
+        style={{ height: "85dvh", backgroundColor: "#EFEFEF" }}
       >
         {/* Slide viewport */}
         <div className="flex-1 overflow-hidden min-h-0 relative">
