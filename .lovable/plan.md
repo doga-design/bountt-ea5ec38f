@@ -1,88 +1,104 @@
-# Redesign "ALL MEMBERS" Section — Circular Avatar Row
+# Implementation Plan: 5 Changes to Expense Screen
 
-## Overview
+## Audit Summary
 
-Replace the current wide card-based `MemberCardScroll` with a circular avatar row matching the reference screenshots. Add inline placeholder invite card with slide-down animation.
 
-## Files to Change
+| Question                | Answer                                                                    |
+| ----------------------- | ------------------------------------------------------------------------- |
+| Sheet background        | `bg-card` (white) on line 533 of ExpenseScreen.tsx                        |
+| Description input       | Does NOT exist — hardcoded `"Quick Expense"` at line 463                  |
+| Particle effect         | MemberAvatarGrid.tsx lines 85-103, SVG animateMotion, runs on ALL members |
+| Dotted lines            | Drawn to ALL members, not filtered by selection                           |
+| Per-member split amount | NOT displayed below avatars                                               |
+| Live split reactivity   | Shares computed but never shown per-member in equal mode                  |
+| Camera button           | Does not exist                                                            |
 
-### 1. New: `src/components/dashboard/MemberAvatarRow.tsx`
 
-Complete replacement for `MemberCardScroll`. Contains all logic for the new row.
+---
 
-**Structure:**
+## Change 1 — Sheet background to #EFEFEF
 
-```text
-┌─ "ALL MEMBERS" label (tracking-wider, text-xs, muted, uppercase) ─┐
-│                                                                     │
-│  ○ You    ○ Kyle    ○ Matt    ◐ (pie icon, disabled)               │
-│  (green   (ghost   (green                                           │
-│   dot)    emoji)    dot)                                            │
-│                                                                     │
-│  ┌─ Inline invite card (slide-down, only for placeholders) ──────┐ │
-│  │ 👻  "Kyle is still a placeholder..."                          │ │
-│  │     [ Invite Kyle → ]                                         │ │
-│  └───────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────┘
-```
+**File:** `src/components/expense/ExpenseScreen.tsx` line 533  
+**Change:** Replace `bg-card` with inline style `backgroundColor: '#EFEFEF'` on the drawer container div. Only this element changes — all child inputs, cards, buttons keep their existing backgrounds.
 
-**Props:** `members`, `currentUserId`, `groupInviteCode?`
+---
 
-**Key implementation details:**
+## Change 2 — Cost name input above save button
 
-- Sort members: current user first, then real (non-placeholder active) members, then placeholders
-- Each avatar: 56px circle with `getAvatarColor` background, `getAvatarImage` PNG inside  
-Use the existing avatar utilities:
-  - getAvatarImage(member) → returns the PNG import for that member
-  - member.avatar_color → the hex color string for the circle background
-  Both are already in src/lib/avatar-utils.ts — do not create new functions.
-- Name label below: 12px, current user shows "You"
-- Green dot (10px, `#22C55E`): positioned top-right for real joined members
-- Ghost emoji overlay: positioned top-right for placeholder members (small, ~16px badge)
-- Active/selected state: `#D94F00` ring border (2.5px) — "You" selected by default
-- Pie chart icon at end: 56px circle, light gray border, clock/pie icon inside, `opacity: 0.4`, `pointer-events: none`
-- `useState` for `selectedMemberId` (defaults to current user's member ID)
-- `useState` for `inviteCardMemberId` (null by default)
-- Tapping placeholder: set as selected + show invite card with CSS transition (`max-height` + `opacity` animation)
-- Tapping real member: set as selected, clear invite card
-- Tapping outside (click-away): dismiss invite card
-- `// TODO: filter feed by selected member`
+**File:** `src/components/expense/ExpenseScreen.tsx`  
 
-**Invite card (inline, not modal):**
+Add a `description` state variable (line ~39). Add a text input above the "Add shared expense" / "Log cost" SaveButton on Slide 2 (before line 743). Specs:
 
-- Rounded card, light background, padding
-- Ghost icon on left
-- Text: `<span className="text-orange-600 font-semibold">{name}</span> is still a placeholder...`
-- Button: dark navy (`#1E293B`), full-width, "Invite {name} →"
-- Button copies invite link or navigates to invite flow; The "Invite [Name] →" button should copy the group invite link to clipboard (using navigator.clipboard.writeText) 
-  and show a brief toast: "Invite link copied!". 
-  Do not open a new sheet or navigate away.
-- Slide-down animation: `transition-all duration-300` with conditional `max-height`/`opacity`
+- White background, 1px `#D4D4D4` border, rounded-xl, full width, comfortable padding
+- Placeholder: `What is it? (e.g Ski Pass)` with "What is it?" portion bold — implement as a single input with the placeholder styled via the `placeholder:` CSS pseudo-class (bold prefix not achievable in pure placeholder, so render as a styled single input matching the reference image)
+- Wire to `description` state, max 50 chars
+- Replace hardcoded `"Quick Expense"` at lines 463 and 480 with `description.trim() || "Quick Expense"`
+- Reset `description` to `""` when drawer opens (in the useEffect at line 69)
 
-### 2. Modify: `src/pages/Dashboard.tsx`
+Also add same input on Slide 1, between the "I am covering" text and the "Log cost" button (matching reference image position). Both inputs share the same `description` state so edits on either slide persist.
 
-- Replace `MemberCardScroll` import with `MemberAvatarRow`
-- Replace the `<MemberCardScroll ... />` usage (lines 130-138) with:
+---
 
-```tsx
-<div className="mt-4">
-  <MemberAvatarRow
-    members={groupMembers}
-    currentUserId={user?.id ?? ""}
-    groupInviteCode={currentGroup?.invite_code}
-  />
-</div>
-```
+## Change 3 — Camera button top-right of Slide 2
 
-- Remove `MemberDetailSheet` trigger from member tap (the old `onCardClick={setSelectedMember}` flow is replaced by the new inline selection)
-- Keep `MemberDetailSheet` available but don't wire it to the new row (the new row handles its own interaction) In Dashboard.tsx, remove the selectedMember useState and 
-  setSelectedMember calls entirely if they were only used 
-  by MemberCardScroll. Do not leave orphaned state.
+**File:** `src/components/expense/ExpenseScreen.tsx`  
 
-### 3. Keep (no changes): `MemberCardScroll.tsx`, `MemberCard.tsx`
+In the Slide 2 top bar (line 606-617), replace the empty spacer `<div className="w-9" />` with a circular camera icon button:
 
-These files become unused by the dashboard but are left in place in case other screens reference them. Can be cleaned up later.
+- Import `Camera` from lucide-react
+- 36x36px (w-9 h-9), rounded-full, `bg-muted` background, Camera icon centered
+- No onClick handler — purely decorative/non-functional
+- Visually matches the back button on the left
 
-### Not touched
+---
 
-ExpenseScreen, numpad, expense logic, AppContext, Supabase queries, feed cards — none modified.
+## Change 4 — Dotted lines and particles only for selected members
+
+**File:** `src/components/expense/MemberAvatarGrid.tsx`  
+
+The SVG section (lines 67-106) currently iterates `members.map` and draws a line + particle for every member. Change:
+
+- Pass `activeIds` into the SVG rendering loop
+- For each member at index `i`, check `activeIds.has(members[i].id)`. If false, skip rendering that `<g>` element entirely (no path, no circle, no animation)
+- When a member is toggled, the line and particle appear/disappear reactively since `activeIds` is already a prop that triggers re-render
+
+No changes to animation timing, style, or color. Only gate rendering by selection state.
+
+---
+
+## Change 5 — Live split amount below each avatar
+
+**File:** `src/components/expense/MemberAvatarGrid.tsx`  
+
+Add new props: `splitAmounts?: Map<string, number>` (per-member dollar amount).
+
+Below each member's name label (line 158), render the split amount:
+
+- Format: `· $X.XX` (with `.00` dropped for round numbers per existing formatting rules)
+- Only shown when the member is active/selected AND splitAmounts has a value for them
+- Uses same `fontSize` tier as the name, muted-foreground color
+- Combined into the name line: `"Kyle · $5"` as shown in reference image
+
+**File:** `src/components/expense/ExpenseScreen.tsx`  
+
+Compute `gridSplitAmounts` as a `Map<string, number>` that updates reactively:
+
+- Equal mode: `distributeCents(totalNum, splitMembers.length)` → map each non-payer member to their share. Recomputes on every `amount` or `activeIds` change.
+- Custom mode: read from `customAmounts` map for each grid member.
+- Pass as prop to `MemberAvatarGrid`.
+
+This uses `useMemo` depending on `amount`, `activeIds`, `splitMode`, `customAmounts`, `splitMembers`, and `gridMembers`. Division by zero guarded: if `splitMembers.length === 0` or `totalNum === 0`, all amounts are 0.
+
+## Notes
+
+- For gridSplitAmounts, compute using the filtered splitMembers array that already excludes the payer — the same array used to build the RPC payload, not the unfiltered one used for equal distribution math.
+- For the description input, use a single input field with a single placeholder string — do not attempt to render bold prefix text inside the input field. Simple styled input only.
+
+---
+
+## Files touched
+
+1. `src/components/expense/ExpenseScreen.tsx` — Changes 1, 2, 3, 5
+2. `src/components/expense/MemberAvatarGrid.tsx` — Changes 4, 5
+
+No other files modified. No new dependencies. No settlement/RPC/data layer changes.
