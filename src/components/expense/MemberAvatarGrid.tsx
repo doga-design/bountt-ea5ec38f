@@ -28,6 +28,7 @@ export default function MemberAvatarGrid({
   onToggle,
   currentUserId,
   onAddMember,
+  splitAmounts,
 }: MemberAvatarGridProps) {
   const memberCount = members.length;
   const { avatarSize, fontSize, gap, verticalSpacing } = getSizingTier(memberCount);
