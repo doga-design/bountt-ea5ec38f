@@ -25,6 +25,7 @@ export default function GroupSettings() {
     expenseSplits,
     addPlaceholderMember,
     removeMember,
+    settleAndRemoveMember,
     groupsLoading,
   } = useApp();
   const { toast } = useToast();
