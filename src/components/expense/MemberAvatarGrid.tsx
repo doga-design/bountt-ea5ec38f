@@ -159,6 +159,15 @@ export default function MemberAvatarGrid({
                 }}
               >
                 {isSelf ? "You" : m.name}
+                {isActive && splitAmounts?.has(m.id) && (
+                  <span style={{ color: "hsl(var(--muted-foreground))", fontWeight: 500 }}>
+                    {" · $"}
+                    {(() => {
+                      const val = splitAmounts.get(m.id)!;
+                      return val % 1 === 0 ? val.toFixed(0) : val.toFixed(2);
+                    })()}
+                  </span>
+                )}
               </span>
             </button>
           );
