@@ -495,10 +495,13 @@ export default function ExpenseDetailSheet({
                           actionLabel = "Deleted";
                         }
 
+                        const snapshotPayerName = (log.expense_snapshot as any)?.paid_by_name ?? "Someone";
+                        const paidByLabel = expense?.paid_by_user_id === user?.id ? "You" : snapshotPayerName;
+
                         return (
                           <div key={log.id} className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground">
-                              {logDate} · {actorLabel} {actionLabel}
+                              {logDate} · {log.action_type === "added" ? paidByLabel : actorLabel} {actionLabel}
                             </span>
                             {amount != null && (
                               <span className="font-medium text-foreground">
