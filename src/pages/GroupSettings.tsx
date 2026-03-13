@@ -129,6 +129,12 @@ export default function GroupSettings() {
             toast({ title: `${selectedMember.name} removed` });
           }
         }}
+        onSettleAndRemove={async () => {
+          if (selectedMember && groupId) {
+            await settleAndRemoveMember(groupId, selectedMember.id);
+            setSelectedMember(null);
+          }
+        }}
       />
     </div>
   );
