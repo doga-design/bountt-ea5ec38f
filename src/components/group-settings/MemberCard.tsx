@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { GroupMember } from "@/types";
+import { GroupMember, ExpenseSplit } from "@/types";
 import { User, Shield } from "lucide-react";
 import {
   AlertDialog,
@@ -17,15 +17,24 @@ interface MemberCardProps {
   currentUserId: string;
   isAdmin: boolean;
   onRemove: () => void;
+  onSettleAndRemove?: () => void;
+  expenseSplits?: ExpenseSplit[];
   type: "active" | "placeholder" | "former";
 }
 
-export default function MemberCard({ member, currentUserId, isAdmin, onRemove, type }: MemberCardProps) {
+export default function MemberCard({ member, currentUserId, isAdmin, onRemove, onSettleAndRemove, expenseSplits, type }: MemberCardProps) {
   const [offsetX, setOffsetX] = useState(0);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmType, setConfirmType] = useState<"simple" | "unsettled" | null>(null);
   const startX = useRef(0);
   const isSelf = member.user_id === currentUserId;
   const canSwipe = isAdmin && !isSelf && type !== "former";
+
+  const hasUnsettledSplits = (expenseSplits ?? []).some(
+    (s) =>
+      !s.is_settled &&
+      ((member.user_id && s.user_id === member.user_id) ||
+        (!member.user_id && s.member_name === member.name && !s.user_id))
+  );
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (!canSwipe) return;
@@ -41,7 +50,11 @@ export default function MemberCard({ member, currentUserId, isAdmin, onRemove, t
   const handleTouchEnd = () => {
     if (!canSwipe) return;
     if (offsetX < -60) {
-      setShowConfirm(true);
+      if (hasUnsettledSplits) {
+        setConfirmType("unsettled");
+      } else {
+        setConfirmType("simple");
+      }
     }
     setOffsetX(0);
   };
@@ -105,7 +118,8 @@ export default function MemberCard({ member, currentUserId, isAdmin, onRemove, t
         </div>
       </div>
 
-      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+      {/* Simple removal confirmation */}
+      <AlertDialog open={confirmType === "simple"} onOpenChange={(o) => !o && setConfirmType(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove {member.name}?</AlertDialogTitle>
@@ -115,8 +129,32 @@ export default function MemberCard({ member, currentUserId, isAdmin, onRemove, t
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={onRemove} className="bg-destructive text-destructive-foreground">
+            <AlertDialogAction onClick={onRemove}>
               Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unsettled splits confirmation */}
+      <AlertDialog open={confirmType === "unsettled"} onOpenChange={(o) => !o && setConfirmType(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsettled costs</AlertDialogTitle>
+            <AlertDialogDescription>
+              {member.name} still has unsettled costs in this group. Settle everything before they leave?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={onRemove}
+              className="bg-muted text-foreground hover:bg-muted/80"
+            >
+              Remove anyway
+            </AlertDialogAction>
+            <AlertDialogAction onClick={onSettleAndRemove}>
+              Yes, settle all
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
