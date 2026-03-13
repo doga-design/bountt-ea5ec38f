@@ -627,7 +627,12 @@ export default function ExpenseScreen({
                 <div className="flex-1 flex justify-center">
                   <div className="w-10 h-1 rounded-full bg-muted" />
                 </div>
-                <div className="w-9" /> {/* Spacer for centering */}
+                <button
+                  className="w-9 h-9 flex items-center justify-center rounded-full bg-muted"
+                  aria-label="Camera"
+                >
+                  <Camera className="w-5 h-5 text-muted-foreground" />
+                </button>
               </div>
 
               {/* Amount + Payer avatar */}
