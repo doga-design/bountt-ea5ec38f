@@ -462,7 +462,7 @@ export default function ExpenseScreen({
         const { error: rpcError } = await supabase.rpc("edit_expense", {
           p_expense_id: editExpense.id,
           p_amount: numAmount,
-          p_description: "Quick Expense",
+           p_description: description.trim() || "Quick Expense",
           p_splits: JSON.parse(JSON.stringify(splits)),
           p_actor_name: actorName,
           p_expense_type: "split",
