@@ -703,6 +703,8 @@ export default function ExpenseScreen({
                         onToggle={handleToggleGridMember}
                         currentUserId={user?.id}
                         onAddMember={() => setShowAddMember(true)}
+                        splitAmounts={gridSplitAmounts}
+                      />
                       />
                     </div>
                   </div>
