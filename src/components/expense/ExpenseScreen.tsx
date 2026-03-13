@@ -37,6 +37,7 @@ export default function ExpenseScreen({
 
   const [slide, setSlide] = useState<1 | 2>(1);
   const [amount, setAmount] = useState("0");
+  const [description, setDescription] = useState("");
   const [splitMode, setSplitMode] = useState<"equal" | "custom">("equal");
   const [activeIds, setActiveIds] = useState<Set<string>>(new Set());
   const [focusedMemberId, setFocusedMemberId] = useState<string | null>(null);
