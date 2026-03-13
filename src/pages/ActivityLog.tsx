@@ -150,6 +150,8 @@ function ActivityCard({ entry, currentUserId }: { entry: ActivityLogEntry; curre
               <span className="text-muted-foreground">
                 {entry.change_detail?.[0]?.field === "settled_all"
                   ? "settled "
+                  : entry.change_detail?.[0]?.field === "settled_member"
+                  ? `settled ${entry.change_detail[0].new_value}'s share of `
                   : "settled their share of "}
               </span>
               {entry.expense_snapshot && (
