@@ -9,6 +9,7 @@ interface MemberAvatarGridProps {
   onToggle: (memberId: string) => void;
   currentUserId: string | undefined;
   onAddMember?: () => void;
+  splitAmounts?: Map<string, number>;
 }
 
 function getSizingTier(memberCount: number) {
