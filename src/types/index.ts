@@ -137,6 +137,7 @@ export interface AppContextValue extends AppState {
   fetchMembers: (groupId: string) => Promise<void>;
   addPlaceholderMember: (groupId: string, name: string) => Promise<GroupMember | null>;
   removeMember: (memberId: string) => Promise<void>;
+  settleAndRemoveMember: (groupId: string, memberId: string) => Promise<void>;
   leaveGroup: (groupId: string) => Promise<void>;
 
   // Expense actions

@@ -118,8 +118,11 @@ function ActivityCard({ entry, currentUserId }: { entry: ActivityLogEntry; curre
 
   if (entry.action_type === "settled" && entry.change_detail) {
     const isSettleAll = entry.change_detail[0]?.field === "settled_all";
+    const isSettleMember = entry.change_detail[0]?.field === "settled_member";
     const text = isSettleAll
       ? `settled for everyone`
+      : isSettleMember
+      ? `settled ${entry.change_detail[0].new_value}'s share`
       : `settled their share`;
     pills.push(
       <span key="settled" className={`inline-block text-xs px-2 py-0.5 rounded-full ${config.pillBg} ${config.pillText} font-medium`}>
@@ -147,6 +150,8 @@ function ActivityCard({ entry, currentUserId }: { entry: ActivityLogEntry; curre
               <span className="text-muted-foreground">
                 {entry.change_detail?.[0]?.field === "settled_all"
                   ? "settled "
+                  : entry.change_detail?.[0]?.field === "settled_member"
+                  ? `settled ${entry.change_detail[0].new_value}'s share of `
                   : "settled their share of "}
               </span>
               {entry.expense_snapshot && (

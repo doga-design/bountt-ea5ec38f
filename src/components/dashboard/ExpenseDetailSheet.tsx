@@ -250,6 +250,8 @@ export default function ExpenseDetailSheet({
       toast({ title: "Expense fully settled" });
       // Don't call onSettled here — auto-close effect handles it via celebratePendingRef
     } catch (err) {
+      setSlideCompleted(false);
+      setSlideX(0);
       toast({ title: err instanceof Error ? err.message : "Something went wrong.", variant: "destructive" });
     } finally {
       setSettleAllLoading(false);
@@ -511,7 +513,7 @@ export default function ExpenseDetailSheet({
                 )}
 
                 {/* Slide to settle — payer only, divider above */}
-                {isPayer && hasUnsettledSplits && !expenseFullySettled && (
+                {isPayer && hasUnsettledSplits && !expenseFullySettled && nonPayerSplits.length > 1 && (
                   <>
                     <div className="h-px bg-border mb-3" />
                     <div

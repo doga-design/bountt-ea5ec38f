@@ -25,6 +25,7 @@ export default function GroupSettings() {
     expenseSplits,
     addPlaceholderMember,
     removeMember,
+    settleAndRemoveMember,
     groupsLoading,
   } = useApp();
   const { toast } = useToast();
@@ -126,6 +127,12 @@ export default function GroupSettings() {
             await removeMember(selectedMember.id);
             setSelectedMember(null);
             toast({ title: `${selectedMember.name} removed` });
+          }
+        }}
+        onSettleAndRemove={async () => {
+          if (selectedMember && groupId) {
+            await settleAndRemoveMember(groupId, selectedMember.id);
+            setSelectedMember(null);
           }
         }}
       />
