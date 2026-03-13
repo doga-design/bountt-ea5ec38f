@@ -480,7 +480,7 @@ export default function ExpenseScreen({
         const { error: rpcError } = await supabase.rpc("create_expense_with_splits", {
           p_group_id: currentGroup.id,
           p_amount: numAmount,
-          p_description: "Quick Expense",
+          p_description: description.trim() || "Quick Expense",
           p_paid_by_user_id: paidByUserId as string,
           p_paid_by_name: paidByName,
           p_created_by: user.id,
