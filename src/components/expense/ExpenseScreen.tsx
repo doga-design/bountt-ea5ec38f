@@ -705,7 +705,6 @@ export default function ExpenseScreen({
                         onAddMember={() => setShowAddMember(true)}
                         splitAmounts={gridSplitAmounts}
                       />
-                      />
                     </div>
                   </div>
                 )}
