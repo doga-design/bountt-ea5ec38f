@@ -96,7 +96,10 @@ export default function ExpenseDetailSheet({
   // Build subtitle
   const payerLabel = isPayer ? "You" : (expense?.paid_by_name ?? "");
   const otherSplitNames = expenseSplits
-    .filter((s) => s.user_id !== expense?.paid_by_user_id)
+    .filter((s) => {
+      if (expense?.paid_by_user_id) return s.user_id !== expense.paid_by_user_id;
+      return s.member_name !== expense?.paid_by_name;
+    })
     .map((s) => (s.user_id === user?.id ? "You" : s.member_name));
   const subtitle = `${payerLabel} paid, splitting with ${otherSplitNames.join(" & ")}`;
 
@@ -113,7 +116,10 @@ export default function ExpenseDetailSheet({
   }) : "";
 
   // Build spoke members — exclude payer
-  const nonPayerSplits = expenseSplits.filter((s) => s.user_id !== expense?.paid_by_user_id);
+  const nonPayerSplits = expenseSplits.filter((s) => {
+    if (expense?.paid_by_user_id) return s.user_id !== expense.paid_by_user_id;
+    return s.member_name !== expense?.paid_by_name;
+  });
   const spokeMembers: SpokeMember[] = nonPayerSplits.map((s) => {
     const member = groupMembers.find(
       (m) =>
@@ -131,9 +137,9 @@ export default function ExpenseDetailSheet({
   });
 
   // Payer member
-  const payerMember = groupMembers.find(
-    (m) => m.user_id === expense?.paid_by_user_id && m.status === "active"
-  ) ?? null;
+  const payerMember = expense?.paid_by_user_id
+    ? groupMembers.find((m) => m.user_id === expense.paid_by_user_id && m.status === "active") ?? null
+    : groupMembers.find((m) => m.name.toLowerCase() === expense?.paid_by_name?.toLowerCase() && m.is_placeholder && m.status === "active") ?? null;
 
   // Settled state members — exclude payer
   const settledMembers = nonPayerSplits.map((s) => {
@@ -351,7 +357,7 @@ export default function ExpenseDetailSheet({
 
             {/* Right: action buttons */}
             <div className="flex items-center gap-2 shrink-0">
-              {isCreator && !expenseFullySettled && (
+              {isCreator && !expenseFullySettled && !nonPayerSplits.some((s) => s.is_settled) && (
                 <button
                   onClick={() => {
                     onEdit(expense, expenseSplits);

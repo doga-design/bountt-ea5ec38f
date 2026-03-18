@@ -282,6 +282,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setExpenseSplits((data as ExpenseSplit[]) ?? []);
     } catch (err) {
       if (import.meta.env.DEV) console.error("Failed to fetch expense splits", err);
+      toast({ title: "Couldn't load expense details. Pull to refresh.", variant: "destructive" });
     }
   }, []);
 
@@ -477,7 +478,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .subscribe();
 
     // Realtime subscription for expense_splits (settlement updates)
-    // Client-side guard: only react to events for splits belonging to current group's expenses
+    // NOTE: expense_splits has no group_id column, so no server-side filter is possible.
+    // All split changes across all groups trigger a refetch for the current group.
+    // This is a known post-launch optimization — adding group_id to expense_splits
+    // would require a non-trivial schema migration and backfill.
     splitsChannelRef.current = supabase
       .channel(`splits:${currentGroup.id}`)
       .on(
