@@ -137,9 +137,9 @@ export default function ExpenseDetailSheet({
   });
 
   // Payer member
-  const payerMember = groupMembers.find(
-    (m) => m.user_id === expense?.paid_by_user_id && m.status === "active"
-  ) ?? null;
+  const payerMember = expense?.paid_by_user_id
+    ? groupMembers.find((m) => m.user_id === expense.paid_by_user_id && m.status === "active") ?? null
+    : groupMembers.find((m) => m.name.toLowerCase() === expense?.paid_by_name?.toLowerCase() && m.is_placeholder && m.status === "active") ?? null;
 
   // Settled state members — exclude payer
   const settledMembers = nonPayerSplits.map((s) => {
