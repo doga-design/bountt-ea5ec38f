@@ -20,7 +20,11 @@ export default function Splash() {
     if (user) {
       if (groupsLoading) return; // wait for groups to resolve
       if (userGroups.length > 0) {
-        navigate(`/dashboard/${userGroups[0].id}`, { replace: true });
+        const lastGroupId = localStorage.getItem("bountt_last_group_id");
+        const targetGroup = lastGroupId && userGroups.find((g) => g.id === lastGroupId)
+          ? lastGroupId
+          : userGroups[0].id;
+        navigate(`/dashboard/${targetGroup}`, { replace: true });
       } else {
         navigate("/groups/empty", { replace: true });
       }

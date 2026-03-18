@@ -80,7 +80,10 @@ export default function Dashboard() {
   useEffect(() => {
     if (groupId) {
       const group = userGroups.find((g) => g.id === groupId);
-      if (group) setCurrentGroup(group);
+      if (group) {
+        setCurrentGroup(group);
+        localStorage.setItem("bountt_last_group_id", groupId);
+      }
     }
   }, [groupId, userGroups]);
 

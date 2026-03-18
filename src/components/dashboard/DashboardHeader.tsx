@@ -1,4 +1,4 @@
-import { Settings, Plus } from "lucide-react";
+import { Settings, Plus, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
@@ -91,7 +91,13 @@ export default function DashboardHeader({ onAddMember, showBalance = false }: Da
 
         {/* Bottom row: group name + balance */}
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-primary-foreground">{currentGroup.name}</h1>
+          <button
+            onClick={() => navigate("/groups")}
+            className="flex items-center gap-1"
+          >
+            <h1 className="text-2xl font-bold text-primary-foreground">{currentGroup.name}</h1>
+            <ChevronDown className="w-4 h-4 text-primary-foreground" />
+          </button>
           {showBalance && <BalancePill />}
         </div>
       </div>
