@@ -478,7 +478,11 @@ export default function ExpenseScreen({
       }
 
       // Remove payer from splits — payer is represented by paid_by_user_id, not a split row
-      splits = splits.filter((s) => s.user_id !== paidByUserId);
+      // NULL-safe: when payer is a placeholder (null user_id), filter by name instead
+      splits = splits.filter((s) => {
+        if (paidByUserId) return s.user_id !== paidByUserId;
+        return s.member_name !== paidByName;
+      });
 
       if (isEditMode && editExpense) {
         const actorName = profile?.display_name ?? user.email?.split("@")[0] ?? "Unknown";

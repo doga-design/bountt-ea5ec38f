@@ -357,7 +357,7 @@ export default function ExpenseDetailSheet({
 
             {/* Right: action buttons */}
             <div className="flex items-center gap-2 shrink-0">
-              {isCreator && !expenseFullySettled && (
+              {isCreator && !expenseFullySettled && !nonPayerSplits.some((s) => s.is_settled) && (
                 <button
                   onClick={() => {
                     onEdit(expense, expenseSplits);
