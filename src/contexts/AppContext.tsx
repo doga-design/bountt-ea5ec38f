@@ -282,6 +282,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setExpenseSplits((data as ExpenseSplit[]) ?? []);
     } catch (err) {
       if (import.meta.env.DEV) console.error("Failed to fetch expense splits", err);
+      toast({ title: "Couldn't load expense details. Pull to refresh.", variant: "destructive" });
     }
   }, []);
 
