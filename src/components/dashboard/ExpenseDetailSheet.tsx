@@ -116,7 +116,10 @@ export default function ExpenseDetailSheet({
   }) : "";
 
   // Build spoke members — exclude payer
-  const nonPayerSplits = expenseSplits.filter((s) => s.user_id !== expense?.paid_by_user_id);
+  const nonPayerSplits = expenseSplits.filter((s) => {
+    if (expense?.paid_by_user_id) return s.user_id !== expense.paid_by_user_id;
+    return s.member_name !== expense?.paid_by_name;
+  });
   const spokeMembers: SpokeMember[] = nonPayerSplits.map((s) => {
     const member = groupMembers.find(
       (m) =>
