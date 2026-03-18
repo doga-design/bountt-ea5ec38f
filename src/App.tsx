@@ -53,7 +53,7 @@ const App = () => (
               <Route path="/dashboard/:groupId" element={<AuthGuard><Dashboard /></AuthGuard>} />
 
               {/* Protected — Phase 2 stubs */}
-              <Route path="/groups" element={<AuthGuard><ComingSoon title="All Groups — Phase 2" /></AuthGuard>} />
+              <Route path="/groups" element={<AuthGuard><Groups /></AuthGuard>} />
               <Route path="/groups/:groupId/members" element={<AuthGuard><ComingSoon title="Members — Phase 2" /></AuthGuard>} />
               <Route path="/groups/:groupId/settings" element={<AuthGuard><GroupSettings /></AuthGuard>} />
               <Route path="/groups/:groupId/activity" element={<AuthGuard><ActivityLog /></AuthGuard>} />
