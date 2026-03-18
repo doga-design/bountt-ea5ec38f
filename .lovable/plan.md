@@ -1,88 +1,126 @@
-# Redesign "ALL MEMBERS" Section — Circular Avatar Row
+# Fix 6 Confirmed Bugs — Single Pass
 
-## Overview
+## Fix 1 — Placeholder payer split row leaks into database (CRITICAL)
 
-Replace the current wide card-based `MemberCardScroll` with a circular avatar row matching the reference screenshots. Add inline placeholder invite card with slide-down animation.
+**Client side — `ExpenseScreen.tsx` line 481:**
+Replace the filter with a NULL-safe version using `paidByName` (available at line 457):
 
-## Files to Change
-
-### 1. New: `src/components/dashboard/MemberAvatarRow.tsx`
-
-Complete replacement for `MemberCardScroll`. Contains all logic for the new row.
-
-**Structure:**
-
-```text
-┌─ "ALL MEMBERS" label (tracking-wider, text-xs, muted, uppercase) ─┐
-│                                                                     │
-│  ○ You    ○ Kyle    ○ Matt    ◐ (pie icon, disabled)               │
-│  (green   (ghost   (green                                           │
-│   dot)    emoji)    dot)                                            │
-│                                                                     │
-│  ┌─ Inline invite card (slide-down, only for placeholders) ──────┐ │
-│  │ 👻  "Kyle is still a placeholder..."                          │ │
-│  │     [ Invite Kyle → ]                                         │ │
-│  └───────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────┘
+```typescript
+splits = splits.filter((s) => {
+  if (paidByUserId) return s.user_id !== paidByUserId;
+  return s.member_name !== paidByName;
+});
 ```
 
-**Props:** `members`, `currentUserId`, `groupInviteCode?`
+**Server side — DB migration for both RPCs:**
 
-**Key implementation details:**
+In `create_expense_with_splits`, replace the safety-net DELETE:
 
-- Sort members: current user first, then real (non-placeholder active) members, then placeholders
-- Each avatar: 56px circle with `getAvatarColor` background, `getAvatarImage` PNG inside  
-Use the existing avatar utilities:
-  - getAvatarImage(member) → returns the PNG import for that member
-  - member.avatar_color → the hex color string for the circle background
-  Both are already in src/lib/avatar-utils.ts — do not create new functions.
-- Name label below: 12px, current user shows "You"
-- Green dot (10px, `#22C55E`): positioned top-right for real joined members
-- Ghost emoji overlay: positioned top-right for placeholder members (small, ~16px badge)
-- Active/selected state: `#D94F00` ring border (2.5px) — "You" selected by default
-- Pie chart icon at end: 56px circle, light gray border, clock/pie icon inside, `opacity: 0.4`, `pointer-events: none`
-- `useState` for `selectedMemberId` (defaults to current user's member ID)
-- `useState` for `inviteCardMemberId` (null by default)
-- Tapping placeholder: set as selected + show invite card with CSS transition (`max-height` + `opacity` animation)
-- Tapping real member: set as selected, clear invite card
-- Tapping outside (click-away): dismiss invite card
-- `// TODO: filter feed by selected member`
-
-**Invite card (inline, not modal):**
-
-- Rounded card, light background, padding
-- Ghost icon on left
-- Text: `<span className="text-orange-600 font-semibold">{name}</span> is still a placeholder...`
-- Button: dark navy (`#1E293B`), full-width, "Invite {name} →"
-- Button copies invite link or navigates to invite flow; The "Invite [Name] →" button should copy the group invite link to clipboard (using navigator.clipboard.writeText) 
-  and show a brief toast: "Invite link copied!". 
-  Do not open a new sheet or navigate away.
-- Slide-down animation: `transition-all duration-300` with conditional `max-height`/`opacity`
-
-### 2. Modify: `src/pages/Dashboard.tsx`
-
-- Replace `MemberCardScroll` import with `MemberAvatarRow`
-- Replace the `<MemberCardScroll ... />` usage (lines 130-138) with:
-
-```tsx
-<div className="mt-4">
-  <MemberAvatarRow
-    members={groupMembers}
-    currentUserId={user?.id ?? ""}
-    groupInviteCode={currentGroup?.invite_code}
-  />
-</div>
+```sql
+DELETE FROM expense_splits
+WHERE expense_id = v_expense_id
+  AND (
+    (p_paid_by_user_id IS NOT NULL AND user_id = p_paid_by_user_id)
+    OR (p_paid_by_user_id IS NULL AND user_id IS NULL AND member_name = p_paid_by_name)
+  );
 ```
 
-- Remove `MemberDetailSheet` trigger from member tap (the old `onCardClick={setSelectedMember}` flow is replaced by the new inline selection)
-- Keep `MemberDetailSheet` available but don't wire it to the new row (the new row handles its own interaction) In Dashboard.tsx, remove the selectedMember useState and 
-  setSelectedMember calls entirely if they were only used 
-  by MemberCardScroll. Do not leave orphaned state.
+In `edit_expense`, apply the identical fix to its safety-net DELETE (replacing `v_old_expense.paid_by_user_id` with the same pattern, using `v_old_expense.paid_by_name` for the name match).
 
-### 3. Keep (no changes): `MemberCardScroll.tsx`, `MemberCard.tsx`
+One migration, both RPCs updated.
 
-These files become unused by the dashboard but are left in place in case other screens reference them. Can be cleaned up later.
+---
 
-### Not touched
+## Fix 2 — nonPayerSplits excludes all placeholders when payer is placeholder (CRITICAL)
 
-ExpenseScreen, numpad, expense logic, AppContext, Supabase queries, feed cards — none modified.
+**File: `ExpenseDetailSheet.tsx` lines 99 and 116**
+
+Replace both `.filter((s) => s.user_id !== expense?.paid_by_user_id)` with:
+
+```typescript
+.filter((s) => {
+  if (expense?.paid_by_user_id) return s.user_id !== expense.paid_by_user_id;
+  return s.member_name !== expense?.paid_by_name;
+})
+```
+
+---
+
+## Fix 3 — Wrong avatar for placeholder payer (HIGH)
+
+**File: `ExpenseDetailSheet.tsx` lines 134-136**  
+  
+Replace the payerMember lookup:
+
+```typescript
+const payerMember = expense?.paid_by_user_id
+  ? groupMembers.find((m) => m.user_id === expense.paid_by_user_id && m.status === "active")
+  : groupMembers.find((m) => m.name === expense?.paid_by_name && m.is_placeholder && m.status === "active")
+  ?? null;
+```
+
+  
+In Fix 3, use case-insensitive name matching for the placeholder payer lookup — compare `m.name.toLowerCase() === expense.paid_by_name?.toLowerCase()` instead of strict equality. This guards against inconsistent casing between group_members.name and expenses.paid_by_name.
+
+---
+
+## Fix 4 — Edit button visible when partially settled (MEDIUM)
+
+**File: `ExpenseDetailSheet.tsx**`
+
+Derive a new boolean near the other computed values:
+
+```typescript
+const expensePartiallySettled = !expenseFullySettled && nonPayerSplits.some((s) => s.is_settled);
+```
+
+Change the edit button condition at line 354 from:
+
+```
+isCreator && !expenseFullySettled
+```
+
+to:
+
+```
+isCreator && !expenseFullySettled && !expensePartiallySettled
+```
+
+---
+
+## Fix 5 — fetchExpenseSplits fails silently (MEDIUM)
+
+**File: `AppContext.tsx` line 283-285**
+
+Add a user-facing toast in the catch block:
+
+```typescript
+catch (err) {
+  if (import.meta.env.DEV) console.error("Failed to fetch expense splits", err);
+  toast({ title: "Couldn't load expense details. Pull to refresh.", variant: "destructive" });
+}
+```
+
+---
+
+## Fix 6 — Splits realtime subscription has no group filter (MEDIUM)
+
+`expense_splits` has no `group_id` column, so a server-side filter on `group_id` is not possible without a schema change. Adding a `group_id` column to expense_splits is a non-trivial schema change that risks breaking existing data flows.
+
+**Decision: Document and skip.** Add a comment to the subscription explaining the limitation. No code change beyond the comment. This is a known post-launch optimization.
+
+---
+
+## Implementation Order
+
+1. DB migration (Fix 1 RPCs) — one migration, both `create_expense_with_splits` and `edit_expense`
+2. `ExpenseScreen.tsx` line 481 (Fix 1 client)
+3. `ExpenseDetailSheet.tsx` lines 99, 116 (Fix 2), lines 134-136 (Fix 3), edit button (Fix 4)
+4. `AppContext.tsx` catch block (Fix 5), comment on subscription (Fix 6)
+
+## Files touched
+
+- `ExpenseScreen.tsx` — 1 line change
+- `ExpenseDetailSheet.tsx` — 5 locations changed
+- `AppContext.tsx` — 2 locations changed
+- DB migration — 2 RPCs updated
