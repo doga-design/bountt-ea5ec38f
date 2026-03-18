@@ -96,7 +96,10 @@ export default function ExpenseDetailSheet({
   // Build subtitle
   const payerLabel = isPayer ? "You" : (expense?.paid_by_name ?? "");
   const otherSplitNames = expenseSplits
-    .filter((s) => s.user_id !== expense?.paid_by_user_id)
+    .filter((s) => {
+      if (expense?.paid_by_user_id) return s.user_id !== expense.paid_by_user_id;
+      return s.member_name !== expense?.paid_by_name;
+    })
     .map((s) => (s.user_id === user?.id ? "You" : s.member_name));
   const subtitle = `${payerLabel} paid, splitting with ${otherSplitNames.join(" & ")}`;
 
