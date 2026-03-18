@@ -16,6 +16,7 @@ import Invite from "./pages/onboarding/Invite";
 import Join from "./pages/Join";
 import Dashboard from "./pages/Dashboard";
 import ComingSoon from "./pages/ComingSoon";
+import Groups from "./pages/Groups";
 import GroupSettings from "./pages/GroupSettings";
 import ActivityLog from "./pages/ActivityLog";
 import NotFound from "./pages/NotFound";
