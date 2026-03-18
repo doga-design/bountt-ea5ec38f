@@ -1,4 +1,4 @@
-import { Settings, Plus } from "lucide-react";
+import { Settings, Plus, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
