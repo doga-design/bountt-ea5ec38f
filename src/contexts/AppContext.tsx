@@ -418,7 +418,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setCurrentGroupState(null);
       }
     } catch (err) {
-      toast({ title: err instanceof Error ? err.message : "Failed to leave group", variant: "destructive" });
+      toast({ title: (err as any)?.message || "Failed to leave group", variant: "destructive" });
     }
   }, [user, groupMembers, currentGroup]);
 
