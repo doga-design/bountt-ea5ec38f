@@ -1,78 +1,51 @@
-# Two Fixes: Creator-Only Edit UI + Invite Code Regeneration
 
-## Fix 1 — GroupBanner: Hide edit UI for non-creators
 
-**File:** `src/components/group-settings/GroupBanner.tsx`
+# Update Cost Detail Bottom Sheet — Arc Visualization + Slide-to-Settle
 
-Currently there is zero creator check — all members can click to edit name and open the gradient picker. The RLS blocks the actual update, but local state shows success until reload.
+Two visual changes to the expense detail sheet. No logic changes, no settlement changes, no RPC changes.
 
-**Change:** Import `useApp` to get `user`, then derive `isCreator = group.created_by === user?.id`. Three places to guard:
+## Change 1 — Rewrite ExpenseSpokeViz.tsx Arc Visualization
 
-- Line 37: Remove `cursor-pointer` from the banner div for non-creators
-- Line 41: Only open gradient picker `onClick` if `isCreator`
-- Lines 55-63: Only allow name click-to-edit if `isCreator`. Non-creators see a plain `<h1>` with no `cursor-text` or click handler.
+**Current:** Straight dashed lines from payer to each member, positioned absolutely with complex trigonometry. No white ring on payer. Label text is tiny (10px). No background glow.
 
-**Note:** In the `regenerate_invite_code` RPC, `v_chars` contains 32 characters but the modulo uses `% 31`. Change the modulo to `% 32` so all characters in the set are reachable. Alternatively, verify the character set length and make the modulo match exactly.
+**New layout (matching reference):**
 
-No other files touched. No DB changes.
+1. **Payer avatar** — centered at top, larger (64px), with a **white ring border** (3px solid white + box-shadow). Below it: `"You Paid · $48"` — "You Paid" in muted medium weight, amount in bold foreground. Use `·` separator.
 
----
+2. **Dashed arc paths** — replace straight `<line>` elements with **quadratic Bézier `<path>` curves** (same as `MemberAvatarGrid.tsx`). Each path curves from payer center downward to each member position. Include the **animated dot (particle)** effect — exact same `<animateMotion>` + `<animate opacity>` pattern from `MemberAvatarGrid.tsx`: a small circle traveling along the path with staggered timing and fade-out. Same stroke style: `#D4D4D4`, strokeWidth 1.5, strokeDasharray `4 4`.
 
-## Fix 2 — Invite Code Regeneration
+3. **Member avatars** — positioned in a horizontal row below the arc (not on a polar arc). Each avatar is 48px with white ring border. Below each:
+   - Line 1: `"[Name]'s share"` or `"[Name] settled"` — medium weight, muted color
+   - Line 2: `"· $[amount]"` — bold foreground
+   - Text wraps responsively for 4-5+ members. Use `max-w-[72px]` with `text-center leading-tight break-words`.
 
-### Part A — DB Migration: `regenerate_invite_code` RPC
+4. **Radial background glow** — a subtle warm radial gradient behind the entire viz area. CSS: `radial-gradient(ellipse at center, rgba(232, 72, 10, 0.04) 0%, transparent 70%)` — very subtle, warm-tinted, not harsh.
 
-```sql
-CREATE OR REPLACE FUNCTION public.regenerate_invite_code(p_group_id uuid)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-DECLARE
-  v_user_id UUID;
-  v_new_code TEXT;
-  v_chars TEXT := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  v_random_bytes BYTEA;
-BEGIN
-  v_user_id := auth.uid();
-  IF v_user_id IS NULL THEN
-    RAISE EXCEPTION 'Not authenticated';
-  END IF;
+5. **Layout approach** — use a simpler flex column layout:
+   - Payer avatar + label at top (centered)
+   - SVG overlay for curved dashed paths + animated dots
+   - Member avatars in a flex row at bottom (centered, wrapping)
+   - Remove all the trigonometric arc positioning code
 
-  IF NOT EXISTS (
-    SELECT 1 FROM groups WHERE id = p_group_id AND created_by = v_user_id
-  ) THEN
-    RAISE EXCEPTION 'Only the group creator can regenerate the invite code';
-  END IF;
+**File:** `src/components/dashboard/ExpenseSpokeViz.tsx` — full rewrite of the render, keeping the same props interface and `canTap` logic.
 
-  v_random_bytes := gen_random_bytes(4);
-  v_new_code := 'BNTT-';
-  FOR i IN 0..3 LOOP
-    v_new_code := v_new_code || substr(v_chars, (get_byte(v_random_bytes, i) % 31) + 1, 1);
-  END LOOP;
+## Change 2 — Slide-to-Settle Bar Styling
 
-  UPDATE groups SET invite_code = v_new_code WHERE id = p_group_id;
+**Current (lines 527-552):** `bg-muted` track, `bg-foreground` thumb with `»` text character, label says "Slide to settle everyone →".
 
-  RETURN jsonb_build_object('invite_code', v_new_code);
-END;
-$$;
-```
+**New styling (matching reference):**
 
-### Part B — UI: Add regenerate button in SettingsCards.tsx
+- Track: `bg-muted` (light gray) — keep as-is
+- Thumb: dark navy rounded rectangle — change from `rounded-full` to `rounded-2xl`, keep `bg-foreground`. Replace `»` text with `>>` using `ChevronsRight` icon from lucide-react (or keep `»` but style it bolder)
+- Label: `"Slide to settle everyone"` — remove the `→` arrow, keep muted text
+- No other logic changes. Same gesture handling, same threshold, same snap-back.
 
-**File:** `src/components/group-settings/SettingsCards.tsx`
+**File:** `src/components/dashboard/ExpenseDetailSheet.tsx` — lines 527-552 only, minor style tweaks.
 
-- Import `user` from `useApp()`, derive `isCreator = group.created_by === user?.id`
-- Add `inviteCode` state initialized from `group.invite_code`, use it for display and `generateJoinUrl`
-- Also gate the Group Name edit (pencil button + inline editing) behind `isCreator` — this component has a duplicate name-edit UI that should also be restricted
-- Below the Copy/Share buttons in the invite code card, add a "Regenerate" button (only visible to creator)
-- On tap: show `AlertDialog` confirmation — "This will invalidate the current invite link. Anyone with the old link won't be able to join." with "Regenerate" and "Cancel"
-- On confirm: call `supabase.rpc("regenerate_invite_code", { p_group_id: group.id })`. Update `inviteCode` state with returned value. Toast: "Invite code updated"
-- No red/green colors on any UI element
+## Files Changed
 
-**Files changed:**
+- `src/components/dashboard/ExpenseSpokeViz.tsx` — rewrite visualization layout
+- `src/components/dashboard/ExpenseDetailSheet.tsx` — slide-to-settle style tweaks (lines 527-552 only)
 
-- `src/components/group-settings/GroupBanner.tsx` — add creator guard
-- `src/components/group-settings/SettingsCards.tsx` — add regenerate button + creator guards on name edit
-- 1 DB migration — `regenerate_invite_code` RPC
+No settlement logic, no RPC, no DB changes.
+
