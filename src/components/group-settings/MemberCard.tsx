@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { GroupMember, ExpenseSplit } from "@/types";
-import { User, Shield } from "lucide-react";
+import { Shield } from "lucide-react";
+import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
 import {
   AlertDialog,
   AlertDialogAction,
