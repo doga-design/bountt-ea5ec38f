@@ -363,7 +363,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (updateError) throw updateError;
       setGroupMembers((prev) => prev.map((m) => m.id === memberId ? { ...m, status: "left", left_at: new Date().toISOString() } : m));
     } catch (err) {
-      toast({ title: err instanceof Error ? err.message : "Failed to remove member", variant: "destructive" });
+      toast({ title: (err as any)?.message || "Failed to remove member", variant: "destructive" });
     }
   }, []);
 
