@@ -540,14 +540,14 @@ export default function ExpenseDetailSheet({
                       />
 
                       <div
-                        className="absolute top-1 left-1 w-12 h-12 rounded-full bg-foreground flex items-center justify-center cursor-grab active:cursor-grabbing"
+                        className="absolute top-1 left-1 w-12 h-12 rounded-2xl bg-foreground flex items-center justify-center cursor-grab active:cursor-grabbing"
                         style={{
                           transform: `translateX(${slideX}px)`,
                           transition: sliding ? "none" : "transform 0.3s ease",
                         }}
                         onPointerDown={handlePointerDown}
                       >
-                        <span className="text-background text-lg font-bold">»</span>
+                        <span className="text-background text-lg font-bold tracking-tighter">»</span>
                       </div>
                     </div>
                   </>
