@@ -12,7 +12,7 @@ export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { user, authLoading, userGroups, groupsLoading, fetchGroups } = useApp();
+  const { user, authLoading, userGroups, groupsLoading } = useApp();
   const redirectTo = (location.state as { from?: string })?.from;
   const [mode, setMode] = useState<Mode>("signup");
   const [email, setEmail] = useState("");
