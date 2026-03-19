@@ -1,88 +1,37 @@
-# Redesign "ALL MEMBERS" Section — Circular Avatar Row
+# Fix All Flows Broken by Security Changes
 
-## Overview
+## Root Causes
 
-Replace the current wide card-based `MemberCardScroll` with a circular avatar row matching the reference screenshots. Add inline placeholder invite card with slide-down animation.
+Three separate breaks from two security fixes:
 
-## Files to Change
+1. `group_members` INSERT RLS set to `false` → direct `.insert()` calls fail
+2. `p_created_by` removed from `create_expense_with_splits` RPC → client calls with old param get 404
 
-### 1. New: `src/components/dashboard/MemberAvatarRow.tsx`
+## Fixes (4 changes, 3 files)
 
-Complete replacement for `MemberCardScroll`. Contains all logic for the new row.
+### Fix A — AppContext.tsx: addPlaceholderMember (line 237-241)
 
-**Structure:**
+Replace direct `.insert().select().single()` with `supabase.rpc("add_placeholder_member", { p_group_id, p_name, p_avatar_color })`. Parse returned JSONB directly as GroupMember.
 
-```text
-┌─ "ALL MEMBERS" label (tracking-wider, text-xs, muted, uppercase) ─┐
-│                                                                     │
-│  ○ You    ○ Kyle    ○ Matt    ◐ (pie icon, disabled)               │
-│  (green   (ghost   (green                                           │
-│   dot)    emoji)    dot)                                            │
-│                                                                     │
-│  ┌─ Inline invite card (slide-down, only for placeholders) ──────┐ │
-│  │ 👻  "Kyle is still a placeholder..."                          │ │
-│  │     [ Invite Kyle → ]                                         │ │
-│  └───────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────┘
-```
+### Fix B — Join.tsx: joinAsNewMember (line 168-176)
 
-**Props:** `members`, `currentUserId`, `groupInviteCode?`
+Replace direct `.insert()` into group_members with `supabase.rpc("join_group", { p_group_id, p_display_name, p_avatar_color })`. The RPC already exists and handles duplicate checks, rejoin, etc.
 
-**Key implementation details:**
+### Fix C — ExpenseSheet.tsx: remove p_created_by (line 91)
 
-- Sort members: current user first, then real (non-placeholder active) members, then placeholders
-- Each avatar: 56px circle with `getAvatarColor` background, `getAvatarImage` PNG inside  
-Use the existing avatar utilities:
-  - getAvatarImage(member) → returns the PNG import for that member
-  - member.avatar_color → the hex color string for the circle background
-  Both are already in src/lib/avatar-utils.ts — do not create new functions.
-- Name label below: 12px, current user shows "You"
-- Green dot (10px, `#22C55E`): positioned top-right for real joined members
-- Ghost emoji overlay: positioned top-right for placeholder members (small, ~16px badge)
-- Active/selected state: `#D94F00` ring border (2.5px) — "You" selected by default
-- Pie chart icon at end: 56px circle, light gray border, clock/pie icon inside, `opacity: 0.4`, `pointer-events: none`
-- `useState` for `selectedMemberId` (defaults to current user's member ID)
-- `useState` for `inviteCardMemberId` (null by default)
-- Tapping placeholder: set as selected + show invite card with CSS transition (`max-height` + `opacity` animation)
-- Tapping real member: set as selected, clear invite card
-- Tapping outside (click-away): dismiss invite card
-- `// TODO: filter feed by selected member`
+Remove `p_created_by: user.id` from the RPC call. The server now uses `auth.uid()` directly.
 
-**Invite card (inline, not modal):**
+### Fix D — ExpenseScreen.tsx: remove p_created_by (line 513)
 
-- Rounded card, light background, padding
-- Ghost icon on left
-- Text: `<span className="text-orange-600 font-semibold">{name}</span> is still a placeholder...`
-- Button: dark navy (`#1E293B`), full-width, "Invite {name} →"
-- Button copies invite link or navigates to invite flow; The "Invite [Name] →" button should copy the group invite link to clipboard (using navigator.clipboard.writeText) 
-  and show a brief toast: "Invite link copied!". 
-  Do not open a new sheet or navigate away.
-- Slide-down animation: `transition-all duration-300` with conditional `max-height`/`opacity`
+Same fix — remove `p_created_by: user.id` from the RPC call.  
+  
+Before implementing Fix B, confirm `join_group` RPC exists in the database by checking migration history or the Supabase function list. If it does not exist, create it in a migration first — takes `p_group_id`, `p_display_name`, `p_avatar_color`, verifies `auth.uid() IS NOT NULL` and user is not already an active member, inserts with `user_id = auth.uid()` and `is_placeholder = false`, returns new member row as JSONB, SECURITY DEFINER.
 
-### 2. Modify: `src/pages/Dashboard.tsx`
+## Files Changed
 
-- Replace `MemberCardScroll` import with `MemberAvatarRow`
-- Replace the `<MemberCardScroll ... />` usage (lines 130-138) with:
+- `src/contexts/AppContext.tsx` — lines 237-244
+- `src/pages/Join.tsx` — lines 168-178
+- `src/components/dashboard/ExpenseSheet.tsx` — line 91
+- `src/components/expense/ExpenseScreen.tsx` — line 513
 
-```tsx
-<div className="mt-4">
-  <MemberAvatarRow
-    members={groupMembers}
-    currentUserId={user?.id ?? ""}
-    groupInviteCode={currentGroup?.invite_code}
-  />
-</div>
-```
-
-- Remove `MemberDetailSheet` trigger from member tap (the old `onCardClick={setSelectedMember}` flow is replaced by the new inline selection)
-- Keep `MemberDetailSheet` available but don't wire it to the new row (the new row handles its own interaction) In Dashboard.tsx, remove the selectedMember useState and 
-  setSelectedMember calls entirely if they were only used 
-  by MemberCardScroll. Do not leave orphaned state.
-
-### 3. Keep (no changes): `MemberCardScroll.tsx`, `MemberCard.tsx`
-
-These files become unused by the dashboard but are left in place in case other screens reference them. Can be cleaned up later.
-
-### Not touched
-
-ExpenseScreen, numpad, expense logic, AppContext, Supabase queries, feed cards — none modified.
+No DB migrations. No RLS changes. No UI changes.
