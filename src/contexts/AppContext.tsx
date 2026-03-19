@@ -102,6 +102,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
+        // For INITIAL_SESSION and SIGNED_IN, verify user exists server-side
+        // before trusting the cached JWT. This prevents deleted users from
+        // acting authenticated with a stale token.
+        if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && newSession?.user) {
+          const { data: { user: verifiedUser }, error: verifyError } = await supabase.auth.getUser();
+          if (verifyError || !verifiedUser) {
+            // User deleted or session invalid — sign out immediately
+            await supabase.auth.signOut({ scope: 'global' }).catch(() => {});
+            setSession(null);
+            setUser(null);
+            setProfile(null);
+            setUserGroups([]);
+            setCurrentGroupState(null);
+            setExpenses([]);
+            setExpenseSplits([]);
+            setGroupMembers([]);
+            setGroupsLoading(false);
+            setAuthLoading(false);
+            groupsFetchedForRef.current = null;
+            return;
+          }
+        }
+
         setSession(newSession);
         setUser(newSession?.user ?? null);
         setAuthLoading(false);
