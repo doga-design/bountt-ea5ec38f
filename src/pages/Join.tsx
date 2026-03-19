@@ -165,23 +165,19 @@ export default function Join() {
     const { pickAvailableColor } = await import("@/lib/avatar-utils");
     const newColor = pickAvailableColor(existingColors);
 
-    const { error: joinError } = await supabase
-      .from("group_members")
-      .insert({
-        group_id: groupId,
-        user_id: user!.id,
-        name: profile?.display_name ?? user!.email?.split("@")[0] ?? "Member",
-        is_placeholder: false,
-        avatar_color: newColor,
-      });
+    const displayName = profile?.display_name ?? user!.email?.split("@")[0] ?? "Member";
+    const { error: joinError } = await supabase.rpc("join_group", {
+      p_group_id: groupId,
+      p_display_name: displayName,
+      p_avatar_color: newColor,
+    });
 
     if (joinError) throw joinError;
 
     // Log member joined activity
-    const memberName = profile?.display_name ?? user!.email?.split("@")[0] ?? "Member";
     await supabase.rpc("log_member_joined", {
       p_group_id: groupId,
-      p_actor_name: memberName,
+      p_actor_name: displayName,
     });
 
     await fetchGroups();
