@@ -34,6 +34,7 @@ export interface GroupMember {
   status: string;
   role: string;
   avatar_color: string | null;
+  avatar_index: number | null;
   left_at: string | null;
   joined_at: string;
 }

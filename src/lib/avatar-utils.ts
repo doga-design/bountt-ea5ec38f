@@ -1,17 +1,49 @@
 import { Expense, ExpenseSplit, GroupMember } from "@/types";
-import Avatar1 from "@/assets/avatars/avatar1.png";
-import Avatar2 from "@/assets/avatars/avatar2.png";
-import Avatar3 from "@/assets/avatars/avatar3.png";
-import Avatar4 from "@/assets/avatars/avatar4.png";
-import Avatar5 from "@/assets/avatars/avatar5.png";
+import Avatar1 from "@/assets/avatars/avatar1.svg";
+import Avatar2 from "@/assets/avatars/avatar2.svg";
+import Avatar3 from "@/assets/avatars/avatar3.svg";
+import Avatar4 from "@/assets/avatars/avatar4.svg";
+import Avatar5 from "@/assets/avatars/avatar5.svg";
+import Avatar6 from "@/assets/avatars/avatar6.svg";
 
-const AVATAR_IMAGES = [Avatar1, Avatar2, Avatar3, Avatar4, Avatar5];
+const AVATAR_IMAGES = [Avatar1, Avatar2, Avatar3, Avatar4, Avatar5, Avatar6];
+
+// 6 named colors with bg and stroke
+const AVATAR_COLORS: Record<string, { bg: string; stroke: string }> = {
+  emerald:  { bg: '#6BD16C', stroke: '#00FF04' },
+  blue:     { bg: '#A3BAFF', stroke: '#00EAFF' },
+  amber:    { bg: '#FF8885', stroke: '#FF0000' },
+  orange:   { bg: '#FFB376', stroke: '#FF7200' },
+  offwhite: { bg: '#DFDFDF', stroke: '#FFFFFF' },
+  purple:   { bg: '#B984E5', stroke: '#A600FF' },
+};
+
+export const AVATAR_COLOR_KEYS = ['emerald', 'blue', 'amber', 'orange', 'offwhite', 'purple'];
 
 /**
- * Returns a deterministic avatar image for a member based on their ID hash.
+ * Returns the member's avatar color as { bg, stroke }.
+ * Falls back to purple if the stored key is invalid.
+ */
+export function getAvatarColor(member: GroupMember): { bg: string; stroke: string } {
+  if (member.avatar_color && AVATAR_COLORS[member.avatar_color]) {
+    return AVATAR_COLORS[member.avatar_color];
+  }
+  return AVATAR_COLORS['purple'];
+}
+
+/**
+ * Returns the avatar SVG image for a member based on their stored avatar_index.
+ * Falls back to avatar1 if index is missing or out of range.
  */
 export function getAvatarImage(member: GroupMember): string {
-  return AVATAR_IMAGES[parseInt(member.id.replace(/-/g, '').slice(0, 8), 16) % AVATAR_IMAGES.length];
+  if (
+    typeof member.avatar_index === 'number' &&
+    member.avatar_index >= 1 &&
+    member.avatar_index <= 6
+  ) {
+    return AVATAR_IMAGES[member.avatar_index - 1];
+  }
+  return AVATAR_IMAGES[0];
 }
 
 /**
@@ -25,44 +57,29 @@ export function getAvatarImageFromName(name: string): string {
   return AVATAR_IMAGES[Math.abs(hash) % AVATAR_IMAGES.length];
 }
 
-// 10-color avatar palette
-const AVATAR_COLORS = [
-  "#3B82F6", // Blue
-  "#EC4899", // Pink
-  "#10B981", // Green
-  "#F97316", // Orange
-  "#8B5CF6", // Purple
-  "#14B8A6", // Teal
-  "#EF4444", // Red
-  "#F59E0B", // Amber
-  "#6366F1", // Indigo
-  "#F43F5E", // Rose
-];
-
 /**
- * Returns the member's stored avatar_color, falling back to hash-based for un-migrated rows.
+ * Pick a color key and avatar index not yet used by existing group members.
+ * Falls back to random if all 6 are taken.
  */
-export function getAvatarColor(member: GroupMember): string {
-  if (member.avatar_color) return member.avatar_color;
-  // Fallback: hash-based for old rows without avatar_color
-  let hash = 0;
-  for (let i = 0; i < member.id.length; i++) {
-    hash = member.id.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
+export function pickAvailableColor(
+  existingColors: string[],
+  existingIndices: number[] = []
+): { color: string; index: number } {
+  const usedColors = new Set(existingColors);
+  const usedIndices = new Set(existingIndices);
 
-/**
- * Pick a color not yet used by existing group members.
- * Falls back to random if all 10 are taken.
- */
-export function pickAvailableColor(existingColors: string[]): string {
-  const used = new Set(existingColors);
-  const available = AVATAR_COLORS.filter((c) => !used.has(c));
-  if (available.length > 0) {
-    return available[Math.floor(Math.random() * available.length)];
-  }
-  return AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
+  const availableColors = AVATAR_COLOR_KEYS.filter((c) => !usedColors.has(c));
+  const availableIndices = [1, 2, 3, 4, 5, 6].filter((i) => !usedIndices.has(i));
+
+  const color = availableColors.length > 0
+    ? availableColors[Math.floor(Math.random() * availableColors.length)]
+    : AVATAR_COLOR_KEYS[Math.floor(Math.random() * AVATAR_COLOR_KEYS.length)];
+
+  const index = availableIndices.length > 0
+    ? availableIndices[Math.floor(Math.random() * availableIndices.length)]
+    : Math.floor(Math.random() * 6) + 1;
+
+  return { color, index };
 }
 
 export interface MemberBalance {
@@ -73,10 +90,6 @@ export interface MemberBalance {
 /**
  * Calculate the net financial relationship between the current user
  * and a specific member.
- *
- * - theyOweYou = sum of member's split amounts on expenses YOU paid (unsettled)
- * - youOweThem = sum of YOUR split amounts on expenses THEY paid (unsettled)
- * - net = theyOweYou - youOweThem
  */
 export function getMemberBalance(
   memberId: string,
@@ -94,7 +107,6 @@ export function getMemberBalance(
 
     const expenseSplits = splits.filter((s) => s.expense_id === expense.id);
 
-    // Case 1: Current user paid → check if member has a split
     if (expense.paid_by_user_id === currentUserId) {
       for (const split of expenseSplits) {
         const isThisMember =
@@ -106,7 +118,6 @@ export function getMemberBalance(
       }
     }
 
-    // Case 2: Member paid → check if current user has a split
     const memberPaid =
       (memberUserId && expense.paid_by_user_id === memberUserId) ||
       (!memberUserId && expense.paid_by_name === memberName && !expense.paid_by_user_id);
