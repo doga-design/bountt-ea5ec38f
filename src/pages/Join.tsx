@@ -109,7 +109,7 @@ export default function Join() {
           .update(updateFields)
           .eq("id", existing.id);
 
-        await fetchGroups();
+        await fetchGroups(true);
         toast({ title: `Rejoined ${group.name}!`, description: "Welcome back 🎉" });
         navigate(`/dashboard/${group.id}`);
         return;
