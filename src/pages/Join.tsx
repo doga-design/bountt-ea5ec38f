@@ -175,7 +175,6 @@ export default function Join() {
     if (joinError) throw joinError;
 
     // Log member joined activity
-    const memberName = profile?.display_name ?? user!.email?.split("@")[0] ?? "Member";
     await supabase.rpc("log_member_joined", {
       p_group_id: groupId,
       p_actor_name: memberName,
