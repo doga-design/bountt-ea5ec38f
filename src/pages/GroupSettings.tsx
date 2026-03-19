@@ -75,7 +75,7 @@ export default function GroupSettings() {
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-bold text-foreground">Members</h2>
             <span className="text-xs text-muted-foreground font-medium">
-              {activeMembers.length} member{activeMembers.length !== 1 ? "s" : ""}
+              {activeMembers.length}/6 members
             </span>
           </div>
         </div>
