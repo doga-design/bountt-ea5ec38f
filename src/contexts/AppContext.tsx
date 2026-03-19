@@ -636,6 +636,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     session,
     profile,
     authLoading,
+    isVerified,
     currentGroup,
     userGroups,
     groupsLoading,
