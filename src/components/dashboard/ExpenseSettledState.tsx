@@ -27,7 +27,7 @@ export default function ExpenseSettledState({ members }: ExpenseSettledStateProp
       {/* Overlapping avatar stack */}
       <div className="flex items-center justify-center">
         {members.map((m, i) => {
-          const color = m.member ? getAvatarColor(m.member) : "#8B5CF6";
+          const color = m.member ? getAvatarColor(m.member).bg : '#B984E5';
           const img = m.member ? getAvatarImage(m.member) : undefined;
 
           return (

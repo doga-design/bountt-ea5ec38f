@@ -117,7 +117,7 @@ export default function MemberAvatarGrid({
       >
         {members.map((m) => {
           const isActive = activeIds.has(m.id);
-          const color = getAvatarColor(m);
+          const { bg, stroke } = getAvatarColor(m);
           const isSelf = m.user_id === currentUserId;
           const avatarImg = getAvatarImage(m);
 
@@ -133,8 +133,8 @@ export default function MemberAvatarGrid({
                 style={{
                   width: avatarSize,
                   height: avatarSize,
-                  backgroundColor: isActive ? color : "#E0E0DC",
-                  border: isActive ? "3px solid white" : "3px solid transparent",
+                  backgroundColor: isActive ? bg : "#E0E0DC",
+                  border: isActive ? `3px solid ${stroke}` : "3px solid white",
                   boxShadow: isActive ? "0 2px 8px rgba(0,0,0,0.15)" : "none",
                   filter: isActive ? "none" : "grayscale(100%)",
                   opacity: isActive ? 1 : 0.5,

@@ -87,7 +87,7 @@ export default function MemberAvatarRow({
             const isSelected = selectedMemberId === member.id;
             const isMe = member.user_id === currentUserId;
             const avatarImg = getAvatarImage(member);
-            const bgColor = getAvatarColor(member);
+            const bgColor = getAvatarColor(member).bg;
 
             return (
               <button

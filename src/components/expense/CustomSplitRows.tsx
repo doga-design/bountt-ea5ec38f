@@ -46,7 +46,7 @@ export default function CustomSplitRows({
                   style={{
                     width: 64,
                     height: 64,
-                    backgroundColor: color,
+                    backgroundColor: bg,
                     border: isFocused ? "3px solid white" : "3px solid transparent",
                     boxShadow: isFocused ? "0 2px 8px rgba(0,0,0,0.15)" : "none",
                   }}

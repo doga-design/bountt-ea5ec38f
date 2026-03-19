@@ -63,7 +63,7 @@ export default function PlaceholderSelectDialog({
               }`}
             >
               <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden"
-                style={{ backgroundColor: getAvatarColor({ id: p.id, avatar_color: null } as GroupMember) }}>
+                style={{ backgroundColor: getAvatarColor({ id: p.id, avatar_color: null, avatar_index: null } as GroupMember).bg }}>
                 <img
                   src={getAvatarImageFromName(p.name)}
                   alt={p.name}

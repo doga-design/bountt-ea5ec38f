@@ -239,15 +239,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const existingColors = groupMembers
-        .filter((m) => m.group_id === groupId && m.status === "active" && m.avatar_color)
-        .map((m) => m.avatar_color!);
-      const newColor = pickAvailableColor(existingColors);
+      const activeMembers = groupMembers.filter((m) => m.group_id === groupId && m.status === "active");
+      const existingColors = activeMembers.filter((m) => m.avatar_color).map((m) => m.avatar_color!);
+      const existingIndices = activeMembers.filter((m) => m.avatar_index != null).map((m) => m.avatar_index!);
+      const { color: newColor, index: newIndex } = pickAvailableColor(existingColors, existingIndices);
 
       const { data, error: insertError } = await supabase.rpc("add_placeholder_member", {
         p_group_id: groupId,
         p_name: name,
         p_avatar_color: newColor,
+        p_avatar_index: newIndex,
       });
 
       if (insertError) throw insertError;

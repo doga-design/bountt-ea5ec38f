@@ -115,7 +115,7 @@ export default function SplitSentence({
               const label = isSelf ? "You" : m.name;
               const isSelected = m.id === payerMember?.id;
               const avatarImg = getAvatarImage(m);
-              const color = getAvatarColor(m);
+              const { bg: color } = getAvatarColor(m);
 
               return (
                 <button

@@ -53,7 +53,7 @@ export default function MemberDetailSheet({
   if (!member) return null;
 
   const isPlaceholder = member.is_placeholder;
-  const avatarColor = getAvatarColor(member);
+  const avatarColor = getAvatarColor(member).bg;
   const balance = getMemberBalance(
     member.id,
     member.user_id,

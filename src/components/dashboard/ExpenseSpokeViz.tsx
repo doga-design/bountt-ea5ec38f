@@ -218,7 +218,7 @@ export default function ExpenseSpokeViz({
       {/* Member avatars row */}
       <div className="flex justify-center w-full z-10" style={{ gap: 8 }}>
         {members.map((m, i) => {
-          const memberColor = m.member ? getAvatarColor(m.member) : "#8B5CF6";
+          const memberColor = m.member ? getAvatarColor(m.member).bg : '#B984E5';
           const memberImg = m.member ? getAvatarImage(m.member) : undefined;
           const tappable = canTap(m);
           const isMe = m.userId === currentUserId;
