@@ -502,19 +502,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const leaveGroup = useCallback(async (groupId: string) => {
     if (!user) return;
     try {
-      const member = groupMembers.find((m) => m.user_id === user.id && m.group_id === groupId);
+      const member = groupMembers.find((m) => m.user_id === user.id && m.group_id === groupId && m.status === "active");
       if (!member) return;
-
-      // Bug 3 fix: Prevent sole admin from leaving
-      if (member.role === "admin") {
-        const otherAdmins = groupMembers.filter(
-          (m) => m.group_id === groupId && m.role === "admin" && m.status === "active" && m.id !== member.id
-        );
-        if (otherAdmins.length === 0) {
-          toast({ title: "You're the only admin. Promote another member before leaving.", variant: "destructive" });
-          return;
-        }
-      }
 
       const { error: updateError } = await supabase
         .from("group_members")
