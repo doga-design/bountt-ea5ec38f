@@ -88,12 +88,14 @@ export default function MemberCard({ member, currentUserId, isAdmin, onRemove, o
           onTouchEnd={handleTouchEnd}
         >
           {/* Avatar */}
-          <div className={`relative w-10 h-10 rounded-full flex items-center justify-center ${
-            type === "placeholder"
-              ? "border-2 border-dashed border-muted-foreground bg-muted"
-              : "bg-muted"
-          }`}>
-            <User className="w-5 h-5 text-muted-foreground" />
+          <div className="relative w-10 h-10 rounded-full flex items-center justify-center overflow-hidden"
+            style={{ backgroundColor: getAvatarColor(member).bg }}>
+            <img
+              src={getAvatarImage(member)}
+              alt={member.name}
+              className="w-[75%] h-[75%] object-contain"
+              draggable={false}
+            />
             <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${statusDot}`} />
           </div>
 
