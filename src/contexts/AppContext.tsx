@@ -21,6 +21,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [isVerified, setIsVerified] = useState(false);
+
+  // Ref for user so interval/visibility callbacks don't read stale state
+  const userRef = useRef<User | null>(null);
+  useEffect(() => { userRef.current = user; }, [user]);
 
   // Groups state
   const [currentGroup, setCurrentGroupState] = useState<Group | null>(null);

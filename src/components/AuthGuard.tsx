@@ -4,10 +4,10 @@ import { Loader2 } from "lucide-react";
 
 /** Wraps routes that require authentication. Redirects to /auth if not logged in. */
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, authLoading, groupsLoading } = useApp();
+  const { user, authLoading, groupsLoading, isVerified } = useApp();
   const location = useLocation();
 
-  if (authLoading || groupsLoading) {
+  if (authLoading || groupsLoading || (user && !isVerified)) {
     return (
       <div className="screen-container bg-background items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
