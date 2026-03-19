@@ -105,7 +105,7 @@ export interface AppState {
   session: Session | null;
   profile: Profile | null;
   authLoading: boolean;
-  isVerified: boolean;
+  
 
   // Groups
   currentGroup: Group | null;
