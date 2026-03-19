@@ -155,7 +155,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const inviteCode = generateInviteCode();
       const displayName = profile?.display_name ?? user.email?.split("@")[0] ?? "You";
-      const creatorColor = pickAvailableColor([]);
+      const { color: creatorColor, index: creatorIndex } = pickAvailableColor([], []);
 
       const { data, error: rpcError } = await supabase.rpc("create_group_with_creator", {
         p_name: name,
@@ -163,6 +163,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         p_invite_code: inviteCode,
         p_display_name: displayName,
         p_avatar_color: creatorColor,
+        p_avatar_index: creatorIndex,
       });
 
       if (rpcError) throw rpcError;
