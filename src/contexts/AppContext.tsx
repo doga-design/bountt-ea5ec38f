@@ -104,9 +104,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // =====================================================
   // AUTH
   // =====================================================
-  // =====================================================
-  // SESSION VERIFICATION
-  // =====================================================
   const clearAllState = useCallback(() => {
     setSession(null);
     setUser(null);
@@ -118,48 +115,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setGroupMembers([]);
     setGroupsLoading(false);
     setAuthLoading(false);
-    setIsVerified(false);
     groupsFetchedForRef.current = null;
   }, []);
 
-  const verifySession = useCallback(async (): Promise<boolean> => {
-    try {
-      const { data: { user: verifiedUser }, error: verifyError } = await supabase.auth.getUser();
-      if (verifyError || !verifiedUser) {
-        await supabase.auth.signOut({ scope: 'global' }).catch(() => {});
-        clearAllState();
-        return false;
-      }
-      setIsVerified(true);
-      return true;
-    } catch {
-      await supabase.auth.signOut({ scope: 'global' }).catch(() => {});
-      clearAllState();
-      return false;
-    }
-  }, [clearAllState]);
-
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
-        // For INITIAL_SESSION and SIGNED_IN, verify user exists server-side
-        if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && newSession?.user) {
-          const verified = await verifySession();
-          if (!verified) return;
-        }
-
-        if (event === 'SIGNED_OUT') {
-          setIsVerified(false);
-        }
-
+      async (_event, newSession) => {
         setSession(newSession);
         setUser(newSession?.user ?? null);
         setAuthLoading(false);
-
-        // Show toast on session expiry
-        if (event === "SIGNED_OUT" && !newSession && userRef.current) {
-          toast({ title: "Session expired. Please sign in again.", variant: "destructive" });
-        }
 
         if (newSession?.user) {
           setTimeout(() => fetchProfile(newSession.user.id), 0);
@@ -168,38 +132,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setTimeout(() => fetchGroups(newSession.user.id), 0);
           }
         } else {
-          setProfile(null);
-          setUserGroups([]);
-          setCurrentGroupState(null);
-          setExpenses([]);
-          setExpenseSplits([]);
-          setGroupMembers([]);
-          setGroupsLoading(false);
-          groupsFetchedForRef.current = null;
+          clearAllState();
         }
       }
     );
 
-    // Periodic verification every 10 minutes
-    const intervalId = setInterval(() => {
-      if (userRef.current) {
-        verifySession();
-      }
-    }, 10 * 60 * 1000);
-
-    // Re-verify on visibility change (app resume from background)
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && userRef.current) {
-        setIsVerified(false); // Reset immediately before re-verification
-        verifySession();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-
     return () => {
       subscription.unsubscribe();
-      clearInterval(intervalId);
-      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, []);
 
