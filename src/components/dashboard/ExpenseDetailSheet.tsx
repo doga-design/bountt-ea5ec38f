@@ -61,8 +61,6 @@ export default function ExpenseDetailSheet({
   // Activity log
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
 
-  // Celebrate pending flag — set true when settlement completes, read in close handler
-  const celebratePendingRef = useRef(false);
 
   // Derived values
   const isCreator = expense ? expense.created_by === user?.id : false;
@@ -279,11 +277,6 @@ export default function ExpenseDetailSheet({
 
   const handleClose = (nextOpen: boolean) => {
     if (!nextOpen) {
-      // Check if we should fire confetti
-      if (celebratePendingRef.current) {
-        celebratePendingRef.current = false;
-        onSettled?.();
-      }
       setConfirmDelete(false);
       setDeleteError(null);
       setConfirmSplit(null);
