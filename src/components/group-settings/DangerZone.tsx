@@ -2,8 +2,9 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Group } from "@/types";
 import { useApp } from "@/contexts/AppContext";
-import { LogOut, Trash2 } from "lucide-react";
+import { LogOut, Trash2, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { getAvatarImage, getAvatarColor } from "@/lib/avatar-utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,10 +24,12 @@ interface DangerZoneProps {
 export default function DangerZone({ group, isAdmin }: DangerZoneProps) {
   const [showLeave, setShowLeave] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
   const [confirmName, setConfirmName] = useState("");
   const [leaveLoading, setLeaveLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const { leaveGroup, deleteGroup, groupMembers, user, expenses, expenseSplits } = useApp();
+  const [selectedSuccessor, setSelectedSuccessor] = useState<string | null>(null);
+  const { leaveGroup, deleteGroup, transferOwnership, groupMembers, user, expenses } = useApp();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -36,21 +39,57 @@ export default function DangerZone({ group, isAdmin }: DangerZoneProps) {
     return groupExpenses.length > 0;
   }, [expenses, group.id]);
 
-  // Bug 3 fix: Check if user is sole admin
+  // Check if user is sole admin
   const isSoleAdmin = isAdmin && groupMembers.filter(
     (m) => m.group_id === group.id && m.role === "admin" && m.status === "active"
   ).length <= 1;
 
-  const handleLeave = async () => {
+  // Eligible members for ownership transfer (active, non-placeholder, not self)
+  const eligibleMembers = useMemo(() => {
+    return groupMembers.filter(
+      (m) =>
+        m.group_id === group.id &&
+        m.status === "active" &&
+        !m.is_placeholder &&
+        m.user_id !== user?.id
+    );
+  }, [groupMembers, group.id, user?.id]);
+
+  const handleLeaveClick = () => {
     if (isSoleAdmin) {
-      toast({ title: "You're the only admin. Promote another member before leaving.", variant: "destructive" });
-      setShowLeave(false);
-      return;
+      if (eligibleMembers.length > 0) {
+        setSelectedSuccessor(null);
+        setShowTransfer(true);
+      } else {
+        toast({
+          title: "You're the only real member. Delete the group instead.",
+          variant: "destructive",
+        });
+      }
+    } else {
+      setShowLeave(true);
     }
+  };
+
+  const handleLeave = async () => {
     setLeaveLoading(true);
     await leaveGroup(group.id);
     setLeaveLoading(false);
     navigate("/");
+  };
+
+  const handleTransferAndLeave = async () => {
+    if (!selectedSuccessor) return;
+    setLeaveLoading(true);
+    try {
+      await transferOwnership(group.id, selectedSuccessor);
+      await leaveGroup(group.id);
+      navigate("/");
+    } catch {
+      // transferOwnership already shows a toast on error
+    } finally {
+      setLeaveLoading(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -66,16 +105,18 @@ export default function DangerZone({ group, isAdmin }: DangerZoneProps) {
       <h2 className="text-lg font-bold text-destructive">Danger Zone</h2>
 
       <button
-        onClick={() => setShowLeave(true)}
+        onClick={handleLeaveClick}
         className="w-full bg-card rounded-xl p-4 flex items-center gap-3 text-left"
       >
         <LogOut className="w-5 h-5 text-destructive" />
         <div>
           <p className="text-sm font-medium text-foreground">Leave Group</p>
           <p className="text-xs text-muted-foreground">
-            {isSoleAdmin
-              ? "Promote another admin before leaving"
-              : "You'll lose access to expenses"}
+            {isSoleAdmin && eligibleMembers.length === 0
+              ? "Delete the group to leave"
+              : isSoleAdmin
+                ? "Transfer admin to another member first"
+                : "You'll lose access to expenses"}
           </p>
         </div>
       </button>
@@ -93,25 +134,79 @@ export default function DangerZone({ group, isAdmin }: DangerZoneProps) {
         </button>
       )}
 
-      {/* Leave dialog */}
+      {/* Leave dialog (non-sole-admin path) */}
       <AlertDialog open={showLeave} onOpenChange={setShowLeave}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Leave {group.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              {isSoleAdmin
-                ? "You're the only admin. Promote another member to admin before leaving."
-                : "You'll lose access to all shared expenses in this group."}
+              You'll lose access to all shared expenses in this group.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleLeave}
-              disabled={isSoleAdmin || leaveLoading}
+              disabled={leaveLoading}
               className="bg-destructive text-destructive-foreground disabled:opacity-50"
             >
               {leaveLoading ? "Leaving…" : "Leave"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Transfer admin dialog (sole-admin path) */}
+      <AlertDialog open={showTransfer} onOpenChange={setShowTransfer}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Transfer admin before leaving</AlertDialogTitle>
+            <AlertDialogDescription>
+              Choose a member to take over as group admin. You'll leave the group after transferring.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {eligibleMembers.map((member) => {
+              const avatarImg = getAvatarImage(member);
+              const avatarColor = getAvatarColor(member);
+              const isSelected = selectedSuccessor === member.user_id;
+
+              return (
+                <button
+                  key={member.id}
+                  onClick={() => setSelectedSuccessor(member.user_id)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors ${
+                    isSelected
+                      ? "bg-primary/10 ring-2 ring-primary"
+                      : "bg-muted/50 hover:bg-muted"
+                  }`}
+                >
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: avatarColor.bg }}
+                  >
+                    <img src={avatarImg} alt={member.name} className="w-6 h-6" />
+                  </div>
+                  <span className="text-sm font-medium text-foreground flex-1 text-left truncate">
+                    {member.name}
+                  </span>
+                  {isSelected && (
+                    <Check className="w-5 h-5 text-primary flex-shrink-0" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSelectedSuccessor(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleTransferAndLeave}
+              disabled={!selectedSuccessor || leaveLoading}
+              className="bg-destructive text-destructive-foreground disabled:opacity-50"
+            >
+              {leaveLoading ? "Transferring…" : "Transfer & Leave"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
