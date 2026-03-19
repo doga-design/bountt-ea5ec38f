@@ -203,7 +203,7 @@ export default function Join() {
       p_actor_name: displayName,
     });
 
-    await fetchGroups();
+    await fetchGroups(true);
     toast({ title: `Joined ${groupName}!`, description: "Welcome to the group 🎉" });
     navigate(`/dashboard/${groupId}`);
   };
