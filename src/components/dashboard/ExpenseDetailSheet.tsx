@@ -84,7 +84,6 @@ export default function ExpenseDetailSheet({
     // Only auto-close if it transitioned from unsettled→settled while open
     if (open && expenseFullySettled && !settledAtOpenRef.current) {
       settledAtOpenRef.current = true; // prevent re-trigger
-      celebratePendingRef.current = true;
       const timer = setTimeout(() => {
         onSettled?.(); // fire confetti flag before closing
         onOpenChange(false);
