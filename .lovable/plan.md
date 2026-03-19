@@ -1,46 +1,30 @@
 
+Root cause confirmed from live request logs: the failing request is `PATCH /rest/v1/groups?id=eq.<groupId>` with body `{ "deleted_at": "..." }`, returning `403` with `new row violates row-level security policy for table "groups"`.
 
-# Fix: Group Deletion Blocked by RLS
+Why this still fails even after adding `WITH CHECK` on UPDATE:
+- The update succeeds only if the updated row is still readable by SELECT policies during PostgREST’s internal `UPDATE ... RETURNING`.
+- Your SELECT policy on `groups` requires `deleted_at IS NULL`.
+- Soft delete sets `deleted_at` to a timestamp, so the updated row becomes non-readable immediately, and PostgREST raises the RLS violation.
 
-## Root Cause
+Important clarification:
+- Group management is not fully broken; this issue specifically breaks the soft-delete update path.
+- Name/gradient updates should still pass because `deleted_at` remains `NULL` for those updates.
 
-The `groups` table has:
-- **SELECT policy**: `is_group_member(id, auth.uid()) AND (deleted_at IS NULL)`
-- **UPDATE policy**: `USING (auth.uid() = created_by)` — no explicit `WITH CHECK`
+Implementation plan:
+1. Add one RLS migration to adjust `groups` SELECT behavior for soft-deleted rows owned by the creator.
+   - Keep current member visibility for active groups.
+   - Add creator visibility for deleted rows (or fold into existing SELECT policy) so soft-delete `UPDATE ... RETURNING` can pass.
+   - Recommended final SELECT condition:
+     - `(is_group_member(id, auth.uid()) AND deleted_at IS NULL)`
+     - `OR (auth.uid() = created_by AND deleted_at IS NOT NULL)`
 
-PostgreSQL combines SELECT and UPDATE policies for UPDATE operations. When no explicit `WITH CHECK` is provided, the USING expression (combined with SELECT policies) is applied to the **new row**. After setting `deleted_at`, the new row fails `deleted_at IS NULL` from the SELECT policy, causing the 403 error.
+2. Keep the existing UPDATE policy with explicit `WITH CHECK (auth.uid() = created_by)` (already correct).
 
-## Fix
+3. Validate end-to-end after migration:
+   - Retry delete from Group Settings.
+   - Expect PATCH `groups` to return success (no 403).
+   - Group disappears from group list because client query still filters `deleted_at IS NULL`.
+   - Confirm rename/gradient/regenerate still work.
 
-One migration: drop and recreate the UPDATE policy with an **explicit `WITH CHECK`** so the new-row validation only checks ownership, not `deleted_at`:
-
-```sql
-DROP POLICY "Group creator can update group" ON groups;
-CREATE POLICY "Group creator can update group" ON groups
-FOR UPDATE TO authenticated
-USING (auth.uid() = created_by)
-WITH CHECK (auth.uid() = created_by);
-```
-
-This separates:
-- **USING** (which rows can be updated): still requires `auth.uid() = created_by` + row must be visible via SELECT policy
-- **WITH CHECK** (what the new row must satisfy): only `auth.uid() = created_by` — no `deleted_at IS NULL` check on the new row
-
-## Secondary fix: Show actual error messages
-
-In `AppContext.tsx` line 353, the catch block uses a generic "Failed to delete group" fallback because `PostgrestError` is not an instance of `Error`. Fix to extract the actual message:
-
-```ts
-const msg = (err as any)?.message || "Failed to delete group";
-toast({ title: msg, variant: "destructive" });
-```
-
-Apply same pattern to other catch blocks that use `err instanceof Error` (updateGroup, removeMember, etc.) so real error messages surface during debugging.
-
-## Files changed
-
-| File | Change |
-|------|--------|
-| Migration SQL | Recreate UPDATE policy with explicit WITH CHECK |
-| `src/contexts/AppContext.tsx` | Improve error message extraction in catch blocks |
-
+4. If needed, tighten further in a follow-up:
+   - Replace client table update with a backend function for soft delete to avoid future PostgREST `RETURNING` + SELECT-policy coupling.
