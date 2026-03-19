@@ -270,7 +270,7 @@ export default function Auth() {
                 className="w-full bg-primary text-primary-foreground rounded-full py-4 font-bold text-base flex items-center justify-center gap-2 mt-2 disabled:opacity-60"
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-                {mode === "signup" ? "Sign Up →" : "Sign In →"}
+                {mode === "signup" ? "Continue →" : "Sign In →"}
               </button>
             </form>
 
