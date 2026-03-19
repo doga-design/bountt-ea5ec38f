@@ -169,10 +169,9 @@ export default function Join() {
   };
 
   const joinAsNewMember = async (groupId: string, groupName: string) => {
-    // Bug 4 fix: Assign avatar_color on join
     const { data: existingMembers } = await supabase
       .from("group_members")
-      .select("avatar_color")
+      .select("avatar_color, avatar_index")
       .eq("group_id", groupId)
       .eq("status", "active");
 
@@ -183,16 +182,17 @@ export default function Join() {
     }
 
     const existingColors = existingMembers?.filter((m) => m.avatar_color).map((m) => m.avatar_color!) ?? [];
+    const existingIndices = existingMembers?.filter((m) => m.avatar_index != null).map((m) => m.avatar_index!) ?? [];
 
-    // Import pickAvailableColor
     const { pickAvailableColor } = await import("@/lib/avatar-utils");
-    const newColor = pickAvailableColor(existingColors);
+    const { color: newColor, index: newIndex } = pickAvailableColor(existingColors, existingIndices);
 
     const displayName = profile?.display_name ?? user!.email?.split("@")[0] ?? "Member";
     const { error: joinError } = await supabase.rpc("join_group", {
       p_group_id: groupId,
       p_display_name: displayName,
       p_avatar_color: newColor,
+      p_avatar_index: newIndex,
     });
 
     if (joinError) throw joinError;
