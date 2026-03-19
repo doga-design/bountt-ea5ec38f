@@ -430,6 +430,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setUserGroups((prev) => prev.filter((g) => g.id !== groupId));
       if (currentGroup?.id === groupId) {
         setCurrentGroupState(null);
+        // FIX 3: Clear stale data on leave
+        setGroupMembers([]);
+        setExpenses([]);
+        setExpenseSplits([]);
+        fetchVersionRef.current += 1;
       }
     } catch (err) {
       toast({ title: (err as any)?.message || "Failed to leave group", variant: "destructive" });
