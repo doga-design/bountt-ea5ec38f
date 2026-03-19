@@ -1,51 +1,45 @@
 
 
-# Update Cost Detail Bottom Sheet — Arc Visualization + Slide-to-Settle
+# Fix ExpenseSpokeViz — Three Visual Fixes
 
-Two visual changes to the expense detail sheet. No logic changes, no settlement changes, no RPC changes.
+## Fix 1 — SVG arcs terminate at exact avatar centers
 
-## Change 1 — Rewrite ExpenseSpokeViz.tsx Arc Visualization
+**Problem:** SVG paths use `slotWidth * i + slotWidth / 2` to estimate member positions, but the actual avatars are in a flex row with `gap: 8` and `justify-center`, so the SVG endpoints don't align with rendered avatar centers.
 
-**Current:** Straight dashed lines from payer to each member, positioned absolutely with complex trigonometry. No white ring on payer. Label text is tiny (10px). No background glow.
+**Solution:** Use refs to measure actual avatar positions relative to the container. Store an array of `{ x, y }` center coordinates via a `useCallback` ref on each member avatar wrapper. Also measure the payer avatar's center. The SVG is made `position: absolute` covering the full container so its coordinate space matches the DOM layout exactly. Paths go from payer center to each member center with a control point that creates a natural downward curve: `ctrlX = (payerCenterX + memberCenterX) / 2`, `ctrlY = payerCenterY + (memberCenterY - payerCenterY) * 0.15` — pulling the curve down from the payer.
 
-**New layout (matching reference):**
+- Add `memberPositions` state: `Record<number, { x: number; y: number }>`
+- Add `payerPos` state: `{ x: number; y: number }`
+- Use refs on payer div and each member avatar div, measure via `getBoundingClientRect()` relative to container's `getBoundingClientRect()` in the existing `ResizeObserver` callback + a `useLayoutEffect`
+- SVG becomes `position: absolute; inset: 0; width: 100%; height: 100%` with `overflow: visible`
+- Paths: `M ${payerPos.x} ${payerPos.y} Q ${ctrlX} ${ctrlY} ${memberPos.x} ${memberPos.y}`
 
-1. **Payer avatar** — centered at top, larger (64px), with a **white ring border** (3px solid white + box-shadow). Below it: `"You Paid · $48"` — "You Paid" in muted medium weight, amount in bold foreground. Use `·` separator.
+## Fix 2 — Member avatar size scales with count
 
-2. **Dashed arc paths** — replace straight `<line>` elements with **quadratic Bézier `<path>` curves** (same as `MemberAvatarGrid.tsx`). Each path curves from payer center downward to each member position. Include the **animated dot (particle)** effect — exact same `<animateMotion>` + `<animate opacity>` pattern from `MemberAvatarGrid.tsx`: a small circle traveling along the path with staggered timing and fade-out. Same stroke style: `#D4D4D4`, strokeWidth 1.5, strokeDasharray `4 4`.
+Replace the fixed `MEMBER_SIZE = 48` with a function:
 
-3. **Member avatars** — positioned in a horizontal row below the arc (not on a polar arc). Each avatar is 48px with white ring border. Below each:
-   - Line 1: `"[Name]'s share"` or `"[Name] settled"` — medium weight, muted color
-   - Line 2: `"· $[amount]"` — bold foreground
-   - Text wraps responsively for 4-5+ members. Use `max-w-[72px]` with `text-center leading-tight break-words`.
+```
+function getMemberSize(count: number): number {
+  if (count <= 1) return 72;
+  if (count === 2) return 64;
+  if (count === 3) return 56;
+  if (count === 4) return 48;
+  if (count === 5) return 44;
+  return 40; // 6+
+}
+```
 
-4. **Radial background glow** — a subtle warm radial gradient behind the entire viz area. CSS: `radial-gradient(ellipse at center, rgba(232, 72, 10, 0.04) 0%, transparent 70%)` — very subtle, warm-tinted, not harsh.
+Use `getMemberSize(members.length)` for avatar width/height. Border scales proportionally: `Math.max(2, Math.round(memberSize * 3 / 48))` — roughly 3px at 48, 2px at 40.
 
-5. **Layout approach** — use a simpler flex column layout:
-   - Payer avatar + label at top (centered)
-   - SVG overlay for curved dashed paths + animated dots
-   - Member avatars in a flex row at bottom (centered, wrapping)
-   - Remove all the trigonometric arc positioning code
+Payer stays fixed at 64px.
 
-**File:** `src/components/dashboard/ExpenseSpokeViz.tsx` — full rewrite of the render, keeping the same props interface and `canTap` logic.
+## Fix 3 — Settled checkmark badge above avatar, not clipped
 
-## Change 2 — Slide-to-Settle Bar Styling
+**Problem:** Badge is a child of the avatar div which has `overflow-hidden` (for the border-radius). It gets clipped.
 
-**Current (lines 527-552):** `bg-muted` track, `bg-foreground` thumb with `»` text character, label says "Slide to settle everyone →".
+**Solution:** Move the badge outside the avatar div but inside the member wrapper div. Position it absolutely, centered horizontally, above the avatar top edge. The member wrapper gets `position: relative` and the badge uses `absolute`, `left: 50%`, `transform: translateX(-50%)`, `top: -8px`, `z-index: 20`. The avatar div itself gets `grayscale` filter when settled instead of `opacity-60`. Remove `overflow-hidden` concern by keeping badge as a sibling, not a child.
 
-**New styling (matching reference):**
+## File Changed
 
-- Track: `bg-muted` (light gray) — keep as-is
-- Thumb: dark navy rounded rectangle — change from `rounded-full` to `rounded-2xl`, keep `bg-foreground`. Replace `»` text with `>>` using `ChevronsRight` icon from lucide-react (or keep `»` but style it bolder)
-- Label: `"Slide to settle everyone"` — remove the `→` arrow, keep muted text
-- No other logic changes. Same gesture handling, same threshold, same snap-back.
-
-**File:** `src/components/dashboard/ExpenseDetailSheet.tsx` — lines 527-552 only, minor style tweaks.
-
-## Files Changed
-
-- `src/components/dashboard/ExpenseSpokeViz.tsx` — rewrite visualization layout
-- `src/components/dashboard/ExpenseDetailSheet.tsx` — slide-to-settle style tweaks (lines 527-552 only)
-
-No settlement logic, no RPC, no DB changes.
+`src/components/dashboard/ExpenseSpokeViz.tsx` — rewrite render layout with measured positions, scaled sizes, and repositioned badge.
 
