@@ -535,6 +535,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, groupMembers, currentGroup]);
 
+  const transferOwnership = useCallback(async (groupId: string, newOwnerId: string) => {
+    if (!user) return;
+    try {
+      const { error: rpcError } = await supabase.rpc("transfer_group_ownership", {
+        p_group_id: groupId,
+        p_new_owner_id: newOwnerId,
+      });
+      if (rpcError) throw rpcError;
+      // Refresh groups and members to reflect new ownership
+      await Promise.all([
+        fetchGroups(user.id),
+        fetchMembers(groupId),
+      ]);
+    } catch (err) {
+      toast({ title: err instanceof Error ? err.message : "Failed to transfer ownership", variant: "destructive" });
+      throw err;
+    }
+  }, [user, fetchGroups, fetchMembers]);
+
   const calculateBalances = useCallback((): BalanceSummary[] => {
     return calcBalances(expenses);
   }, [expenses]);
