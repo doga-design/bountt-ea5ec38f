@@ -64,6 +64,17 @@ export default function Join() {
 
       // If user was previously in group but left, rejoin
       if (existing && existing.status === "left") {
+        // Check 6-member limit before rejoin
+        const { data: activeMembersCount } = await supabase
+          .from("group_members")
+          .select("id")
+          .eq("group_id", group.id)
+          .eq("status", "active");
+        if ((activeMembersCount?.length ?? 0) >= 6) {
+          toast({ title: "This group is full (6/6 members)" });
+          return;
+        }
+
         // Bug 5 fix: Check for color collision on rejoin
         const { data: activeColorRows } = await supabase
           .from("group_members")
@@ -159,6 +170,13 @@ export default function Join() {
       .select("avatar_color")
       .eq("group_id", groupId)
       .eq("status", "active");
+
+    // Check 6-member limit
+    if ((existingMembers?.length ?? 0) >= 6) {
+      toast({ title: "This group is full (6/6 members)" });
+      return;
+    }
+
     const existingColors = existingMembers?.filter((m) => m.avatar_color).map((m) => m.avatar_color!) ?? [];
 
     // Import pickAvailableColor
