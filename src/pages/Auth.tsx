@@ -22,6 +22,11 @@ export default function Auth() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
 
+  // FIX 6: Confirmation email resend state
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
+  const [confirmationEmail, setConfirmationEmail] = useState("");
+  const [resendLoading, setResendLoading] = useState(false);
+
   // If already logged in, redirect smartly
   useEffect(() => {
     if (authLoading || !user) return;
@@ -42,6 +47,7 @@ export default function Auth() {
     if (!email || !password) return;
 
     setLoading(true);
+    setNeedsConfirmation(false);
     try {
       if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
@@ -53,6 +59,8 @@ export default function Auth() {
 
         // Check if it's a fake signup (user already exists but unconfirmed re-signup)
         if (data.user && !data.session) {
+          setNeedsConfirmation(true);
+          setConfirmationEmail(email);
           toast({
             title: "Check your email!",
             description: "We sent you a confirmation link to verify your account.",
@@ -107,6 +115,28 @@ export default function Auth() {
     }
   };
 
+  // FIX 6: Resend confirmation email
+  const handleResendConfirmation = async () => {
+    if (!confirmationEmail) return;
+    setResendLoading(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: confirmationEmail,
+      });
+      if (error) throw error;
+      toast({ title: "Confirmation email resent!", description: "Check your inbox." });
+    } catch (err) {
+      toast({
+        title: "Failed to resend",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   // Don't render auth form if already logged in
   if (user && !authLoading) return null;
 
@@ -133,6 +163,7 @@ export default function Auth() {
                 onChange={(e) => setForgotEmail(e.target.value)}
                 placeholder="you@example.com"
                 required
+                autoComplete="email"
                 className="w-full text-base text-foreground bg-transparent outline-none placeholder:text-muted-foreground"
               />
             </div>
@@ -167,6 +198,7 @@ export default function Auth() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   required
+                  autoComplete="email"
                   className="w-full text-base text-foreground bg-transparent outline-none placeholder:text-muted-foreground"
                 />
               </div>
@@ -182,6 +214,7 @@ export default function Auth() {
                   placeholder="••••••••"
                   required
                   minLength={8}
+                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
                   className="w-full text-base text-foreground bg-transparent outline-none placeholder:text-muted-foreground"
                 />
               </div>
@@ -226,8 +259,21 @@ export default function Auth() {
               </button>
             </form>
 
+            {/* FIX 6: Resend confirmation email button — only after unconfirmed signup */}
+            {needsConfirmation && (
+              <button
+                type="button"
+                onClick={handleResendConfirmation}
+                disabled={resendLoading}
+                className="mt-4 text-sm text-primary font-semibold flex items-center gap-2"
+              >
+                {resendLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Resend confirmation email →
+              </button>
+            )}
+
             <button
-              onClick={() => setMode(mode === "signup" ? "signin" : "signup")}
+              onClick={() => { setMode(mode === "signup" ? "signin" : "signup"); setNeedsConfirmation(false); }}
               className="mt-4 text-sm text-muted-foreground font-medium"
             >
               {mode === "signup" ? "Already have an account? Sign in →" : "Need an account? Sign up →"}

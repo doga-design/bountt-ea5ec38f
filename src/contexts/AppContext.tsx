@@ -146,7 +146,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut({ scope: 'global' });
+    } catch (err) {
+      toast({
+        title: "Sign out failed",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   // =====================================================
