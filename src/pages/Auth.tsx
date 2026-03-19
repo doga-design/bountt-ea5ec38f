@@ -69,8 +69,7 @@ export default function Auth() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        // Redirect handled by useEffect above once user state updates
-        await fetchGroups();
+        // Redirect handled by onAuthStateChange → useEffect above
       }
     } catch (err) {
       toast({
