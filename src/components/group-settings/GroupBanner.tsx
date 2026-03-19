@@ -20,8 +20,9 @@ export default function GroupBanner({ group }: GroupBannerProps) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(group.name);
   const [showPicker, setShowPicker] = useState(false);
-  const { updateGroup } = useApp();
+  const { updateGroup, user } = useApp();
 
+  const isCreator = group.created_by === user?.id;
   const gradient = GRADIENTS[group.banner_gradient] ?? GRADIENTS["orange-red"];
 
   const handleNameSave = async () => {
@@ -34,14 +35,14 @@ export default function GroupBanner({ group }: GroupBannerProps) {
   return (
     <>
       <div
-        className="relative h-[200px] flex flex-col items-center justify-center cursor-pointer"
+        className={`relative h-[200px] flex flex-col items-center justify-center ${isCreator ? "cursor-pointer" : ""}`}
         style={{
           background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`,
         }}
-        onClick={() => !editing && setShowPicker(true)}
+        onClick={() => isCreator && !editing && setShowPicker(true)}
       >
         <span className="text-5xl mb-3">{group.emoji}</span>
-        {editing ? (
+        {isCreator && editing ? (
           <input
             className="text-2xl font-bold text-primary-foreground bg-transparent text-center outline-none"
             value={name}
@@ -53,8 +54,9 @@ export default function GroupBanner({ group }: GroupBannerProps) {
           />
         ) : (
           <h1
-            className="text-2xl font-bold text-primary-foreground cursor-text"
+            className={`text-2xl font-bold text-primary-foreground ${isCreator ? "cursor-text" : ""}`}
             onClick={(e) => {
+              if (!isCreator) return;
               e.stopPropagation();
               setEditing(true);
             }}
@@ -64,15 +66,17 @@ export default function GroupBanner({ group }: GroupBannerProps) {
         )}
       </div>
 
-      <GradientPicker
-        open={showPicker}
-        onOpenChange={setShowPicker}
-        current={group.banner_gradient}
-        onSelect={async (gradient) => {
-          await updateGroup(group.id, { banner_gradient: gradient });
-          setShowPicker(false);
-        }}
-      />
+      {isCreator && (
+        <GradientPicker
+          open={showPicker}
+          onOpenChange={setShowPicker}
+          current={group.banner_gradient}
+          onSelect={async (gradient) => {
+            await updateGroup(group.id, { banner_gradient: gradient });
+            setShowPicker(false);
+          }}
+        />
+      )}
     </>
   );
 }
