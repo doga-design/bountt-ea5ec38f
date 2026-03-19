@@ -234,14 +234,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .map((m) => m.avatar_color!);
       const newColor = pickAvailableColor(existingColors);
 
-      const { data, error: insertError } = await supabase
-        .from("group_members")
-        .insert({ group_id: groupId, user_id: null, name, is_placeholder: true, avatar_color: newColor })
-        .select()
-        .single();
+      const { data, error: insertError } = await supabase.rpc("add_placeholder_member", {
+        p_group_id: groupId,
+        p_name: name,
+        p_avatar_color: newColor,
+      });
 
       if (insertError) throw insertError;
-      const member = data as GroupMember;
+      const member = data as unknown as GroupMember;
       setGroupMembers((prev) => [...prev, member]);
       return member;
     } catch (err) {
