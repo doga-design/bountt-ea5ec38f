@@ -86,7 +86,6 @@ export default function ExpenseDetailSheet({
       settledAtOpenRef.current = true; // prevent re-trigger
       celebratePendingRef.current = true;
       const timer = setTimeout(() => {
-        onSettled?.(); // fire confetti flag before closing
         onOpenChange(false);
       }, 800);
       return () => clearTimeout(timer);
