@@ -387,7 +387,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           : "Member removed",
       });
     } catch (err) {
-      toast({ title: err instanceof Error ? err.message : "Failed to settle and remove member", variant: "destructive" });
+      toast({ title: (err as any)?.message || "Failed to settle and remove member", variant: "destructive" });
     }
   }, [fetchExpenses, fetchExpenseSplits, fetchMembers]);
 
