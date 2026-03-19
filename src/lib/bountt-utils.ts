@@ -7,9 +7,8 @@ import { Expense, BalanceSummary, SmartMatchSuggestion, GroupMember } from "@/ty
 export function generateInviteCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
-  const randomValues = crypto.getRandomValues(new Uint32Array(4));
   for (let i = 0; i < 4; i++) {
-    code += chars[randomValues[i] % chars.length];
+    code += chars[Math.floor(Math.random() * chars.length)];
   }
   return `BNTT-${code}`;
 }
