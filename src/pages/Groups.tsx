@@ -122,6 +122,10 @@ export default function Groups() {
           </button>
         </div>
       </div>
+      <BottomNav onFabPress={() => {
+        const lastGroupId = localStorage.getItem("bountt_last_group_id") || userGroups[0]?.id;
+        if (lastGroupId) navigate(`/dashboard/${lastGroupId}`);
+      }} />
     </div>
   );
 }
