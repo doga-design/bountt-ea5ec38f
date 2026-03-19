@@ -122,6 +122,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setUserGroups([]);
           setCurrentGroupState(null);
           setExpenses([]);
+          setExpenseSplits([]);
           setGroupMembers([]);
           setGroupsLoading(false);
           groupsFetchedForRef.current = null;
