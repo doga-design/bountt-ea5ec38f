@@ -1,37 +1,78 @@
-# Fix All Flows Broken by Security Changes
+# Two Fixes: Creator-Only Edit UI + Invite Code Regeneration
 
-## Root Causes
+## Fix 1 — GroupBanner: Hide edit UI for non-creators
 
-Three separate breaks from two security fixes:
+**File:** `src/components/group-settings/GroupBanner.tsx`
 
-1. `group_members` INSERT RLS set to `false` → direct `.insert()` calls fail
-2. `p_created_by` removed from `create_expense_with_splits` RPC → client calls with old param get 404
+Currently there is zero creator check — all members can click to edit name and open the gradient picker. The RLS blocks the actual update, but local state shows success until reload.
 
-## Fixes (4 changes, 3 files)
+**Change:** Import `useApp` to get `user`, then derive `isCreator = group.created_by === user?.id`. Three places to guard:
 
-### Fix A — AppContext.tsx: addPlaceholderMember (line 237-241)
+- Line 37: Remove `cursor-pointer` from the banner div for non-creators
+- Line 41: Only open gradient picker `onClick` if `isCreator`
+- Lines 55-63: Only allow name click-to-edit if `isCreator`. Non-creators see a plain `<h1>` with no `cursor-text` or click handler.
 
-Replace direct `.insert().select().single()` with `supabase.rpc("add_placeholder_member", { p_group_id, p_name, p_avatar_color })`. Parse returned JSONB directly as GroupMember.
+**Note:** In the `regenerate_invite_code` RPC, `v_chars` contains 32 characters but the modulo uses `% 31`. Change the modulo to `% 32` so all characters in the set are reachable. Alternatively, verify the character set length and make the modulo match exactly.
 
-### Fix B — Join.tsx: joinAsNewMember (line 168-176)
+No other files touched. No DB changes.
 
-Replace direct `.insert()` into group_members with `supabase.rpc("join_group", { p_group_id, p_display_name, p_avatar_color })`. The RPC already exists and handles duplicate checks, rejoin, etc.
+---
 
-### Fix C — ExpenseSheet.tsx: remove p_created_by (line 91)
+## Fix 2 — Invite Code Regeneration
 
-Remove `p_created_by: user.id` from the RPC call. The server now uses `auth.uid()` directly.
+### Part A — DB Migration: `regenerate_invite_code` RPC
 
-### Fix D — ExpenseScreen.tsx: remove p_created_by (line 513)
+```sql
+CREATE OR REPLACE FUNCTION public.regenerate_invite_code(p_group_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  v_user_id UUID;
+  v_new_code TEXT;
+  v_chars TEXT := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  v_random_bytes BYTEA;
+BEGIN
+  v_user_id := auth.uid();
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
 
-Same fix — remove `p_created_by: user.id` from the RPC call.  
-  
-Before implementing Fix B, confirm `join_group` RPC exists in the database by checking migration history or the Supabase function list. If it does not exist, create it in a migration first — takes `p_group_id`, `p_display_name`, `p_avatar_color`, verifies `auth.uid() IS NOT NULL` and user is not already an active member, inserts with `user_id = auth.uid()` and `is_placeholder = false`, returns new member row as JSONB, SECURITY DEFINER.
+  IF NOT EXISTS (
+    SELECT 1 FROM groups WHERE id = p_group_id AND created_by = v_user_id
+  ) THEN
+    RAISE EXCEPTION 'Only the group creator can regenerate the invite code';
+  END IF;
 
-## Files Changed
+  v_random_bytes := gen_random_bytes(4);
+  v_new_code := 'BNTT-';
+  FOR i IN 0..3 LOOP
+    v_new_code := v_new_code || substr(v_chars, (get_byte(v_random_bytes, i) % 31) + 1, 1);
+  END LOOP;
 
-- `src/contexts/AppContext.tsx` — lines 237-244
-- `src/pages/Join.tsx` — lines 168-178
-- `src/components/dashboard/ExpenseSheet.tsx` — line 91
-- `src/components/expense/ExpenseScreen.tsx` — line 513
+  UPDATE groups SET invite_code = v_new_code WHERE id = p_group_id;
 
-No DB migrations. No RLS changes. No UI changes.
+  RETURN jsonb_build_object('invite_code', v_new_code);
+END;
+$$;
+```
+
+### Part B — UI: Add regenerate button in SettingsCards.tsx
+
+**File:** `src/components/group-settings/SettingsCards.tsx`
+
+- Import `user` from `useApp()`, derive `isCreator = group.created_by === user?.id`
+- Add `inviteCode` state initialized from `group.invite_code`, use it for display and `generateJoinUrl`
+- Also gate the Group Name edit (pencil button + inline editing) behind `isCreator` — this component has a duplicate name-edit UI that should also be restricted
+- Below the Copy/Share buttons in the invite code card, add a "Regenerate" button (only visible to creator)
+- On tap: show `AlertDialog` confirmation — "This will invalidate the current invite link. Anyone with the old link won't be able to join." with "Regenerate" and "Cancel"
+- On confirm: call `supabase.rpc("regenerate_invite_code", { p_group_id: group.id })`. Update `inviteCode` state with returned value. Toast: "Invite code updated"
+- No red/green colors on any UI element
+
+**Files changed:**
+
+- `src/components/group-settings/GroupBanner.tsx` — add creator guard
+- `src/components/group-settings/SettingsCards.tsx` — add regenerate button + creator guards on name edit
+- 1 DB migration — `regenerate_invite_code` RPC
