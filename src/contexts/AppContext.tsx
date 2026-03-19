@@ -52,6 +52,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const currentGroupRef = useRef<Group | null>(null);
   useEffect(() => { currentGroupRef.current = currentGroup; }, [currentGroup]);
 
+  // FIX 5: Fetch version counter — prevents stale fetches from overwriting current data
+  const fetchVersionRef = useRef(0);
+
   // =====================================================
   // GROUPS (defined before AUTH so it can be called there)
   // =====================================================
@@ -172,6 +175,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       setUserGroups((prev) => [group, ...prev]);
       setCurrentGroupState(group);
+      // FIX 2: Clear stale data from previous group
+      setGroupMembers([]);
+      setExpenses([]);
+      setExpenseSplits([]);
+      fetchVersionRef.current += 1;
       return group;
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Failed to create group", variant: "destructive" });
@@ -181,14 +189,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const setCurrentGroup = useCallback((group: Group | null) => {
     setCurrentGroupState(group);
+    // FIX 1 & 5: Clear arrays synchronously and increment fetch version
+    setGroupMembers([]);
+    setExpenses([]);
+    setExpenseSplits([]);
+    fetchVersionRef.current += 1;
     if (group) {
       fetchMembers(group.id);
       fetchExpenses(group.id);
       fetchExpenseSplits(group.id);
-    } else {
-      setGroupMembers([]);
-      setExpenses([]);
-      setExpenseSplits([]);
     }
   }, []);
 
@@ -196,6 +205,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // MEMBERS
   // =====================================================
   const fetchMembers = useCallback(async (groupId: string) => {
+    const version = fetchVersionRef.current;
     setMembersLoading(true);
     try {
       const { data, error: fetchError } = await supabase
@@ -205,11 +215,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .order("joined_at", { ascending: true });
 
       if (fetchError) throw fetchError;
+      // FIX 5: Discard stale result if group switched during fetch
+      if (fetchVersionRef.current !== version) return;
       setGroupMembers((data as GroupMember[]) ?? []);
     } catch (err) {
+      if (fetchVersionRef.current !== version) return;
       toast({ title: err instanceof Error ? err.message : "Failed to fetch members", variant: "destructive" });
     } finally {
-      setMembersLoading(false);
+      if (fetchVersionRef.current === version) setMembersLoading(false);
     }
   }, []);
 
@@ -265,6 +278,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // EXPENSES
   // =====================================================
   const fetchExpenses = useCallback(async (groupId: string) => {
+    const version = fetchVersionRef.current;
     setExpensesLoading(true);
     try {
       const { data, error: fetchError } = await supabase
@@ -275,23 +289,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .order("created_at", { ascending: false });
 
       if (fetchError) throw fetchError;
+      // FIX 5: Discard stale result if group switched during fetch
+      if (fetchVersionRef.current !== version) return;
       setExpenses((data as Expense[]) ?? []);
     } catch (err) {
+      if (fetchVersionRef.current !== version) return;
       toast({ title: err instanceof Error ? err.message : "Failed to fetch expenses", variant: "destructive" });
     } finally {
-      setExpensesLoading(false);
+      if (fetchVersionRef.current === version) setExpensesLoading(false);
     }
   }, []);
 
   // Fix 9: Use RPC for efficient group splits fetching
   const fetchExpenseSplits = useCallback(async (groupId: string) => {
+    const version = fetchVersionRef.current;
     try {
       const { data, error: fetchError } = await supabase
         .rpc("get_group_splits", { p_group_id: groupId });
 
       if (fetchError) throw fetchError;
+      // FIX 5: Discard stale result if group switched during fetch
+      if (fetchVersionRef.current !== version) return;
       setExpenseSplits((data as ExpenseSplit[]) ?? []);
     } catch (err) {
+      if (fetchVersionRef.current !== version) return;
       if (import.meta.env.DEV) console.error("Failed to fetch expense splits", err);
       toast({ title: "Couldn't load expense details. Pull to refresh.", variant: "destructive" });
     }
@@ -348,6 +369,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setUserGroups((prev) => prev.filter((g) => g.id !== groupId));
       if (currentGroup?.id === groupId) {
         setCurrentGroupState(null);
+        // FIX 3: Clear stale data on delete
+        setGroupMembers([]);
+        setExpenses([]);
+        setExpenseSplits([]);
+        fetchVersionRef.current += 1;
       }
     } catch (err) {
       toast({ title: (err as any)?.message || "Failed to delete group", variant: "destructive" });
@@ -416,6 +442,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setUserGroups((prev) => prev.filter((g) => g.id !== groupId));
       if (currentGroup?.id === groupId) {
         setCurrentGroupState(null);
+        // FIX 3: Clear stale data on leave
+        setGroupMembers([]);
+        setExpenses([]);
+        setExpenseSplits([]);
+        fetchVersionRef.current += 1;
       }
     } catch (err) {
       toast({ title: (err as any)?.message || "Failed to leave group", variant: "destructive" });
