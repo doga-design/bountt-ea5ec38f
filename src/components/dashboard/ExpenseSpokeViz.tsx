@@ -100,7 +100,7 @@ export default function ExpenseSpokeViz({
   const count = members.length;
   const memberSize = getMemberSize(count);
   const memberBorder = getBorderWidth(memberSize);
-  const payerColor = payer ? getAvatarColor(payer) : "#8B5CF6";
+  const payerColor = payer ? getAvatarColor(payer).bg : '#B984E5';
   const payerImg = payer ? getAvatarImage(payer) : undefined;
 
   const canTap = (m: SpokeMember) => {
