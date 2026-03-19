@@ -52,6 +52,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const currentGroupRef = useRef<Group | null>(null);
   useEffect(() => { currentGroupRef.current = currentGroup; }, [currentGroup]);
 
+  // FIX 5: Fetch version counter — prevents stale fetches from overwriting current data
+  const fetchVersionRef = useRef(0);
+
   // =====================================================
   // GROUPS (defined before AUTH so it can be called there)
   // =====================================================
