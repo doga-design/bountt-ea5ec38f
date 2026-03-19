@@ -350,7 +350,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setCurrentGroupState(null);
       }
     } catch (err) {
-      toast({ title: err instanceof Error ? err.message : "Failed to delete group", variant: "destructive" });
+      toast({ title: (err as any)?.message || "Failed to delete group", variant: "destructive" });
     }
   }, [currentGroup]);
 
@@ -363,7 +363,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (updateError) throw updateError;
       setGroupMembers((prev) => prev.map((m) => m.id === memberId ? { ...m, status: "left", left_at: new Date().toISOString() } : m));
     } catch (err) {
-      toast({ title: err instanceof Error ? err.message : "Failed to remove member", variant: "destructive" });
+      toast({ title: (err as any)?.message || "Failed to remove member", variant: "destructive" });
     }
   }, []);
 
@@ -387,7 +387,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           : "Member removed",
       });
     } catch (err) {
-      toast({ title: err instanceof Error ? err.message : "Failed to settle and remove member", variant: "destructive" });
+      toast({ title: (err as any)?.message || "Failed to settle and remove member", variant: "destructive" });
     }
   }, [fetchExpenses, fetchExpenseSplits, fetchMembers]);
 
@@ -418,7 +418,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setCurrentGroupState(null);
       }
     } catch (err) {
-      toast({ title: err instanceof Error ? err.message : "Failed to leave group", variant: "destructive" });
+      toast({ title: (err as any)?.message || "Failed to leave group", variant: "destructive" });
     }
   }, [user, groupMembers, currentGroup]);
 
