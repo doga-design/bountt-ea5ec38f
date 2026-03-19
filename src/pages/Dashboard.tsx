@@ -126,7 +126,8 @@ export default function Dashboard() {
     return { unsettledGroups: groups, settledExpenses: settled };
   }, [expenses]);
 
-  if (isLoading && !hasOtherMembers && !hasExpenses) {
+  // FIX 4: Group parity guard — show spinner if data doesn't match current URL group
+  if (!currentGroup || currentGroup.id !== groupId || membersLoading || expensesLoading) {
     return (
       <div className="screen-container items-center justify-center">
         <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />

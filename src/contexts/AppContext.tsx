@@ -302,13 +302,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Fix 9: Use RPC for efficient group splits fetching
   const fetchExpenseSplits = useCallback(async (groupId: string) => {
+    const version = fetchVersionRef.current;
     try {
       const { data, error: fetchError } = await supabase
         .rpc("get_group_splits", { p_group_id: groupId });
 
       if (fetchError) throw fetchError;
+      // FIX 5: Discard stale result if group switched during fetch
+      if (fetchVersionRef.current !== version) return;
       setExpenseSplits((data as ExpenseSplit[]) ?? []);
     } catch (err) {
+      if (fetchVersionRef.current !== version) return;
       if (import.meta.env.DEV) console.error("Failed to fetch expense splits", err);
       toast({ title: "Couldn't load expense details. Pull to refresh.", variant: "destructive" });
     }
