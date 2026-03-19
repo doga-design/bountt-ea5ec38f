@@ -1,3 +1,4 @@
+import { useRef, useState, useEffect } from "react";
 import { GroupMember } from "@/types";
 import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
 import { formatCurrency } from "@/lib/bountt-utils";
@@ -20,15 +21,12 @@ interface ExpenseSpokeVizProps {
   currentUserId: string;
   isPayer: boolean;
   onMemberTap: (splitId: string, memberName: string, shareAmount: number) => void;
-  /** Ref callback so parent can get avatar DOM positions for popover anchoring */
   memberAvatarRef?: (splitId: string, el: HTMLDivElement | null) => void;
 }
 
-const PAYER_SIZE = 56;
+const PAYER_SIZE = 64;
 const MEMBER_SIZE = 48;
-const ARC_DEGREES = 160;
-const ARC_START_DEG = (180 - ARC_DEGREES) / 2 + 180; // center the arc below payer
-const DEG_TO_RAD = Math.PI / 180;
+const SVG_ARC_HEIGHT = 80;
 
 export default function ExpenseSpokeViz({
   payer,
@@ -40,29 +38,20 @@ export default function ExpenseSpokeViz({
   onMemberTap,
   memberAvatarRef,
 }: ExpenseSpokeVizProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => setContainerWidth(el.offsetWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [members.length]);
+
   const count = members.length;
-  // Radius scales: at 320px min width, ensure no overlap for 6 members
-  const radius = Math.max(90, Math.min(120, 300 / (count + 1)));
-  const centerX = 50; // percentage
-
-  // SVG viewBox dimensions
-  const svgWidth = 300;
-  const svgHeight = radius + MEMBER_SIZE / 2 + 30;
-  const payerCx = svgWidth / 2;
-  const payerCy = PAYER_SIZE / 2 + 4;
-
-  // Calculate member positions on the arc
-  const memberPositions = members.map((_, i) => {
-    const angleDeg =
-      count === 1
-        ? 270 // straight down
-        : ARC_START_DEG + (ARC_DEGREES / (count - 1)) * i;
-    const angleRad = angleDeg * DEG_TO_RAD;
-    const x = payerCx + radius * Math.cos(angleRad);
-    const y = payerCy + radius * Math.sin(angleRad);
-    return { x, y };
-  });
-
   const payerColor = payer ? getAvatarColor(payer) : "#8B5CF6";
   const payerImg = payer ? getAvatarImage(payer) : undefined;
 
@@ -73,56 +62,109 @@ export default function ExpenseSpokeViz({
     return false;
   };
 
+  // Member slot positions (centered row)
+  const slotWidth = count > 0 ? containerWidth / count : containerWidth;
+  const apexX = containerWidth / 2;
+
   return (
-    <div className="flex flex-col items-center w-full py-2">
-      {/* Payer label */}
-      <p className="text-xs font-semibold text-muted-foreground mb-1">
-        {isPayer ? "You" : payerName} paid · {formatCurrency(totalAmount)}
-      </p>
-
-      <div className="relative w-full" style={{ maxWidth: svgWidth, height: svgHeight + 60 }}>
-        {/* Dashed lines SVG */}
-        <svg
-          className="absolute inset-0 w-full h-full"
-          viewBox={`0 0 ${svgWidth} ${svgHeight + 60}`}
-          fill="none"
-          style={{ pointerEvents: "none" }}
-        >
-          {memberPositions.map((pos, i) => (
-            <line
-              key={i}
-              x1={payerCx}
-              y1={payerCy}
-              x2={pos.x}
-              y2={pos.y}
-              stroke="hsl(var(--border))"
-              strokeWidth={1.5}
-              strokeDasharray="6 4"
-              opacity={members[i].isSettled ? 0.3 : 0.6}
-            />
-          ))}
-        </svg>
-
-        {/* Payer avatar */}
+    <div
+      ref={containerRef}
+      className="flex flex-col items-center w-full py-2 relative"
+      style={{
+        background:
+          "radial-gradient(ellipse at center, rgba(232, 72, 10, 0.04) 0%, transparent 70%)",
+      }}
+    >
+      {/* Payer avatar + label */}
+      <div className="flex flex-col items-center z-10">
         <div
-          className="absolute rounded-full flex items-center justify-center border-2 border-card"
+          className="rounded-full flex items-center justify-center overflow-hidden"
           style={{
             width: PAYER_SIZE,
             height: PAYER_SIZE,
             backgroundColor: payerColor,
-            left: `calc(50% - ${PAYER_SIZE / 2}px)`,
-            top: 4,
-            zIndex: 10,
+            border: "3px solid white",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
           }}
         >
           {payerImg && (
-            <img src={payerImg} alt={payerName} className="w-full h-full rounded-full object-cover" />
+            <img
+              src={payerImg}
+              alt={payerName}
+              className="w-[75%] h-[75%] object-contain"
+              draggable={false}
+            />
           )}
         </div>
+        <p className="mt-1.5 text-xs text-center">
+          <span className="font-medium text-muted-foreground">
+            {isPayer ? "You" : payerName} paid
+          </span>
+          <span className="text-muted-foreground"> · </span>
+          <span className="font-bold text-foreground">
+            {formatCurrency(totalAmount)}
+          </span>
+        </p>
+      </div>
 
-        {/* Member avatars */}
-        {members.map((m, i) => {
-          const pos = memberPositions[i];
+      {/* SVG arc paths with animated dots */}
+      {count >= 1 && containerWidth > 0 && (
+        <svg
+          style={{
+            width: "100%",
+            height: SVG_ARC_HEIGHT,
+            overflow: "visible",
+            pointerEvents: "none",
+          }}
+        >
+          {members.map((m, i) => {
+            const endX = slotWidth * i + slotWidth / 2;
+            const endY = SVG_ARC_HEIGHT;
+            const ctrlX = endX;
+            const ctrlY = 0;
+            const d = `M ${apexX} 0 Q ${ctrlX} ${ctrlY} ${endX} ${endY}`;
+            const dur = `${1.2 + (i * 0.3) % 1.2}s`;
+            const begin = `${i * 0.4}s`;
+
+            return (
+              <g key={i} opacity={m.isSettled ? 0.3 : 1}>
+                <path
+                  d={d}
+                  stroke="#D4D4D4"
+                  strokeWidth="1.5"
+                  strokeDasharray="4 4"
+                  fill="none"
+                />
+                {!m.isSettled && (
+                  <circle r="4" fill="#D4D4D4">
+                    <animateMotion
+                      path={d}
+                      dur={dur}
+                      begin={begin}
+                      repeatCount="indefinite"
+                      calcMode="spline"
+                      keySplines="0.4 0 0.6 1"
+                      keyTimes="0;1"
+                    />
+                    <animate
+                      attributeName="opacity"
+                      values="1;1;0"
+                      keyTimes="0;0.7;1"
+                      dur={dur}
+                      begin={begin}
+                      repeatCount="indefinite"
+                    />
+                  </circle>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      )}
+
+      {/* Member avatars row */}
+      <div className="flex justify-center w-full z-10" style={{ gap: 8 }}>
+        {members.map((m) => {
           const memberColor = m.member ? getAvatarColor(m.member) : "#8B5CF6";
           const memberImg = m.member ? getAvatarImage(m.member) : undefined;
           const tappable = canTap(m);
@@ -132,31 +174,36 @@ export default function ExpenseSpokeViz({
           return (
             <div
               key={m.splitId}
-              className="absolute flex flex-col items-center"
-              style={{
-                left: pos.x - MEMBER_SIZE / 2,
-                top: pos.y - MEMBER_SIZE / 2,
-                zIndex: 10,
-              }}
+              className="flex flex-col items-center"
+              style={{ width: Math.max(MEMBER_SIZE, Math.min(72, slotWidth - 8)) }}
             >
-              {/* Avatar circle */}
               <div
                 ref={(el) => memberAvatarRef?.(m.splitId, el)}
-                onClick={() => tappable && onMemberTap(m.splitId, m.name, m.shareAmount)}
-                className={`relative rounded-full flex items-center justify-center border-2 border-card ${
-                  tappable ? "cursor-pointer active:scale-95 transition-transform" : "cursor-default"
+                onClick={() =>
+                  tappable && onMemberTap(m.splitId, m.name, m.shareAmount)
+                }
+                className={`relative rounded-full flex items-center justify-center overflow-hidden ${
+                  tappable
+                    ? "cursor-pointer active:scale-95 transition-transform"
+                    : "cursor-default"
                 } ${m.isSettled ? "opacity-60" : ""}`}
                 style={{
                   width: MEMBER_SIZE,
                   height: MEMBER_SIZE,
                   backgroundColor: memberColor,
+                  border: "3px solid white",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
                 }}
               >
                 {memberImg && (
-                  <img src={memberImg} alt={m.name} className="w-full h-full rounded-full object-cover" />
+                  <img
+                    src={memberImg}
+                    alt={m.name}
+                    className="w-[75%] h-[75%] object-contain"
+                    draggable={false}
+                  />
                 )}
 
-                {/* Settled checkmark badge */}
                 {m.isSettled && (
                   <div
                     className="absolute -top-1 -right-1 rounded-full flex items-center justify-center bg-foreground"
@@ -167,11 +214,10 @@ export default function ExpenseSpokeViz({
                 )}
               </div>
 
-              {/* Label below avatar */}
-              <span className="text-[10px] font-medium text-muted-foreground mt-1 text-center leading-tight max-w-[64px] truncate">
+              <span className="text-[10px] font-medium text-muted-foreground mt-1 text-center leading-tight max-w-[72px] break-words">
                 {m.isSettled ? `${label} settled` : `${label}'s share`}
               </span>
-              <span className="text-[10px] font-semibold text-foreground">
+              <span className="text-[11px] font-bold text-foreground">
                 {formatCurrency(m.shareAmount)}
               </span>
             </div>
