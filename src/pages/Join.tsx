@@ -177,7 +177,7 @@ export default function Join() {
     // Log member joined activity
     await supabase.rpc("log_member_joined", {
       p_group_id: groupId,
-      p_actor_name: memberName,
+      p_actor_name: displayName,
     });
 
     await fetchGroups();
