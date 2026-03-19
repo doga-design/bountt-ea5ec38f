@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { supabase } from "@/integrations/supabase/client";
+import BottomNav from "@/components/BottomNav";
 
 const GRADIENTS: Record<string, { from: string; to: string }> = {
   "solid-orange": { from: "hsl(18,89%,47%)", to: "hsl(18,89%,47%)" },
@@ -121,6 +122,10 @@ export default function Groups() {
           </button>
         </div>
       </div>
+      <BottomNav onFabPress={() => {
+        const lastGroupId = localStorage.getItem("bountt_last_group_id") || userGroups[0]?.id;
+        if (lastGroupId) navigate(`/dashboard/${lastGroupId}`);
+      }} />
     </div>
   );
 }
