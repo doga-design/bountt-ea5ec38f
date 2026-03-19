@@ -313,33 +313,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_placeholder_member: {
+        Args: { p_avatar_color: string; p_group_id: string; p_name: string }
+        Returns: Json
+      }
       claim_placeholder: { Args: { p_placeholder_id: string }; Returns: string }
-      create_expense_with_splits:
-        | {
-            Args: {
-              p_amount: number
-              p_created_by: string
-              p_description: string
-              p_group_id: string
-              p_paid_by_name: string
-              p_paid_by_user_id: string
-              p_splits: Json
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_amount: number
-              p_created_by: string
-              p_description: string
-              p_expense_type?: string
-              p_group_id: string
-              p_paid_by_name: string
-              p_paid_by_user_id: string
-              p_splits: Json
-            }
-            Returns: Json
-          }
+      create_expense_with_splits: {
+        Args: {
+          p_amount: number
+          p_description: string
+          p_expense_type?: string
+          p_group_id: string
+          p_paid_by_name: string
+          p_paid_by_user_id: string
+          p_splits: Json
+        }
+        Returns: Json
+      }
       create_group_with_creator: {
         Args: {
           p_avatar_color: string
@@ -398,6 +388,14 @@ export type Database = {
       is_group_member: {
         Args: { p_group_id: string; p_user_id: string }
         Returns: boolean
+      }
+      join_group: {
+        Args: {
+          p_avatar_color: string
+          p_display_name: string
+          p_group_id: string
+        }
+        Returns: Json
       }
       log_member_joined: {
         Args: { p_actor_name: string; p_group_id: string }
