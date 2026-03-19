@@ -278,6 +278,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // EXPENSES
   // =====================================================
   const fetchExpenses = useCallback(async (groupId: string) => {
+    const version = fetchVersionRef.current;
     setExpensesLoading(true);
     try {
       const { data, error: fetchError } = await supabase
@@ -288,11 +289,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .order("created_at", { ascending: false });
 
       if (fetchError) throw fetchError;
+      // FIX 5: Discard stale result if group switched during fetch
+      if (fetchVersionRef.current !== version) return;
       setExpenses((data as Expense[]) ?? []);
     } catch (err) {
+      if (fetchVersionRef.current !== version) return;
       toast({ title: err instanceof Error ? err.message : "Failed to fetch expenses", variant: "destructive" });
     } finally {
-      setExpensesLoading(false);
+      if (fetchVersionRef.current === version) setExpensesLoading(false);
     }
   }, []);
 
