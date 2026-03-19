@@ -88,7 +88,6 @@ export default function ExpenseSheet({
           p_description: description.trim() || "Quick Expense",
           p_paid_by_user_id: payer.user_id,
           p_paid_by_name: payer.name,
-          p_created_by: user.id,
           p_splits: splits,
         });
 
