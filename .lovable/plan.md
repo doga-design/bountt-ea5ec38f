@@ -1,112 +1,65 @@
-## Security Hardening — 5 Fixes
+## Two Bug Fixes: Post-Claim Fetch & Admin Leave Transfer
 
-### Files touched
+### BUG 1 — Post-placeholder-claim group fetch
 
-- `src/contexts/AppContext.tsx` (Fix 1)
-- `src/components/AuthGuard.tsx` (Fix 5)
-- `src/types/index.ts` (Fix 5 — add `isVerified` to context type)
-- 3 database migrations (Fixes 2, 3, 4)
+**Root cause analysis:** After `claim_placeholder` succeeds (Join.tsx:218-222), `fetchGroups()` is called directly (line 225). `fetchGroups` itself has no guard — it always queries. However, `groupsFetchedForRef.current` is already set to the user's ID from the initial auth flow (AppContext.tsx:167). If `onAuthStateChange` fires again (e.g., token refresh during the claim flow), the guard at line 166 will skip the re-fetch because `groupsFetchedForRef.current === newSession.user.id`.
 
-After every migration runs, explicitly confirm whether it succeeded or failed. Do not assume success. For the `on_auth_user_deleted` trigger specifically, after the migration runs, query `pg_trigger` to verify the trigger is actually attached: `SELECT tgname FROM pg_trigger WHERE tgname = 'on_auth_user_deleted'` — show the result before proceeding to the next fix.
+The `claim_placeholder` RPC correctly writes `auth.uid()` server-side (not client-provided). The membership row will have the correct `user_id` and `status = 'active'`. The issue is that the direct `fetchGroups()` call works, but any subsequent auth event won't re-fetch — and if the direct call's result is overwritten by a stale auth-triggered flow, the group disappears from state.
+
+**Fix:** In Join.tsx `handlePlaceholderSelection`, reset `groupsFetchedForRef.current = null` before calling `fetchGroups()`. This requires either:
+
+- Exposing a `resetGroupsFetched` function from AppContext, or
+- Having `fetchGroups` always reset the ref internally when called explicitly
+
+Cleanest approach: Add a `forceRefresh` parameter to `fetchGroups`. When `true`, reset `groupsFetchedForRef.current = null` before proceeding. Call `fetchGroups(true)` from Join.tsx after claim. Also apply this in `joinAsNewMember` and the rejoin path for consistency.
+
+**Files changed:**
+
+- `src/contexts/AppContext.tsx` — Add optional `forceRefresh` param to `fetchGroups`
+- `src/types/index.ts` — Update `fetchGroups` signature
+- `src/pages/Join.tsx` — Pass `true` to all three `fetchGroups()` calls
 
 ---
 
-### FIX 1 — Mid-session periodic verification (AppContext.tsx)
+### BUG 2 — Admin leave dead end → transfer UI
 
-Inside the auth `useEffect` (line 102), after registering `onAuthStateChange`, add:
+**Current state:** DangerZone.tsx line 45-48 blocks sole admin with a toast and disables the Leave button (line 111). `transfer_group_ownership` RPC exists and works. No client code calls it. No `transferOwnership` function in AppContext.
 
-- Extract the `getUser()` + cleanup logic into a named `verifySession()` function
-- Set a 10-minute `setInterval` that calls `verifySession()` only if `user` is set
-- Also call `verifySession()` on `visibilitychange` when document becomes visible (app resume from background)
-- Clean up interval and visibility listener in the effect return
-- Add `isVerified` state: starts `false`, set `true` on successful verification, reset `false` on SIGNED_OUT and on verify failure
+**Fix — 3 parts:**
 
-### FIX 2 — Attach missing DB triggers (Migration)
+**Part A — AppContext: add `transferOwnership` function**
 
-Two triggers are confirmed missing:
+- Call `transfer_group_ownership` RPC with `p_group_id` and `p_new_owner_id`
+- On success, refetch groups and members to update local state
+- Add to context value and `AppContextValue` type
 
-`**trg_prevent_sole_admin_leave**`: Function `prevent_sole_admin_leave()` exists but was never attached. Create trigger:
+Before implementing Part A, read the full body of `transfer_group_ownership` RPC and confirm whether `p_new_owner_id` expects `group_members.id` or `user_id`. Pass whichever the RPC actually requires — do not assume.
 
-```sql
-DROP TRIGGER IF EXISTS trg_prevent_sole_admin_leave ON public.group_members;
-CREATE TRIGGER trg_prevent_sole_admin_leave
-  BEFORE UPDATE ON public.group_members
-  FOR EACH ROW EXECUTE FUNCTION public.prevent_sole_admin_leave();
-```
+**Part B — DangerZone.tsx: replace dead-end with member selection**
 
-`**on_auth_user_deleted**`: Function `handle_user_deletion()` exists but was never attached to `auth.users`. Create trigger:
+- Add state: `showTransfer` boolean, `selectedSuccessor` string
+- Compute `eligibleMembers`: active, non-placeholder, `user_id !== user.id` members from `groupMembers`
+- When sole admin taps Leave Group:
+  - If `eligibleMembers.length > 0` → open transfer sheet (`setShowTransfer(true)`)
+  - If `eligibleMembers.length === 0` → show message "You're the only real member. Delete the group instead."
+- Transfer dialog shows member list with avatars and names
+- "Transfer & Leave" button: calls `transferOwnership(group.id, selectedSuccessor)` then `leaveGroup(group.id)` then `navigate("/")`
+- Error handling: destructive toast, stay on screen
 
-```sql
-CREATE TRIGGER on_auth_user_deleted
-  BEFORE DELETE ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_user_deletion();
-```
+**Part C — Types update**
 
-Note: `trg_enforce_member_limit` IS already attached (confirmed in migration `20260319161223`).
+- Add `transferOwnership: (groupId: string, newOwnerId: string) => Promise<void>` to `AppContextValue`
 
-### FIX 3 — Orphaned groups on creator deletion (Migration)
+**Files changed:**
 
-**Part A — New RPC `transfer_group_ownership`:**
+- `src/contexts/AppContext.tsx` — Add `transferOwnership` function, export in value
+- `src/types/index.ts` — Add to `AppContextValue` interface
+- `src/components/group-settings/DangerZone.tsx` — Replace dead-end with transfer member selection dialog
 
-- Parameters: `p_group_id uuid`, `p_new_owner_id uuid`
-- Verify caller is current `created_by`
-- Verify new owner is active non-placeholder member
-- Update `groups.created_by`, update roles, write activity log
-- `SECURITY DEFINER`
-
-**Part B — Enhance `handle_user_deletion` trigger:**
-After marking memberships as `left`, for each group where `created_by = OLD.id`:
-
-- Find oldest active non-placeholder member (by `joined_at`)
-- If found: transfer `created_by` and set their role to `admin`
-- If none found: soft-delete group (`deleted_at = now()`)
-
-This prevents orphaned groups entirely.
-
-### FIX 4 — Unsettleable expenses when payer deleted (Migration)
-
-Modify `settle_all` and `settle_member_share` RPCs:
-
-- After the existing payer check fails (`paid_by_user_id != auth.uid()`), add fallback:
-- If `paid_by_user_id IS NULL` OR payer no longer exists in `auth.users`, allow the group creator to call these RPCs
-- Check: `EXISTS (SELECT 1 FROM groups WHERE id = v_expense.group_id AND created_by = v_actor_id)`
-- All existing authorization for active payers is unchanged
-
-### FIX 5 — isVerified gates AuthGuard (AuthGuard.tsx + types)
-
-- Add `isVerified` to `AppContextValue` interface in `types/index.ts`
-- Export `isVerified` from AppContext value object
-- AuthGuard checks `!isVerified` alongside `authLoading` — shows spinner until verified
-- Protected content never renders until server-side verification completes
-
-**Fix 2 —** `on_auth_user_deleted` **trigger on** `auth.users`
-
-This is the most risky part of the plan. Creating triggers on `auth.users` requires elevated permissions that may not be available through normal migrations in Supabase. The `auth` schema is managed by Supabase internally. If this migration fails silently, the trigger never attaches and you won't know. Tell Lovable to wrap this in a `DO $$ BEGIN ... EXCEPTION WHEN OTHERS THEN NULL; END $$` block and log the result, so you know whether it succeeded or failed.
-
-**Fix 3 —** `handle_user_deletion` **enhancement**
-
-The current trigger only does one thing — mark memberships as left. You're now asking it to also find next owners, transfer ownership, and soft-delete groups. This is significantly more logic inside a trigger that fires on `auth.users` DELETE. If this trigger fails for any reason, the entire user deletion could fail or behave unexpectedly. Make sure Lovable wraps the new logic in its own `BEGIN ... EXCEPTION WHEN OTHERS THEN NULL; END` block so a failure in the ownership transfer doesn't block the membership cleanup.
-
-**Fix 4 — Fallback payer authorization**
-
-The fallback check `EXISTS (SELECT 1 FROM groups WHERE id = v_expense.group_id AND created_by = v_actor_id)` is correct. Just confirm this check is added as an OR condition alongside the existing payer check — not replacing it. The existing payer authorization must remain completely unchanged for all normal cases.
-
-**Fix 5 —** `isVerified` **and the 10-minute interval**
-
-The interval calls `verifySession()` only if `user` is set. Make sure the interval check reads from a ref not from state — state closures inside `setInterval` go stale in React. If it reads from state directly, it will always see the initial value of `user` (null) and never fire. Use `userRef.current` or equivalent.
+**UI approach:** Reuse existing `AlertDialog` pattern already in DangerZone. Member list renders each eligible member with avatar (using existing `getAvatarImage` + avatar color) and name. Radio-style selection. Confirm button disabled until selection made.
 
 ---
 
 ### What stays the same
 
-All expense creation, group creation, split logic, UI components (except AuthGuard spinner condition), routing structure — untouched.
-
-### Verification checklist
-
-- Deleted user opens app → `getUser()` fails → redirected to `/auth`
-- Deleted user has app open → caught within 10 minutes by interval
-- App resumes from background → `visibilitychange` triggers re-verification
-- Creator account deleted → group auto-transfers to next member or soft-deletes
-- Payer account deleted → group creator can settle their expenses
-- `trg_prevent_sole_admin_leave` and `on_auth_user_deleted` triggers confirmed active
-- All existing functionality works identically
+All settlement logic, expense creation, realtime subscriptions, auth flows, routing — untouched. No new screens. No DB migrations needed (RPC already exists).
