@@ -20,7 +20,7 @@ function Avatar({
   size?: number;
   className?: string;
 }) {
-  const bg = member ? getAvatarColor(member) : "#9CA3AF";
+  const bg = member ? getAvatarColor(member).bg : '#DFDFDF';
   const img = member ? getAvatarImage(member) : null;
   return (
     <div
