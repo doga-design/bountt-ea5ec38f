@@ -1,128 +1,112 @@
-## Pre-Launch Fixes: Confetti, Avatar Collision, Admin Transfer
+## Security Hardening — 5 Fixes
 
 ### Files touched
 
-- `src/components/dashboard/ExpenseDetailSheet.tsx` (Fix 1)
-- `src/lib/avatar-utils.ts` (Fix 2 — no changes needed, already correct)
-- `src/components/group-settings/DangerZone.tsx` (Fix 3)
-- `src/types/index.ts` (Fix 3 — if context type needs update)
-- `src/contexts/AppContext.tsx` (Fix 3 — wire `transferGroupOwnership`)
-- 1 database migration (Fix 2 — unique constraint + drop old RPCs)
+- `src/contexts/AppContext.tsx` (Fix 1)
+- `src/components/AuthGuard.tsx` (Fix 5)
+- `src/types/index.ts` (Fix 5 — add `isVerified` to context type)
+- 3 database migrations (Fixes 2, 3, 4)
 
-Before implementing Fix 1, trace the full confetti path and confirm every step is working: does the auto-close effect fire after settlement, does it call `onSettled`, does `handleSettlementComplete` set `pendingConfettiRef.current = true`, does `handleDetailOpenChange(false)` read it and fire confetti. If any step is broken, identify and fix it before removing `celebratePendingRef`.
-
-For Fix 2 backfill, use a PL/pgSQL DO block that assigns only indices 1-6 not already taken in each group — do not use sequential row numbering which could collide with existing values.
-
-For Fix 3, placeholders must not appear as selectable transfer targets in the member picker. Only active non-placeholder real members should be listed.
+After every migration runs, explicitly confirm whether it succeeded or failed. Do not assume success. For the `on_auth_user_deleted` trigger specifically, after the migration runs, query `pg_trigger` to verify the trigger is actually attached: `SELECT tgname FROM pg_trigger WHERE tgname = 'on_auth_user_deleted'` — show the result before proceeding to the next fix.
 
 ---
 
-### Fix 1 — Confetti
+### FIX 1 — Mid-session periodic verification (AppContext.tsx)
 
-**Current state:** The auto-close effect (ExpenseDetailSheet lines 83-93) correctly detects settlement transition and calls `onSettled?.()` → Dashboard's `handleSettlementComplete` → sets `pendingConfettiRef.current = true` → `onOpenChange(false)` → Dashboard's `handleDetailOpenChange` reads the ref and fires confetti. This path is correctly wired.
+Inside the auth `useEffect` (line 102), after registering `onAuthStateChange`, add:
 
-`celebratePendingRef` (line 65) in ExpenseDetailSheet is dead code — declared, checked in `handleClose` (line 283), but never set to true anywhere. It's a vestige of an earlier approach.
+- Extract the `getUser()` + cleanup logic into a named `verifySession()` function
+- Set a 10-minute `setInterval` that calls `verifySession()` only if `user` is set
+- Also call `verifySession()` on `visibilitychange` when document becomes visible (app resume from background)
+- Clean up interval and visibility listener in the effect return
+- Add `isVerified` state: starts `false`, set `true` on successful verification, reset `false` on SIGNED_OUT and on verify failure
 
-**Fix:** Remove `celebratePendingRef` entirely — the declaration (line 65), and the check in `handleClose` (lines 283-286). The auto-close path through Dashboard's `pendingConfettiRef` is the correct and working mechanism.
+### FIX 2 — Attach missing DB triggers (Migration)
 
-**Risk:** The auto-close effect depends on `expenseFullySettled` updating via realtime → refetch → state update while the drawer is still open. If the refetch is slow, the 800ms delay timer might need adjustment. But the logic is sound — this is a cleanup, not a behavioral change.
+Two triggers are confirmed missing:
 
----
-
-### Fix 2 — Avatar collision
-
-**Part A — DB unique constraint (migration):**
-
-```sql
--- Clean up any existing duplicates first (keep lowest id)
-DELETE FROM group_members a
-USING group_members b
-WHERE a.group_id = b.group_id
-  AND a.avatar_index = b.avatar_index
-  AND a.status = 'active'
-  AND b.status = 'active'
-  AND a.id > b.id;
-
--- Add unique partial index
-CREATE UNIQUE INDEX idx_unique_avatar_index_per_group
-ON group_members (group_id, avatar_index)
-WHERE status = 'active' AND avatar_index IS NOT NULL;
-```
-
-**Part B — Drop old 3-param RPC overloads that don't set avatar_index:**
+`**trg_prevent_sole_admin_leave**`: Function `prevent_sole_admin_leave()` exists but was never attached. Create trigger:
 
 ```sql
-DROP FUNCTION IF EXISTS public.join_group(uuid, text, text);
-DROP FUNCTION IF EXISTS public.add_placeholder_member(uuid, text, text);
-DROP FUNCTION IF EXISTS public.create_group_with_creator(uuid, text, text, text, text);
+DROP TRIGGER IF EXISTS trg_prevent_sole_admin_leave ON public.group_members;
+CREATE TRIGGER trg_prevent_sole_admin_leave
+  BEFORE UPDATE ON public.group_members
+  FOR EACH ROW EXECUTE FUNCTION public.prevent_sole_admin_leave();
 ```
 
-Wait — `create_group_with_creator` 5-param takes `(text, text, text, text, text)` not `(uuid, ...)`. Need to match exact signatures. Will verify in migration.
-
-**Part C — Backfill NULL avatar_index values:**
+`**on_auth_user_deleted**`: Function `handle_user_deletion()` exists but was never attached to `auth.users`. Create trigger:
 
 ```sql
--- For each group, assign sequential indexes to members with NULL avatar_index
-WITH numbered AS (
-  SELECT id, group_id,
-    ROW_NUMBER() OVER (PARTITION BY group_id ORDER BY joined_at) as rn
-  FROM group_members
-  WHERE avatar_index IS NULL AND status = 'active'
-)
-UPDATE group_members gm
-SET avatar_index = n.rn
-FROM numbered n
-WHERE gm.id = n.id
-  AND n.rn <= 6;
+CREATE TRIGGER on_auth_user_deleted
+  BEFORE DELETE ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_user_deletion();
 ```
 
-This needs care to avoid conflicts with existing non-null indexes in the same group. More precise approach:
+Note: `trg_enforce_member_limit` IS already attached (confirmed in migration `20260319161223`).
 
-```sql
-WITH existing AS (
-  SELECT group_id, array_agg(avatar_index) as used
-  FROM group_members
-  WHERE avatar_index IS NOT NULL AND status = 'active'
-  GROUP BY group_id
-),
-to_fix AS (
-  SELECT gm.id, gm.group_id,
-    ROW_NUMBER() OVER (PARTITION BY gm.group_id ORDER BY gm.joined_at) as rn
-  FROM group_members gm
-  WHERE gm.avatar_index IS NULL AND gm.status = 'active'
-)
--- This is complex in pure SQL. Will use a DO block with a loop.
-```
+### FIX 3 — Orphaned groups on creator deletion (Migration)
 
-Will implement as a PL/pgSQL DO block that iterates and assigns the first available index per group.
+**Part A — New RPC `transfer_group_ownership`:**
 
----
+- Parameters: `p_group_id uuid`, `p_new_owner_id uuid`
+- Verify caller is current `created_by`
+- Verify new owner is active non-placeholder member
+- Update `groups.created_by`, update roles, write activity log
+- `SECURITY DEFINER`
 
-### Fix 3 — Admin transfer before leave
+**Part B — Enhance `handle_user_deletion` trigger:**
+After marking memberships as `left`, for each group where `created_by = OLD.id`:
 
-**What exists:** `transfer_group_ownership` RPC exists in DB. `DangerZone.tsx` blocks sole admin from leaving with a toast message and disabled button. No UI to select a successor. Dead end.
+- Find oldest active non-placeholder member (by `joined_at`)
+- If found: transfer `created_by` and set their role to `admin`
+- If none found: soft-delete group (`deleted_at = now()`)
 
-**What to build:**
+This prevents orphaned groups entirely.
 
-1. **In DangerZone.tsx** — When `isSoleAdmin` is true and user taps "Leave Group", show a member selection dialog instead of blocking. List all active non-placeholder members (excluding self). Tapping a member calls `transfer_group_ownership` RPC, then calls `leaveGroup`.
-2. **In AppContext.tsx** — Add `transferOwnership(groupId, newOwnerId)` function that calls the RPC and refetches group data.
+### FIX 4 — Unsettleable expenses when payer deleted (Migration)
 
-**UI approach:** Reuse `AlertDialog` pattern already in DangerZone. When sole admin taps Leave:
+Modify `settle_all` and `settle_member_share` RPCs:
 
-- Show dialog: "Choose a new admin before leaving"
-- List active non-placeholder members with their avatars
-- Tap member → confirm → transfer → leave → navigate home
+- After the existing payer check fails (`paid_by_user_id != auth.uid()`), add fallback:
+- If `paid_by_user_id IS NULL` OR payer no longer exists in `auth.users`, allow the group creator to call these RPCs
+- Check: `EXISTS (SELECT 1 FROM groups WHERE id = v_expense.group_id AND created_by = v_actor_id)`
+- All existing authorization for active payers is unchanged
 
-**Flow:**
+### FIX 5 — isVerified gates AuthGuard (AuthGuard.tsx + types)
 
-1. User taps Leave Group
-2. If `isSoleAdmin` and other real members exist → show member picker dialog
-3. If `isSoleAdmin` and NO other real members → show "Delete the group or add another member first" (current behavior, but only for groups with only placeholders)
-4. User selects successor → `transferOwnership()` → `leaveGroup()` → navigate to `/`
-5. If not sole admin → show current leave confirmation dialog (unchanged)
+- Add `isVerified` to `AppContextValue` interface in `types/index.ts`
+- Export `isVerified` from AppContext value object
+- AuthGuard checks `!isVerified` alongside `authLoading` — shows spinner until verified
+- Protected content never renders until server-side verification completes
+
+**Fix 2 —** `on_auth_user_deleted` **trigger on** `auth.users`
+
+This is the most risky part of the plan. Creating triggers on `auth.users` requires elevated permissions that may not be available through normal migrations in Supabase. The `auth` schema is managed by Supabase internally. If this migration fails silently, the trigger never attaches and you won't know. Tell Lovable to wrap this in a `DO $$ BEGIN ... EXCEPTION WHEN OTHERS THEN NULL; END $$` block and log the result, so you know whether it succeeded or failed.
+
+**Fix 3 —** `handle_user_deletion` **enhancement**
+
+The current trigger only does one thing — mark memberships as left. You're now asking it to also find next owners, transfer ownership, and soft-delete groups. This is significantly more logic inside a trigger that fires on `auth.users` DELETE. If this trigger fails for any reason, the entire user deletion could fail or behave unexpectedly. Make sure Lovable wraps the new logic in its own `BEGIN ... EXCEPTION WHEN OTHERS THEN NULL; END` block so a failure in the ownership transfer doesn't block the membership cleanup.
+
+**Fix 4 — Fallback payer authorization**
+
+The fallback check `EXISTS (SELECT 1 FROM groups WHERE id = v_expense.group_id AND created_by = v_actor_id)` is correct. Just confirm this check is added as an OR condition alongside the existing payer check — not replacing it. The existing payer authorization must remain completely unchanged for all normal cases.
+
+**Fix 5 —** `isVerified` **and the 10-minute interval**
+
+The interval calls `verifySession()` only if `user` is set. Make sure the interval check reads from a ref not from state — state closures inside `setInterval` go stale in React. If it reads from state directly, it will always see the initial value of `user` (null) and never fire. Use `userRef.current` or equivalent.
 
 ---
 
 ### What stays the same
 
-All settlement logic, expense creation, auth flows, realtime subscriptions, routing — untouched.
+All expense creation, group creation, split logic, UI components (except AuthGuard spinner condition), routing structure — untouched.
+
+### Verification checklist
+
+- Deleted user opens app → `getUser()` fails → redirected to `/auth`
+- Deleted user has app open → caught within 10 minutes by interval
+- App resumes from background → `visibilitychange` triggers re-verification
+- Creator account deleted → group auto-transfers to next member or soft-deletes
+- Payer account deleted → group creator can settle their expenses
+- `trg_prevent_sole_admin_leave` and `on_auth_user_deleted` triggers confirmed active
+- All existing functionality works identically

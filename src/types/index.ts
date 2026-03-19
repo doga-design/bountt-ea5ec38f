@@ -134,7 +134,6 @@ export interface AppContextValue extends AppState {
   createGroup: (name: string, emoji: string) => Promise<Group | null>;
   updateGroup: (groupId: string, updates: Partial<Pick<Group, 'name' | 'banner_gradient'>>) => Promise<void>;
   deleteGroup: (groupId: string) => Promise<void>;
-  transferOwnership: (groupId: string, newOwnerId: string) => Promise<boolean>;
 
   // Member actions
   fetchMembers: (groupId: string) => Promise<void>;
