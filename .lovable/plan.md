@@ -1,30 +1,75 @@
+## Group Data Isolation — 5 Targeted Fixes
 
-Root cause confirmed from live request logs: the failing request is `PATCH /rest/v1/groups?id=eq.<groupId>` with body `{ "deleted_at": "..." }`, returning `403` with `new row violates row-level security policy for table "groups"`.
+### FIX 1 — `AppContext.tsx` `setCurrentGroup` (lines 182-193)
 
-Why this still fails even after adding `WITH CHECK` on UPDATE:
-- The update succeeds only if the updated row is still readable by SELECT policies during PostgREST’s internal `UPDATE ... RETURNING`.
-- Your SELECT policy on `groups` requires `deleted_at IS NULL`.
-- Soft delete sets `deleted_at` to a timestamp, so the updated row becomes non-readable immediately, and PostgREST raises the RLS violation.
+Clear all three arrays synchronously before firing async fetches for non-null groups:
 
-Important clarification:
-- Group management is not fully broken; this issue specifically breaks the soft-delete update path.
-- Name/gradient updates should still pass because `deleted_at` remains `NULL` for those updates.
+```
+setCurrentGroup = (group) => {
+  setCurrentGroupState(group);
+  setGroupMembers([]);
+  setExpenses([]);
+  setExpenseSplits([]);
+  if (group) {
+    fetchMembers(group.id);
+    fetchExpenses(group.id);
+    fetchExpenseSplits(group.id);
+  }
+}
+```
 
-Implementation plan:
-1. Add one RLS migration to adjust `groups` SELECT behavior for soft-deleted rows owned by the creator.
-   - Keep current member visibility for active groups.
-   - Add creator visibility for deleted rows (or fold into existing SELECT policy) so soft-delete `UPDATE ... RETURNING` can pass.
-   - Recommended final SELECT condition:
-     - `(is_group_member(id, auth.uid()) AND deleted_at IS NULL)`
-     - `OR (auth.uid() = created_by AND deleted_at IS NOT NULL)`
+### FIX 2 — `AppContext.tsx` `createGroup` (lines 151-180)
 
-2. Keep the existing UPDATE policy with explicit `WITH CHECK (auth.uid() = created_by)` (already correct).
+After `setCurrentGroupState(group)` on line 174, add three synchronous clears:
 
-3. Validate end-to-end after migration:
-   - Retry delete from Group Settings.
-   - Expect PATCH `groups` to return success (no 403).
-   - Group disappears from group list because client query still filters `deleted_at IS NULL`.
-   - Confirm rename/gradient/regenerate still work.
+```
+setGroupMembers([]);
+setExpenses([]);
+setExpenseSplits([]);
+```
 
-4. If needed, tighten further in a follow-up:
-   - Replace client table update with a backend function for soft delete to avoid future PostgREST `RETURNING` + SELECT-policy coupling.
+### FIX 3 — `AppContext.tsx` `deleteGroup` (lines 341-355)
+
+After `setCurrentGroupState(null)` on line 350, add explicit clears (the null path in `setCurrentGroup` won't fire since we call `setCurrentGroupState` directly here):
+
+```
+setGroupMembers([]);
+setExpenses([]);
+setExpenseSplits([]);
+```
+
+Same treatment for `leaveGroup` (line 417-419) which has the identical pattern.
+
+### FIX 4 — `Dashboard.tsx` loading guard (line 129)
+
+Replace current condition with group parity check:
+
+```
+if (!currentGroup || currentGroup.id !== groupId || membersLoading || expensesLoading) {
+  return <LoadingSpinner />;
+}
+```
+
+This eliminates the `!hasOtherMembers && !hasExpenses` bypass that lets stale data render.
+
+### FIX 5 — `AppContext.tsx` fetch version counter
+
+Add `fetchVersionRef = useRef(0)`. Increment in `setCurrentGroup`. Each fetch function (`fetchMembers`, `fetchExpenses`, `fetchExpenseSplits`) captures the version at call start; on resolve, checks if it still matches before calling the setter. Stale results are silently discarded.
+
+Affected lines:
+
+- New ref declaration near line 52
+- Increment in `setCurrentGroup` (line 182)
+- Guard in `fetchMembers` (lines 198-214)
+- Guard in `fetchExpenses` (lines 267-284)
+- Guard in `fetchExpenseSplits` (lines 287-298)
+
+**Notes:** For `leaveGroup` at line 417-419 — if it calls `setCurrentGroupState(null)` directly, add the three explicit clears. If it calls `setCurrentGroup(null)`, skip it — Fix 1 already handles it.
+
+### Files touched
+
+Only `AppContext.tsx` and `Dashboard.tsx`. No RPCs, RLS, settlement, realtime filters, or other files changed.
+
+### What stays the same
+
+Settlement flows, expense CRUD, realtime subscriptions, avatar system, member removal, join/claim, activity log, group switching persistence — all untouched.
