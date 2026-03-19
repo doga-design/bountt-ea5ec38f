@@ -1,75 +1,43 @@
-## Group Data Isolation — 5 Targeted Fixes
 
-### FIX 1 — `AppContext.tsx` `setCurrentGroup` (lines 182-193)
 
-Clear all three arrays synchronously before firing async fetches for non-null groups:
-
-```
-setCurrentGroup = (group) => {
-  setCurrentGroupState(group);
-  setGroupMembers([]);
-  setExpenses([]);
-  setExpenseSplits([]);
-  if (group) {
-    fetchMembers(group.id);
-    fetchExpenses(group.id);
-    fetchExpenseSplits(group.id);
-  }
-}
-```
-
-### FIX 2 — `AppContext.tsx` `createGroup` (lines 151-180)
-
-After `setCurrentGroupState(group)` on line 174, add three synchronous clears:
-
-```
-setGroupMembers([]);
-setExpenses([]);
-setExpenseSplits([]);
-```
-
-### FIX 3 — `AppContext.tsx` `deleteGroup` (lines 341-355)
-
-After `setCurrentGroupState(null)` on line 350, add explicit clears (the null path in `setCurrentGroup` won't fire since we call `setCurrentGroupState` directly here):
-
-```
-setGroupMembers([]);
-setExpenses([]);
-setExpenseSplits([]);
-```
-
-Same treatment for `leaveGroup` (line 417-419) which has the identical pattern.
-
-### FIX 4 — `Dashboard.tsx` loading guard (line 129)
-
-Replace current condition with group parity check:
-
-```
-if (!currentGroup || currentGroup.id !== groupId || membersLoading || expensesLoading) {
-  return <LoadingSpinner />;
-}
-```
-
-This eliminates the `!hasOtherMembers && !hasExpenses` bypass that lets stale data render.
-
-### FIX 5 — `AppContext.tsx` fetch version counter
-
-Add `fetchVersionRef = useRef(0)`. Increment in `setCurrentGroup`. Each fetch function (`fetchMembers`, `fetchExpenses`, `fetchExpenseSplits`) captures the version at call start; on resolve, checks if it still matches before calling the setter. Stale results are silently discarded.
-
-Affected lines:
-
-- New ref declaration near line 52
-- Increment in `setCurrentGroup` (line 182)
-- Guard in `fetchMembers` (lines 198-214)
-- Guard in `fetchExpenses` (lines 267-284)
-- Guard in `fetchExpenseSplits` (lines 287-298)
-
-**Notes:** For `leaveGroup` at line 417-419 — if it calls `setCurrentGroupState(null)` directly, add the three explicit clears. If it calls `setCurrentGroup(null)`, skip it — Fix 1 already handles it.
+## Security Hardening — 6 Fixes
 
 ### Files touched
+- `src/contexts/AppContext.tsx` (Fixes 1, 2, 3)
+- `index.html` (Fix 4)
+- `src/pages/Auth.tsx` (Fixes 5, 6)
 
-Only `AppContext.tsx` and `Dashboard.tsx`. No RPCs, RLS, settlement, realtime filters, or other files changed.
+---
+
+### FIX 1 — Global signOut (AppContext.tsx line 147-149)
+Change `supabase.auth.signOut()` to `supabase.auth.signOut({ scope: 'global' })`. Revokes refresh token server-side.
+
+### FIX 2 — try/catch on signOut (AppContext.tsx line 147-149)
+Wrap the signOut call in try/catch. On failure, show a destructive toast. No state cleanup duplication — `onAuthStateChange` handles that.
+
+### FIX 3 — Clear expenseSplits on SIGNED_OUT (AppContext.tsx line 124-125)
+Add `setExpenseSplits([])` between `setExpenses([])` and `setGroupMembers([])` in the SIGNED_OUT cleanup block.
+
+### FIX 4 — Content Security Policy (index.html)
+Add a `<meta http-equiv="Content-Security-Policy">` tag in `<head>` with:
+- `default-src 'self'`
+- `script-src 'self' 'unsafe-inline'` (Vite needs inline scripts)
+- `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`
+- `font-src 'self' https://fonts.gstatic.com`
+- `img-src 'self' data: blob: https://storage.googleapis.com` (OG images reference this domain)
+- `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.lovable.dev https://*.lovable.app` (Supabase API + realtime + Lovable OAuth)
+- `frame-ancestors 'none'`
+
+### FIX 5 — autocomplete attributes (Auth.tsx)
+- Email input: add `autoComplete="email"`
+- Password input: add `autoComplete={mode === "signup" ? "new-password" : "current-password"}`
+- Forgot-password email input: add `autoComplete="email"`
+
+### FIX 6 — Confirmation email resend (Auth.tsx)
+Add state `needsConfirmation` (boolean) and `confirmationEmail` (string). After successful signup with `data.user && !data.session`, set both. Render a "Resend confirmation email" button inline below the form when `needsConfirmation` is true. On tap, call `supabase.auth.resend({ type: 'signup', email: confirmationEmail })`, show success/error toast. Button only appears after an unconfirmed signup — not always visible.
+
+---
 
 ### What stays the same
+All RLS policies, RPCs, settlement logic, expense logic, realtime subscriptions, routing, and all other files remain untouched.
 
-Settlement flows, expense CRUD, realtime subscriptions, avatar system, member removal, join/claim, activity log, group switching persistence — all untouched.
