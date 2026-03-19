@@ -184,14 +184,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const setCurrentGroup = useCallback((group: Group | null) => {
     setCurrentGroupState(group);
+    // FIX 1 & 5: Clear arrays synchronously and increment fetch version
+    setGroupMembers([]);
+    setExpenses([]);
+    setExpenseSplits([]);
+    fetchVersionRef.current += 1;
     if (group) {
       fetchMembers(group.id);
       fetchExpenses(group.id);
       fetchExpenseSplits(group.id);
-    } else {
-      setGroupMembers([]);
-      setExpenses([]);
-      setExpenseSplits([]);
     }
   }, []);
 
