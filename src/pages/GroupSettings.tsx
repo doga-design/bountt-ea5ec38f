@@ -87,13 +87,15 @@ export default function GroupSettings() {
           currentUserId={user?.id ?? ""}
           onCardClick={setSelectedMember}
           addButton={
-            <button
-              onClick={() => setShowAddMember(true)}
-              className="min-w-[260px] flex-shrink-0 rounded-xl border-2 border-dashed border-muted-foreground/30 bg-muted/50 flex items-center justify-center gap-2 p-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
-            >
-              <Plus className="w-4 h-4" />
-              Add Member
-            </button>
+            activeMembers.length < 6 ? (
+              <button
+                onClick={() => setShowAddMember(true)}
+                className="min-w-[260px] flex-shrink-0 rounded-xl border-2 border-dashed border-muted-foreground/30 bg-muted/50 flex items-center justify-center gap-2 p-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
+              >
+                <Plus className="w-4 h-4" />
+                Add Member
+              </button>
+            ) : undefined
           }
         />
 

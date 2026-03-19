@@ -170,6 +170,13 @@ export default function Join() {
       .select("avatar_color")
       .eq("group_id", groupId)
       .eq("status", "active");
+
+    // Check 6-member limit
+    if ((existingMembers?.length ?? 0) >= 6) {
+      toast({ title: "This group is full (6/6 members)" });
+      return;
+    }
+
     const existingColors = existingMembers?.filter((m) => m.avatar_color).map((m) => m.avatar_color!) ?? [];
 
     // Import pickAvailableColor

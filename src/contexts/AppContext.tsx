@@ -218,6 +218,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   ): Promise<GroupMember | null> => {
     if (!user) return null;
 
+    // Enforce 6-member limit (client-side UX check; DB trigger is source of truth)
+    const activeCount = groupMembers.filter(
+      (m) => m.group_id === groupId && m.status === "active"
+    ).length;
+    if (activeCount >= 6) {
+      toast({ title: "Group is full (6/6 members)" });
+      return null;
+    }
+
     // Bug 2 fix: Prevent duplicate placeholder names (client-side UX check; DB index is source of truth)
     const duplicate = groupMembers.find(
       (m) => m.group_id === groupId && m.status === "active"
