@@ -667,6 +667,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     createGroup,
     updateGroup,
     deleteGroup,
+    transferOwnership,
     fetchMembers,
     addPlaceholderMember,
     removeMember,
