@@ -175,6 +175,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       setUserGroups((prev) => [group, ...prev]);
       setCurrentGroupState(group);
+      // FIX 2: Clear stale data from previous group
+      setGroupMembers([]);
+      setExpenses([]);
+      setExpenseSplits([]);
+      fetchVersionRef.current += 1;
       return group;
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Failed to create group", variant: "destructive" });
