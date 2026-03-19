@@ -682,6 +682,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     addExpense,
     fetchExpenseSplits,
     calculateBalances,
+    transferOwnership,
     signOut,
   };
 
