@@ -277,11 +277,6 @@ export default function ExpenseDetailSheet({
 
   const handleClose = (nextOpen: boolean) => {
     if (!nextOpen) {
-      // Check if we should fire confetti
-      if (celebratePendingRef.current) {
-        celebratePendingRef.current = false;
-        onSettled?.();
-      }
       setConfirmDelete(false);
       setDeleteError(null);
       setConfirmSplit(null);
