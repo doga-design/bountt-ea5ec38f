@@ -1,65 +1,63 @@
-## Two Bug Fixes: Post-Claim Fetch & Admin Leave Transfer
 
-### BUG 1 — Post-placeholder-claim group fetch
 
-**Root cause analysis:** After `claim_placeholder` succeeds (Join.tsx:218-222), `fetchGroups()` is called directly (line 225). `fetchGroups` itself has no guard — it always queries. However, `groupsFetchedForRef.current` is already set to the user's ID from the initial auth flow (AppContext.tsx:167). If `onAuthStateChange` fires again (e.g., token refresh during the claim flow), the guard at line 166 will skip the re-fetch because `groupsFetchedForRef.current === newSession.user.id`.
+## Remove verifySession — Trust onAuthStateChange
 
-The `claim_placeholder` RPC correctly writes `auth.uid()` server-side (not client-provided). The membership row will have the correct `user_id` and `status = 'active'`. The issue is that the direct `fetchGroups()` call works, but any subsequent auth event won't re-fetch — and if the direct call's result is overwritten by a stale auth-triggered flow, the group disappears from state.
+### Problem
+`verifySession()` calls `getUser()` on every app open, every sign-in, every 10 minutes, and every background resume. If that network call fails (slow connection, brief outage, network switch), the user is immediately signed out. This causes random kick-outs in production.
 
-**Fix:** In Join.tsx `handlePlaceholderSelection`, reset `groupsFetchedForRef.current = null` before calling `fetchGroups()`. This requires either:
+### Changes
 
-- Exposing a `resetGroupsFetched` function from AppContext, or
-- Having `fetchGroups` always reset the ref internally when called explicitly
+**1. `src/contexts/AppContext.tsx`**
 
-Cleanest approach: Add a `forceRefresh` parameter to `fetchGroups`. When `true`, reset `groupsFetchedForRef.current = null` before proceeding. Call `fetchGroups(true)` from Join.tsx after claim. Also apply this in `joinAsNewMember` and the rejoin path for consistency.
+Delete:
+- `isVerified` state (line 24)
+- `userRef` ref and its sync effect (lines 27-28)
+- `verifySession` function (lines 128-143)
+- 10-minute `setInterval` (lines 187-191)
+- `visibilitychange` listener (lines 194-200)
+- Cleanup for interval and visibility listener (lines 204-205)
+- `isVerified` from `clearAllState` (line 124)
+- `isVerified` from context value (line 650)
+- Session expiry toast that reads `userRef` (lines 163-165)
 
-**Files changed:**
+Simplify `onAuthStateChange` handler (lines 146-184) to:
+```
+async (event, newSession) => {
+  setSession(newSession);
+  setUser(newSession?.user ?? null);
+  setAuthLoading(false);
 
-- `src/contexts/AppContext.tsx` — Add optional `forceRefresh` param to `fetchGroups`
-- `src/types/index.ts` — Update `fetchGroups` signature
-- `src/pages/Join.tsx` — Pass `true` to all three `fetchGroups()` calls
+  if (newSession?.user) {
+    setTimeout(() => fetchProfile(newSession.user.id), 0);
+    if (groupsFetchedForRef.current !== newSession.user.id) {
+      groupsFetchedForRef.current = newSession.user.id;
+      setTimeout(() => fetchGroups(newSession.user.id), 0);
+    }
+  } else {
+    clearAllState();
+  }
+}
+```
 
----
+Cleanup becomes just `subscription.unsubscribe()`.
 
-### BUG 2 — Admin leave dead end → transfer UI
+**2. `src/components/AuthGuard.tsx`**
 
-**Current state:** DangerZone.tsx line 45-48 blocks sole admin with a toast and disables the Leave button (line 111). `transfer_group_ownership` RPC exists and works. No client code calls it. No `transferOwnership` function in AppContext.
+Remove `isVerified` from destructure. New logic:
+- `authLoading || groupsLoading` → spinner
+- `!user` → redirect to `/auth`
+- Otherwise → render children
 
-**Fix — 3 parts:**
+**3. `src/pages/Auth.tsx`**
 
-**Part A — AppContext: add `transferOwnership` function**
+Remove `await fetchGroups()` on line 73. `onAuthStateChange` handles it.
 
-- Call `transfer_group_ownership` RPC with `p_group_id` and `p_new_owner_id`
-- On success, refetch groups and members to update local state
-- Add to context value and `AppContextValue` type
+**4. `src/types/index.ts`**
 
-Before implementing Part A, read the full body of `transfer_group_ownership` RPC and confirm whether `p_new_owner_id` expects `group_members.id` or `user_id`. Pass whichever the RPC actually requires — do not assume.
+Remove `isVerified: boolean` from `AppState` (line 108).
 
-**Part B — DangerZone.tsx: replace dead-end with member selection**
+**5. No changes to:** Splash.tsx (already doesn't check `isVerified`), Join.tsx, ResetPassword.tsx, migrations, RLS, any other file.
 
-- Add state: `showTransfer` boolean, `selectedSuccessor` string
-- Compute `eligibleMembers`: active, non-placeholder, `user_id !== user.id` members from `groupMembers`
-- When sole admin taps Leave Group:
-  - If `eligibleMembers.length > 0` → open transfer sheet (`setShowTransfer(true)`)
-  - If `eligibleMembers.length === 0` → show message "You're the only real member. Delete the group instead."
-- Transfer dialog shows member list with avatars and names
-- "Transfer & Leave" button: calls `transferOwnership(group.id, selectedSuccessor)` then `leaveGroup(group.id)` then `navigate("/")`
-- Error handling: destructive toast, stay on screen
+### Why this is safe
+Supabase's `onAuthStateChange` already validates the session internally before firing events. `INITIAL_SESSION` restores on app open. `TOKEN_REFRESHED` handles silent renewal. `SIGNED_OUT` fires on refresh token expiry. The only uncovered case is a deleted user whose JWT remains valid for up to 1 hour — acceptable for a friend group expense app.
 
-**Part C — Types update**
-
-- Add `transferOwnership: (groupId: string, newOwnerId: string) => Promise<void>` to `AppContextValue`
-
-**Files changed:**
-
-- `src/contexts/AppContext.tsx` — Add `transferOwnership` function, export in value
-- `src/types/index.ts` — Add to `AppContextValue` interface
-- `src/components/group-settings/DangerZone.tsx` — Replace dead-end with transfer member selection dialog
-
-**UI approach:** Reuse existing `AlertDialog` pattern already in DangerZone. Member list renders each eligible member with avatar (using existing `getAvatarImage` + avatar color) and name. Radio-style selection. Confirm button disabled until selection made.
-
----
-
-### What stays the same
-
-All settlement logic, expense creation, realtime subscriptions, auth flows, routing — untouched. No new screens. No DB migrations needed (RPC already exists).
