@@ -205,6 +205,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // MEMBERS
   // =====================================================
   const fetchMembers = useCallback(async (groupId: string) => {
+    const version = fetchVersionRef.current;
     setMembersLoading(true);
     try {
       const { data, error: fetchError } = await supabase
@@ -214,11 +215,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .order("joined_at", { ascending: true });
 
       if (fetchError) throw fetchError;
+      // FIX 5: Discard stale result if group switched during fetch
+      if (fetchVersionRef.current !== version) return;
       setGroupMembers((data as GroupMember[]) ?? []);
     } catch (err) {
+      if (fetchVersionRef.current !== version) return;
       toast({ title: err instanceof Error ? err.message : "Failed to fetch members", variant: "destructive" });
     } finally {
-      setMembersLoading(false);
+      if (fetchVersionRef.current === version) setMembersLoading(false);
     }
   }, []);
 
