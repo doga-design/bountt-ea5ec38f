@@ -1,10 +1,21 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Group } from "@/types";
-import { Copy, Share2, Pencil, FileText, ChevronRight } from "lucide-react";
+import { Copy, Share2, Pencil, FileText, ChevronRight, RefreshCw } from "lucide-react";
 import { generateJoinUrl } from "@/lib/bountt-utils";
 import { useApp } from "@/contexts/AppContext";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SettingsCardsProps {
   group: Group;
@@ -13,10 +24,15 @@ interface SettingsCardsProps {
 export default function SettingsCards({ group }: SettingsCardsProps) {
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(group.name);
-  const { updateGroup } = useApp();
+  const [inviteCode, setInviteCode] = useState(group.invite_code);
+  const [showRegenConfirm, setShowRegenConfirm] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const { updateGroup, user } = useApp();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const joinUrl = generateJoinUrl(group.invite_code);
+
+  const isCreator = group.created_by === user?.id;
+  const joinUrl = generateJoinUrl(inviteCode);
 
   const handleNameSave = async () => {
     setEditingName(false);
@@ -35,10 +51,27 @@ export default function SettingsCards({ group }: SettingsCardsProps) {
     if (navigator.share) {
       await navigator.share({ title: group.name, url: joinUrl });
     } else {
-      // Open email client
       const subject = encodeURIComponent(`Join ${group.name} on Bountt`);
       const body = encodeURIComponent(`Hey! Join my group on Bountt:\n\n${joinUrl}`);
       window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    }
+  };
+
+  const handleRegenerate = async () => {
+    setRegenerating(true);
+    try {
+      const { data, error } = await supabase.rpc("regenerate_invite_code", {
+        p_group_id: group.id,
+      });
+      if (error) throw error;
+      const newCode = (data as { invite_code: string }).invite_code;
+      setInviteCode(newCode);
+      toast({ title: "Invite code updated" });
+    } catch (err: any) {
+      toast({ title: "Failed to regenerate", description: err.message, variant: "destructive" });
+    } finally {
+      setRegenerating(false);
+      setShowRegenConfirm(false);
     }
   };
 
@@ -50,7 +83,7 @@ export default function SettingsCards({ group }: SettingsCardsProps) {
       <div className="bg-card rounded-xl p-4 flex items-center justify-between">
         <div className="flex-1">
           <p className="text-xs text-muted-foreground mb-1">Group Name</p>
-          {editingName ? (
+          {isCreator && editingName ? (
             <input
               className="text-sm font-medium text-foreground bg-transparent border-b border-border outline-none w-full"
               value={name}
@@ -63,7 +96,7 @@ export default function SettingsCards({ group }: SettingsCardsProps) {
             <p className="text-sm font-medium text-foreground">{group.name}</p>
           )}
         </div>
-        {!editingName && (
+        {isCreator && !editingName && (
           <button onClick={() => setEditingName(true)} className="p-2">
             <Pencil className="w-4 h-4 text-muted-foreground" />
           </button>
@@ -73,7 +106,7 @@ export default function SettingsCards({ group }: SettingsCardsProps) {
       {/* Invite Link */}
       <div className="bg-card rounded-xl p-4">
         <p className="text-xs text-muted-foreground mb-1">Invite Link</p>
-        <p className="text-sm font-mono text-foreground mb-3 truncate">{group.invite_code}</p>
+        <p className="text-sm font-mono text-foreground mb-3 truncate">{inviteCode}</p>
         <div className="flex gap-2">
           <button
             onClick={handleCopy}
@@ -88,6 +121,14 @@ export default function SettingsCards({ group }: SettingsCardsProps) {
             <Share2 className="w-4 h-4" /> Share
           </button>
         </div>
+        {isCreator && (
+          <button
+            onClick={() => setShowRegenConfirm(true)}
+            className="mt-3 w-full flex items-center justify-center gap-2 bg-muted rounded-lg py-2 text-sm font-medium text-muted-foreground"
+          >
+            <RefreshCw className="w-4 h-4" /> Regenerate
+          </button>
+        )}
       </div>
 
       {/* Transparency section */}
@@ -105,6 +146,24 @@ export default function SettingsCards({ group }: SettingsCardsProps) {
         </div>
         <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
       </button>
+
+      {/* Regenerate Confirmation Dialog */}
+      <AlertDialog open={showRegenConfirm} onOpenChange={setShowRegenConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Regenerate invite code?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will invalidate the current invite link. Anyone with the old link won't be able to join.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={regenerating}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRegenerate} disabled={regenerating}>
+              {regenerating ? "Regenerating…" : "Regenerate"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
