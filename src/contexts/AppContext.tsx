@@ -63,7 +63,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // =====================================================
   // GROUPS (defined before AUTH so it can be called there)
   // =====================================================
-  const fetchGroups = useCallback(async (userId?: string) => {
+  const fetchGroups = useCallback(async (userId?: string, forceRefresh?: boolean) => {
+    if (forceRefresh) {
+      groupsFetchedForRef.current = null;
+    }
     const uid = userId ?? user?.id;
     if (!uid) return;
     setGroupsLoading(true);
@@ -499,19 +502,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const leaveGroup = useCallback(async (groupId: string) => {
     if (!user) return;
     try {
-      const member = groupMembers.find((m) => m.user_id === user.id && m.group_id === groupId);
+      const member = groupMembers.find((m) => m.user_id === user.id && m.group_id === groupId && m.status === "active");
       if (!member) return;
-
-      // Bug 3 fix: Prevent sole admin from leaving
-      if (member.role === "admin") {
-        const otherAdmins = groupMembers.filter(
-          (m) => m.group_id === groupId && m.role === "admin" && m.status === "active" && m.id !== member.id
-        );
-        if (otherAdmins.length === 0) {
-          toast({ title: "You're the only admin. Promote another member before leaving.", variant: "destructive" });
-          return;
-        }
-      }
 
       const { error: updateError } = await supabase
         .from("group_members")
@@ -531,6 +523,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       toast({ title: (err as any)?.message || "Failed to leave group", variant: "destructive" });
     }
   }, [user, groupMembers, currentGroup]);
+
+  const transferOwnership = useCallback(async (groupId: string, newOwnerId: string) => {
+    if (!user) return;
+    try {
+      const { error: rpcError } = await supabase.rpc("transfer_group_ownership", {
+        p_group_id: groupId,
+        p_new_owner_id: newOwnerId,
+      });
+      if (rpcError) throw rpcError;
+      // Refresh groups and members to reflect new ownership
+      await Promise.all([
+        fetchGroups(user.id),
+        fetchMembers(groupId),
+      ]);
+    } catch (err) {
+      toast({ title: err instanceof Error ? err.message : "Failed to transfer ownership", variant: "destructive" });
+      throw err;
+    }
+  }, [user, fetchGroups, fetchMembers]);
 
   const calculateBalances = useCallback((): BalanceSummary[] => {
     return calcBalances(expenses);
@@ -647,7 +658,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     expenseSplits,
     error,
     setCurrentGroup,
-    fetchGroups,
+    fetchGroups: (forceRefresh?: boolean) => fetchGroups(undefined, forceRefresh),
     createGroup,
     updateGroup,
     deleteGroup,
@@ -660,6 +671,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     addExpense,
     fetchExpenseSplits,
     calculateBalances,
+    transferOwnership,
     signOut,
   };
 

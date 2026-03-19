@@ -109,7 +109,7 @@ export default function Join() {
           .update(updateFields)
           .eq("id", existing.id);
 
-        await fetchGroups();
+        await fetchGroups(true);
         toast({ title: `Rejoined ${group.name}!`, description: "Welcome back 🎉" });
         navigate(`/dashboard/${group.id}`);
         return;
@@ -203,7 +203,7 @@ export default function Join() {
       p_actor_name: displayName,
     });
 
-    await fetchGroups();
+    await fetchGroups(true);
     toast({ title: `Joined ${groupName}!`, description: "Welcome to the group 🎉" });
     navigate(`/dashboard/${groupId}`);
   };
@@ -222,7 +222,7 @@ export default function Join() {
         if (error) throw error;
 
         const selected = placeholders.find((p) => p.id === placeholderId);
-        await fetchGroups();
+        await fetchGroups(true);
 
         // Log member joined activity (placeholder claim)
         const memberName = profile?.display_name ?? user!.email?.split("@")[0] ?? "Member";
