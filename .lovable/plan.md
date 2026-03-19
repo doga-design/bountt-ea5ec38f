@@ -1,45 +1,96 @@
+# Enforce 6-Member Group Limit
 
+Five steps, executed in order. No expense/settlement/avatar logic changes.
 
-# Fix ExpenseSpokeViz — Three Visual Fixes
+## Step 1 — Database: Validation trigger + RPC guards
 
-## Fix 1 — SVG arcs terminate at exact avatar centers
+**Migration SQL:**
 
-**Problem:** SVG paths use `slotWidth * i + slotWidth / 2` to estimate member positions, but the actual avatars are in a flex row with `gap: 8` and `justify-center`, so the SVG endpoints don't align with rendered avatar centers.
+1. Create a `BEFORE INSERT` trigger on `group_members` that counts active members and raises an exception if count >= 6:
 
-**Solution:** Use refs to measure actual avatar positions relative to the container. Store an array of `{ x, y }` center coordinates via a `useCallback` ref on each member avatar wrapper. Also measure the payer avatar's center. The SVG is made `position: absolute` covering the full container so its coordinate space matches the DOM layout exactly. Paths go from payer center to each member center with a control point that creates a natural downward curve: `ctrlX = (payerCenterX + memberCenterX) / 2`, `ctrlY = payerCenterY + (memberCenterY - payerCenterY) * 0.15` — pulling the curve down from the payer.
+```sql
+CREATE OR REPLACE FUNCTION public.enforce_group_member_limit()
+RETURNS trigger LANGUAGE plpgsql SET search_path TO 'public' AS $$
+BEGIN
+  IF (SELECT COUNT(*) FROM group_members WHERE group_id = NEW.group_id AND status = 'active') >= 6 THEN
+    RAISE EXCEPTION 'This group is full. Maximum 6 members allowed.';
+  END IF;
+  RETURN NEW;
+END;
+$$;
 
-- Add `memberPositions` state: `Record<number, { x: number; y: number }>`
-- Add `payerPos` state: `{ x: number; y: number }`
-- Use refs on payer div and each member avatar div, measure via `getBoundingClientRect()` relative to container's `getBoundingClientRect()` in the existing `ResizeObserver` callback + a `useLayoutEffect`
-- SVG becomes `position: absolute; inset: 0; width: 100%; height: 100%` with `overflow: visible`
-- Paths: `M ${payerPos.x} ${payerPos.y} Q ${ctrlX} ${ctrlY} ${memberPos.x} ${memberPos.y}`
-
-## Fix 2 — Member avatar size scales with count
-
-Replace the fixed `MEMBER_SIZE = 48` with a function:
-
+CREATE TRIGGER trg_enforce_member_limit
+BEFORE INSERT ON public.group_members
+FOR EACH ROW EXECUTE FUNCTION public.enforce_group_member_limit();
 ```
-function getMemberSize(count: number): number {
-  if (count <= 1) return 72;
-  if (count === 2) return 64;
-  if (count === 3) return 56;
-  if (count === 4) return 48;
-  if (count === 5) return 44;
-  return 40; // 6+
+
+2. Add count check to `join_group` RPC — after the "already a member" check and before the rejoin UPDATE or new INSERT:
+
+```sql
+IF (SELECT COUNT(*) FROM group_members WHERE group_id = p_group_id AND status = 'active') >= 6 THEN
+  RAISE EXCEPTION 'This group is full. Maximum 6 members allowed.';
+END IF;
+```
+
+This check goes before the rejoin path too (a left member reactivating increases active count).
+
+3. Add same count check to `add_placeholder_member` RPC — after the `is_group_member` check, before the INSERT.
+4. `claim_placeholder` — no changes. Claiming converts an existing active row, count stays the same.
+
+## Step 2 — Client: Join.tsx
+
+Two guard points using fresh data already fetched in the flow:
+
+**Rejoin path (line ~66):** Before the `supabase.from("group_members").update(...)` call, count active members. If >= 6, show toast `"This group is full (6/6 members)"` and return early.
+
+**New member path — `joinAsNewMember` function (line ~155):** The `existingMembers` query at line 157 already fetches active members. Check `existingMembers.length >= 6` before calling the RPC. Same toast and return.
+
+Both checks use the active member data already being queried (for avatar color assignment), so no extra network call needed.
+
+## Step 3 — Client: AppContext.tsx `addPlaceholderMember`
+
+At line ~221, before the duplicate name check, add:
+
+```ts
+const activeCount = groupMembers.filter(
+  (m) => m.group_id === groupId && m.status === "active"
+).length;
+if (activeCount >= 6) {
+  toast({ title: "Group is full (6/6 members)", variant: "destructive" });
+  return null;
 }
 ```
 
-Use `getMemberSize(members.length)` for avatar width/height. Border scales proportionally: `Math.max(2, Math.round(memberSize * 3 / 48))` — roughly 3px at 48, 2px at 40.
+## Step 4 — UI: GroupSettings.tsx
 
-Payer stays fixed at 64px.
+**Line 78:** Change member count from `{activeMembers.length} member(s)` to `{activeMembers.length}/6 members`.
 
-## Fix 3 — Settled checkmark badge above avatar, not clipped
+**Lines 89-97:** Conditionally render the Add Member button — hide it entirely when `activeMembers.length >= 6`. Wrap the existing `<button>` in `{activeMembers.length < 6 && (...)}`.
 
-**Problem:** Badge is a child of the avatar div which has `overflow-hidden` (for the border-radius). It gets clipped.
+## Step 5 — UI: ExpenseScreen.tsx
 
-**Solution:** Move the badge outside the avatar div but inside the member wrapper div. Position it absolutely, centered horizontally, above the avatar top edge. The member wrapper gets `position: relative` and the badge uses `absolute`, `left: 50%`, `transform: translateX(-50%)`, `top: -8px`, `z-index: 20`. The avatar div itself gets `grayscale` filter when settled instead of `opacity-60`. Remove `overflow-hidden` concern by keeping badge as a sibling, not a child.
+The `MemberAvatarGrid` component receives an `onAddMember` prop (line 708). When `activeMembers.length >= 6`, pass `undefined` instead of the handler to hide the add-member shortcut:
 
-## File Changed
+```ts
+onAddMember={activeMembers.length < 6 ? () => setShowAddMember(true) : undefined}
+```
 
-`src/components/dashboard/ExpenseSpokeViz.tsx` — rewrite render layout with measured positions, scaled sizes, and repositioned badge.
+## Edge Cases Handled
 
+- **Grandfathered groups:** Trigger only fires on INSERT, not on existing rows. Groups with 7+ members continue working.
+- **Race conditions:** The DB trigger is the single source of truth — even if two users join simultaneously, the trigger prevents a 7th active row.
+- **Placeholder claiming:** Not affected — `claim_placeholder` does an UPDATE, not INSERT. Trigger doesn't fire.
+- **Rejoin after leaving:** Both RPC and client check active count before reactivation. A left member returning to a full group sees "Group is full."
+
+**Note:** In Step 3, confirm whether `groupMembers` in AppContext is already scoped to the current group or contains all groups. Use the appropriate filter accordingly. Also change the toast variant from destructive to the existing neutral/default toast style — no red colors.
+
+## Files Changed
+
+
+| File                                       | Change                                                                                |
+| ------------------------------------------ | ------------------------------------------------------------------------------------- |
+| New migration                              | Trigger function + trigger + RPC updates to `join_group` and `add_placeholder_member` |
+| `src/pages/Join.tsx`                       | Count guard on rejoin path (line 66) and in `joinAsNewMember` (line 157)              |
+| `src/contexts/AppContext.tsx`              | Count guard in `addPlaceholderMember` (~line 221)                                     |
+| `src/pages/GroupSettings.tsx`              | Member count display `N/6`, hide Add Member button when full                          |
+| `src/components/expense/ExpenseScreen.tsx` | Hide add-member shortcut in grid when full                                            |
