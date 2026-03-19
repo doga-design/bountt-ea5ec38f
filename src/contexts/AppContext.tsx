@@ -63,7 +63,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // =====================================================
   // GROUPS (defined before AUTH so it can be called there)
   // =====================================================
-  const fetchGroups = useCallback(async (userId?: string) => {
+  const fetchGroups = useCallback(async (userId?: string, forceRefresh?: boolean) => {
+    if (forceRefresh) {
+      groupsFetchedForRef.current = null;
+    }
     const uid = userId ?? user?.id;
     if (!uid) return;
     setGroupsLoading(true);

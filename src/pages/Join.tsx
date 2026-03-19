@@ -222,7 +222,7 @@ export default function Join() {
         if (error) throw error;
 
         const selected = placeholders.find((p) => p.id === placeholderId);
-        await fetchGroups();
+        await fetchGroups(true);
 
         // Log member joined activity (placeholder claim)
         const memberName = profile?.display_name ?? user!.email?.split("@")[0] ?? "Member";
