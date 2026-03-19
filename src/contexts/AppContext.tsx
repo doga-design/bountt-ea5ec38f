@@ -650,7 +650,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     expenseSplits,
     error,
     setCurrentGroup,
-    fetchGroups,
+    fetchGroups: (forceRefresh?: boolean) => fetchGroups(undefined, forceRefresh),
     createGroup,
     updateGroup,
     deleteGroup,
