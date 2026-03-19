@@ -44,7 +44,7 @@ export default function DashboardHeader({ onAddMember, showBalance = false }: Da
             {activeMembers.map((member, i) => {
               const isCurrentUser = member.user_id === user?.id;
               const isPlaceholder = member.is_placeholder;
-              const color = getAvatarColor(member);
+              const { bg } = getAvatarColor(member);
 
               return (
                 <div
