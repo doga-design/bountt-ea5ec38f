@@ -456,6 +456,10 @@ export type Database = {
         Returns: Json
       }
       settle_my_share: { Args: { p_expense_id: string }; Returns: Json }
+      transfer_group_ownership: {
+        Args: { p_group_id: string; p_new_owner_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
