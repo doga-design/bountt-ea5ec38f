@@ -410,6 +410,7 @@ export type Database = {
           name: string
         }[]
       }
+      regenerate_invite_code: { Args: { p_group_id: string }; Returns: Json }
       settle_all: { Args: { p_expense_id: string }; Returns: Json }
       settle_member_and_remove: {
         Args: { p_group_id: string; p_member_id: string }
