@@ -152,6 +152,7 @@ export type Database = {
       group_members: {
         Row: {
           avatar_color: string | null
+          avatar_index: number | null
           group_id: string
           id: string
           is_placeholder: boolean
@@ -164,6 +165,7 @@ export type Database = {
         }
         Insert: {
           avatar_color?: string | null
+          avatar_index?: number | null
           group_id: string
           id?: string
           is_placeholder?: boolean
@@ -176,6 +178,7 @@ export type Database = {
         }
         Update: {
           avatar_color?: string | null
+          avatar_index?: number | null
           group_id?: string
           id?: string
           is_placeholder?: boolean
@@ -313,10 +316,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      add_placeholder_member: {
-        Args: { p_avatar_color: string; p_group_id: string; p_name: string }
-        Returns: Json
-      }
+      add_placeholder_member:
+        | {
+            Args: { p_avatar_color: string; p_group_id: string; p_name: string }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_avatar_color: string
+              p_avatar_index: number
+              p_group_id: string
+              p_name: string
+            }
+            Returns: Json
+          }
       claim_placeholder: { Args: { p_placeholder_id: string }; Returns: string }
       create_expense_with_splits: {
         Args: {
@@ -330,16 +343,28 @@ export type Database = {
         }
         Returns: Json
       }
-      create_group_with_creator: {
-        Args: {
-          p_avatar_color: string
-          p_display_name: string
-          p_emoji: string
-          p_invite_code: string
-          p_name: string
-        }
-        Returns: Json
-      }
+      create_group_with_creator:
+        | {
+            Args: {
+              p_avatar_color: string
+              p_display_name: string
+              p_emoji: string
+              p_invite_code: string
+              p_name: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_avatar_color: string
+              p_avatar_index: number
+              p_display_name: string
+              p_emoji: string
+              p_invite_code: string
+              p_name: string
+            }
+            Returns: Json
+          }
       delete_expense: {
         Args: { p_actor_name: string; p_expense_id: string }
         Returns: Json
@@ -389,14 +414,24 @@ export type Database = {
         Args: { p_group_id: string; p_user_id: string }
         Returns: boolean
       }
-      join_group: {
-        Args: {
-          p_avatar_color: string
-          p_display_name: string
-          p_group_id: string
-        }
-        Returns: Json
-      }
+      join_group:
+        | {
+            Args: {
+              p_avatar_color: string
+              p_display_name: string
+              p_group_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_avatar_color: string
+              p_avatar_index: number
+              p_display_name: string
+              p_group_id: string
+            }
+            Returns: Json
+          }
       log_member_joined: {
         Args: { p_actor_name: string; p_group_id: string }
         Returns: undefined
