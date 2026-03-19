@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { GroupMember } from "@/types";
 import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
 import { formatCurrency } from "@/lib/bountt-utils";
@@ -25,8 +25,19 @@ interface ExpenseSpokeVizProps {
 }
 
 const PAYER_SIZE = 64;
-const MEMBER_SIZE = 48;
-const SVG_ARC_HEIGHT = 80;
+
+function getMemberSize(count: number): number {
+  if (count <= 1) return 72;
+  if (count === 2) return 64;
+  if (count === 3) return 56;
+  if (count === 4) return 48;
+  if (count === 5) return 44;
+  return 40;
+}
+
+function getBorderWidth(memberSize: number): number {
+  return Math.max(2, Math.round((memberSize * 3) / 48));
+}
 
 export default function ExpenseSpokeViz({
   payer,
@@ -39,19 +50,56 @@ export default function ExpenseSpokeViz({
   memberAvatarRef,
 }: ExpenseSpokeVizProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
+  const payerRef = useRef<HTMLDivElement>(null);
+  const memberRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  const [payerPos, setPayerPos] = useState<{ x: number; y: number } | null>(null);
+  const [memberPositions, setMemberPositions] = useState<Record<number, { x: number; y: number }>>({});
+  const [containerSize, setContainerSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+
+  const measureAll = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const cRect = container.getBoundingClientRect();
+    setContainerSize({ w: cRect.width, h: cRect.height });
+
+    if (payerRef.current) {
+      const pRect = payerRef.current.getBoundingClientRect();
+      setPayerPos({
+        x: pRect.left + pRect.width / 2 - cRect.left,
+        y: pRect.top + pRect.height / 2 - cRect.top,
+      });
+    }
+
+    const positions: Record<number, { x: number; y: number }> = {};
+    memberRefs.current.forEach((el, idx) => {
+      if (el) {
+        const mRect = el.getBoundingClientRect();
+        positions[idx] = {
+          x: mRect.left + mRect.width / 2 - cRect.left,
+          y: mRect.top + mRect.height / 2 - cRect.top,
+        };
+      }
+    });
+    setMemberPositions(positions);
+  }, []);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const measure = () => setContainerWidth(el.offsetWidth);
-    measure();
-    const ro = new ResizeObserver(measure);
+    // Measure after layout paint
+    const raf = requestAnimationFrame(measureAll);
+    const ro = new ResizeObserver(measureAll);
     ro.observe(el);
-    return () => ro.disconnect();
-  }, [members.length]);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [members.length, measureAll]);
 
   const count = members.length;
+  const memberSize = getMemberSize(count);
+  const memberBorder = getBorderWidth(memberSize);
   const payerColor = payer ? getAvatarColor(payer) : "#8B5CF6";
   const payerImg = payer ? getAvatarImage(payer) : undefined;
 
@@ -62,67 +110,36 @@ export default function ExpenseSpokeViz({
     return false;
   };
 
-  // Member slot positions (centered row)
-  const slotWidth = count > 0 ? containerWidth / count : containerWidth;
-  const apexX = containerWidth / 2;
+  const hasPositions = payerPos && Object.keys(memberPositions).length === count && count > 0;
 
   return (
     <div
       ref={containerRef}
-      className="flex flex-col items-center w-full py-2 relative"
+      className="relative flex flex-col items-center w-full py-2"
       style={{
         background:
           "radial-gradient(ellipse at center, rgba(232, 72, 10, 0.04) 0%, transparent 70%)",
       }}
     >
-      {/* Payer avatar + label */}
-      <div className="flex flex-col items-center z-10">
-        <div
-          className="rounded-full flex items-center justify-center overflow-hidden"
-          style={{
-            width: PAYER_SIZE,
-            height: PAYER_SIZE,
-            backgroundColor: payerColor,
-            border: "3px solid white",
-            boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
-          }}
-        >
-          {payerImg && (
-            <img
-              src={payerImg}
-              alt={payerName}
-              className="w-[75%] h-[75%] object-contain"
-              draggable={false}
-            />
-          )}
-        </div>
-        <p className="mt-1.5 text-xs text-center">
-          <span className="font-medium text-muted-foreground">
-            {isPayer ? "You" : payerName} paid
-          </span>
-          <span className="text-muted-foreground"> · </span>
-          <span className="font-bold text-foreground">
-            {formatCurrency(totalAmount)}
-          </span>
-        </p>
-      </div>
-
-      {/* SVG arc paths with animated dots */}
-      {count >= 1 && containerWidth > 0 && (
+      {/* SVG overlay for arc paths */}
+      {hasPositions && (
         <svg
           style={{
-            width: "100%",
-            height: SVG_ARC_HEIGHT,
+            position: "absolute",
+            inset: 0,
+            width: containerSize.w,
+            height: containerSize.h,
             overflow: "visible",
             pointerEvents: "none",
+            zIndex: 1,
           }}
         >
           {members.map((m, i) => {
-            const endX = slotWidth * i + slotWidth / 2;
-            const endY = SVG_ARC_HEIGHT;
-            const ctrlX = endX;
-            const ctrlY = 0;
-            const d = `M ${apexX} 0 Q ${ctrlX} ${ctrlY} ${endX} ${endY}`;
+            const mPos = memberPositions[i];
+            if (!mPos || !payerPos) return null;
+            const ctrlX = (payerPos.x + mPos.x) / 2;
+            const ctrlY = payerPos.y + (mPos.y - payerPos.y) * 0.15;
+            const d = `M ${payerPos.x} ${payerPos.y} Q ${ctrlX} ${ctrlY} ${mPos.x} ${mPos.y}`;
             const dur = `${1.2 + (i * 0.3) % 1.2}s`;
             const begin = `${i * 0.4}s`;
 
@@ -162,9 +179,45 @@ export default function ExpenseSpokeViz({
         </svg>
       )}
 
+      {/* Payer avatar + label */}
+      <div className="flex flex-col items-center z-10">
+        <div
+          ref={payerRef}
+          className="rounded-full flex items-center justify-center overflow-hidden"
+          style={{
+            width: PAYER_SIZE,
+            height: PAYER_SIZE,
+            backgroundColor: payerColor,
+            border: "3px solid white",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
+          }}
+        >
+          {payerImg && (
+            <img
+              src={payerImg}
+              alt={payerName}
+              className="w-[75%] h-[75%] object-contain"
+              draggable={false}
+            />
+          )}
+        </div>
+        <p className="mt-1.5 text-xs text-center">
+          <span className="font-medium text-muted-foreground">
+            {isPayer ? "You" : payerName} paid
+          </span>
+          <span className="text-muted-foreground"> · </span>
+          <span className="font-bold text-foreground">
+            {formatCurrency(totalAmount)}
+          </span>
+        </p>
+      </div>
+
+      {/* Spacer for arc paths */}
+      <div style={{ height: 60 }} />
+
       {/* Member avatars row */}
       <div className="flex justify-center w-full z-10" style={{ gap: 8 }}>
-        {members.map((m) => {
+        {members.map((m, i) => {
           const memberColor = m.member ? getAvatarColor(m.member) : "#8B5CF6";
           const memberImg = m.member ? getAvatarImage(m.member) : undefined;
           const tappable = canTap(m);
@@ -174,25 +227,47 @@ export default function ExpenseSpokeViz({
           return (
             <div
               key={m.splitId}
-              className="flex flex-col items-center"
-              style={{ width: Math.max(MEMBER_SIZE, Math.min(72, slotWidth - 8)) }}
+              className="relative flex flex-col items-center"
+              style={{ width: Math.max(memberSize, Math.min(72, memberSize + 24)) }}
             >
+              {/* Settled badge — above avatar, not clipped */}
+              {m.isSettled && (
+                <div
+                  className="absolute flex items-center justify-center rounded-full bg-foreground"
+                  style={{
+                    width: 18,
+                    height: 18,
+                    top: -6,
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    zIndex: 20,
+                  }}
+                >
+                  <Check className="w-3 h-3 text-background" />
+                </div>
+              )}
+
               <div
-                ref={(el) => memberAvatarRef?.(m.splitId, el)}
+                ref={(el) => {
+                  if (el) memberRefs.current.set(i, el);
+                  else memberRefs.current.delete(i);
+                  memberAvatarRef?.(m.splitId, el);
+                }}
                 onClick={() =>
                   tappable && onMemberTap(m.splitId, m.name, m.shareAmount)
                 }
-                className={`relative rounded-full flex items-center justify-center overflow-hidden ${
+                className={`rounded-full flex items-center justify-center overflow-hidden ${
                   tappable
                     ? "cursor-pointer active:scale-95 transition-transform"
                     : "cursor-default"
-                } ${m.isSettled ? "opacity-60" : ""}`}
+                }`}
                 style={{
-                  width: MEMBER_SIZE,
-                  height: MEMBER_SIZE,
+                  width: memberSize,
+                  height: memberSize,
                   backgroundColor: memberColor,
-                  border: "3px solid white",
+                  border: `${memberBorder}px solid white`,
                   boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+                  filter: m.isSettled ? "grayscale(100%)" : "none",
                 }}
               >
                 {memberImg && (
@@ -202,15 +277,6 @@ export default function ExpenseSpokeViz({
                     className="w-[75%] h-[75%] object-contain"
                     draggable={false}
                   />
-                )}
-
-                {m.isSettled && (
-                  <div
-                    className="absolute -top-1 -right-1 rounded-full flex items-center justify-center bg-foreground"
-                    style={{ width: 18, height: 18 }}
-                  >
-                    <Check className="w-3 h-3 text-background" />
-                  </div>
                 )}
               </div>
 
