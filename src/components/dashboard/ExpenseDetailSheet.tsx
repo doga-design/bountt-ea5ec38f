@@ -531,7 +531,7 @@ export default function ExpenseDetailSheet({
                       onPointerUp={handlePointerUp}
                     >
                       <span className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-muted-foreground pointer-events-none">
-                        {slideCompleted ? "Settling..." : "Slide to settle everyone →"}
+                        {slideCompleted ? "Settling..." : "Slide to settle everyone"}
                       </span>
 
                       <div
