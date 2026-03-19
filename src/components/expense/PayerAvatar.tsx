@@ -8,7 +8,7 @@ interface PayerAvatarProps {
 }
 
 export default function PayerAvatar({ payer, onClick, size = 44 }: PayerAvatarProps) {
-  const color = getAvatarColor(payer);
+  const { bg } = getAvatarColor(payer);
   const avatarImg = getAvatarImage(payer);
 
   return (
@@ -18,7 +18,7 @@ export default function PayerAvatar({ payer, onClick, size = 44 }: PayerAvatarPr
       style={{
         width: size,
         height: size,
-        backgroundColor: color,
+        backgroundColor: bg,
         border: "2px solid white",
         boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
       }}

@@ -28,7 +28,7 @@ export default function CustomSplitRows({
         const isSelf = m.user_id === currentUserId;
         const isFocused = focusedMemberId === m.id;
         const isShaking = shakeMemberId === m.id;
-        const color = getAvatarColor(m);
+        const { bg } = getAvatarColor(m);
         const avatarImg = getAvatarImage(m);
         const amountStr = customAmounts.get(m.id) ?? "0";
         const displayAmount = amountStr === "0" ? "0" : amountStr;
@@ -46,7 +46,7 @@ export default function CustomSplitRows({
                   style={{
                     width: 64,
                     height: 64,
-                    backgroundColor: color,
+                    backgroundColor: bg,
                     border: isFocused ? "3px solid white" : "3px solid transparent",
                     boxShadow: isFocused ? "0 2px 8px rgba(0,0,0,0.15)" : "none",
                   }}

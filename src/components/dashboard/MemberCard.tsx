@@ -12,7 +12,7 @@ interface MemberCardProps {
 
 export default function MemberCard({ member, balance, isCurrentUser, onClick }: MemberCardProps) {
   const isPlaceholder = member.is_placeholder;
-  const avatarColor = getAvatarColor(member);
+  const avatarColor = getAvatarColor(member).bg;
 
   const balanceText = (() => {
     if (balance.direction === "settled") return "All settled ✓";

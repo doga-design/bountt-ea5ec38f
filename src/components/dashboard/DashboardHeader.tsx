@@ -44,7 +44,7 @@ export default function DashboardHeader({ onAddMember, showBalance = false }: Da
             {activeMembers.map((member, i) => {
               const isCurrentUser = member.user_id === user?.id;
               const isPlaceholder = member.is_placeholder;
-              const color = getAvatarColor(member);
+              const { bg } = getAvatarColor(member);
 
               return (
                 <div
@@ -52,7 +52,7 @@ export default function DashboardHeader({ onAddMember, showBalance = false }: Da
                   className="w-10 h-10 rounded-full flex items-center justify-center border-2 border-primary-foreground overflow-hidden"
                   style={{
                     marginLeft: i > 0 ? "-12px" : "0",
-                    backgroundColor: isCurrentUser ? "hsl(var(--card))" : color,
+                    backgroundColor: isCurrentUser ? "hsl(var(--card))" : bg,
                     zIndex: activeMembers.length - i,
                     position: "relative",
                   }}

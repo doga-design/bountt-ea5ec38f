@@ -65,38 +65,43 @@ export default function Join() {
       // If user was previously in group but left, rejoin
       if (existing && existing.status === "left") {
         // Check 6-member limit before rejoin
-        const { data: activeMembersCount } = await supabase
+        const { data: activeMembersData } = await supabase
           .from("group_members")
-          .select("id")
+          .select("id, avatar_color, avatar_index")
           .eq("group_id", group.id)
           .eq("status", "active");
-        if ((activeMembersCount?.length ?? 0) >= 6) {
+        if ((activeMembersData?.length ?? 0) >= 6) {
           toast({ title: "This group is full (6/6 members)" });
           return;
         }
 
-        // Bug 5 fix: Check for color collision on rejoin
-        const { data: activeColorRows } = await supabase
-          .from("group_members")
-          .select("avatar_color")
-          .eq("group_id", group.id)
-          .eq("status", "active");
-        const activeColors = activeColorRows?.filter((m) => m.avatar_color).map((m) => m.avatar_color!) ?? [];
+        const activeColors = activeMembersData?.filter((m) => m.avatar_color).map((m) => m.avatar_color!) ?? [];
+        const activeIndices = activeMembersData?.filter((m) => m.avatar_index != null).map((m) => m.avatar_index!) ?? [];
 
-        // Get the member's current color
+        // Get the member's current color and index
         const { data: memberRow } = await supabase
           .from("group_members")
-          .select("avatar_color")
+          .select("avatar_color, avatar_index")
           .eq("id", existing.id)
           .single();
 
+        const { pickAvailableColor, AVATAR_COLOR_KEYS } = await import("@/lib/avatar-utils");
+        const validColorKeys = new Set(AVATAR_COLOR_KEYS);
+
         let updateFields: Record<string, unknown> = { status: "active", left_at: null };
-        if (memberRow?.avatar_color && activeColors.includes(memberRow.avatar_color)) {
-          const { pickAvailableColor } = await import("@/lib/avatar-utils");
-          updateFields.avatar_color = pickAvailableColor(activeColors);
-        } else if (!memberRow?.avatar_color) {
-          const { pickAvailableColor } = await import("@/lib/avatar-utils");
-          updateFields.avatar_color = pickAvailableColor(activeColors);
+
+        const currentColor = memberRow?.avatar_color;
+        const currentIndex = memberRow?.avatar_index;
+        const colorValid = currentColor && validColorKeys.has(currentColor) && !activeColors.includes(currentColor);
+        const indexValid = currentIndex != null && currentIndex >= 1 && currentIndex <= 6 && !activeIndices.includes(currentIndex);
+
+        if (!colorValid || !indexValid) {
+          const { color, index } = pickAvailableColor(activeColors, activeIndices);
+          updateFields.avatar_color = color;
+          updateFields.avatar_index = index;
+        } else {
+          updateFields.avatar_color = currentColor;
+          updateFields.avatar_index = currentIndex;
         }
 
         await supabase
@@ -164,10 +169,9 @@ export default function Join() {
   };
 
   const joinAsNewMember = async (groupId: string, groupName: string) => {
-    // Bug 4 fix: Assign avatar_color on join
     const { data: existingMembers } = await supabase
       .from("group_members")
-      .select("avatar_color")
+      .select("avatar_color, avatar_index")
       .eq("group_id", groupId)
       .eq("status", "active");
 
@@ -178,16 +182,17 @@ export default function Join() {
     }
 
     const existingColors = existingMembers?.filter((m) => m.avatar_color).map((m) => m.avatar_color!) ?? [];
+    const existingIndices = existingMembers?.filter((m) => m.avatar_index != null).map((m) => m.avatar_index!) ?? [];
 
-    // Import pickAvailableColor
     const { pickAvailableColor } = await import("@/lib/avatar-utils");
-    const newColor = pickAvailableColor(existingColors);
+    const { color: newColor, index: newIndex } = pickAvailableColor(existingColors, existingIndices);
 
     const displayName = profile?.display_name ?? user!.email?.split("@")[0] ?? "Member";
     const { error: joinError } = await supabase.rpc("join_group", {
       p_group_id: groupId,
       p_display_name: displayName,
       p_avatar_color: newColor,
+      p_avatar_index: newIndex,
     });
 
     if (joinError) throw joinError;
