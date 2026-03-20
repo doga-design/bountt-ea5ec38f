@@ -240,14 +240,25 @@ export default function Dashboard() {
         open={sheetOpen}
         onOpenChange={(o) => {
           setSheetOpen(o);
+          // Persist / clear sheet-open marker for remount recovery
+          if (sheetMarkerKey) {
+            if (o) {
+              sessionStorage.setItem(sheetMarkerKey, "1");
+            } else {
+              sessionStorage.removeItem(sheetMarkerKey);
+            }
+          }
           if (!o) {
             setEditExpense(undefined);
             setEditSplits(undefined);
+            // Clear draft on intentional close
+            if (draftKey) sessionStorage.removeItem(draftKey);
           }
         }}
         editExpense={editExpense}
         editSplits={editSplits}
         isFirstExpense={mode === "prompt"}
+        draftKey={draftKey}
       />
     </div>
   );

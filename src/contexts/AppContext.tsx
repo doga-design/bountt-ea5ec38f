@@ -121,7 +121,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
+      async (event, newSession) => {
         setSession(newSession);
         setUser(newSession?.user ?? null);
         setAuthLoading(false);
@@ -133,7 +133,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setGroupsLoading(true);
             setTimeout(() => fetchGroups(newSession.user.id), 0);
           }
-        } else {
+        } else if (event === "SIGNED_OUT") {
+          // Only wipe state on explicit sign-out.
+          // Transient null sessions (e.g. token refresh hiccup) must NOT
+          // tear down the component tree while a user is mid-interaction.
           clearAllState();
         }
       }
