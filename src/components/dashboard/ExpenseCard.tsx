@@ -43,6 +43,8 @@ export default function ExpenseCard({ expense, splits, groupMembers, onClick }: 
 
   // --- Subtitle: "Paid by X · Y owes $Z" ---
   const payerLabel = isPayer ? "You" : expense.paid_by_name;
+  const selfMember = groupMembers.find((m) => m.user_id === user?.id);
+  const selfColor = selfMember ? getAvatarColor(selfMember).bg : undefined;
   const payerLabelColor = expense.is_settled
     ? "hsl(var(--muted-foreground))"
     : isPayer
