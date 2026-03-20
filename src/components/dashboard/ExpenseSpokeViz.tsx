@@ -204,7 +204,7 @@ export default function ExpenseSpokeViz({
           )}
         </div>
         <p className="mt-1.5 text-xs text-center">
-          <span className="font-medium text-muted-foreground" style={isPayer ? { color: payerColor, fontWeight: 700 } : undefined}>
+          <span className={`font-medium text-muted-foreground ${isPayer ? "font-bold text-foreground" : ""}`}>
             {isPayer ? "You" : payerName} paid
           </span>
           <span className="text-muted-foreground"> · </span>
