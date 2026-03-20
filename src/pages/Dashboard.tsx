@@ -266,6 +266,7 @@ export default function Dashboard() {
         editSplits={editSplits}
         isFirstExpense={mode === "prompt"}
         draftKey={draftKey}
+        onFirstExpenseSaved={() => { pendingFirstExpenseConfettiRef.current = true; }}
       />
     </div>
   );
