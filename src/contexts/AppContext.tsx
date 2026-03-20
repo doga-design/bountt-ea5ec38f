@@ -122,21 +122,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
-        setSession(newSession);
-        setUser(newSession?.user ?? null);
-        setAuthLoading(false);
-
         if (newSession?.user) {
+          setSession(newSession);
+          setUser(newSession.user);
+          setAuthLoading(false);
+
+          // On initial load, verify the user still exists server-side
+          // (cached JWTs survive user deletion for up to 1 hour)
+          if (event === "INITIAL_SESSION") {
+            const { error: getUserError } = await supabase.auth.getUser();
+            if (getUserError) {
+              console.warn("Session invalid (user deleted or revoked), signing out.", getUserError.message);
+              await supabase.auth.signOut({ scope: "local" });
+              clearAllState();
+              return;
+            }
+          }
+
           setTimeout(() => fetchProfile(newSession.user.id), 0);
           if (groupsFetchedForRef.current !== newSession.user.id) {
             groupsFetchedForRef.current = newSession.user.id;
             setGroupsLoading(true);
             setTimeout(() => fetchGroups(newSession.user.id), 0);
           }
-        } else if (event === "SIGNED_OUT") {
-          // Only wipe state on explicit sign-out.
-          // Transient null sessions (e.g. token refresh hiccup) must NOT
-          // tear down the component tree while a user is mid-interaction.
+        } else {
+          // Any null session — explicit sign-out, failed token refresh,
+          // deleted user — clears state immediately. No exceptions.
           clearAllState();
         }
       }
