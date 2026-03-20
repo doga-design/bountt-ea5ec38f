@@ -1,11 +1,12 @@
 import { useNavigate } from "react-router-dom";
 import { Plus, TicketCheck } from "lucide-react";
+import BottomNav from "@/components/BottomNav";
 
 export default function EmptyGroups() {
   const navigate = useNavigate();
 
   return (
-    <div className="screen-container bg-background items-center justify-center">
+    <div className="screen-container bg-background items-center justify-center pb-24">
       <div className="text-center px-8">
         <h1 className="bountt-wordmark text-4xl text-foreground mb-2">
           bountt<span className="text-primary">.</span>
@@ -33,6 +34,7 @@ export default function EmptyGroups() {
           </button>
         </div>
       </div>
+      <BottomNav onFabPress={() => navigate("/onboarding/group-name")} />
     </div>
   );
 }

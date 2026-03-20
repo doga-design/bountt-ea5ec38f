@@ -17,7 +17,7 @@ export default function BottomNav({ onFabPress }: BottomNavProps) {
   const fabBgSrc = getBackgroundSrc(currentGroup?.banner_gradient ?? "");
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[9999] bg-card border-t border-border px-12 pb-5 pt-4">
+    <div className="fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-border px-12 pb-5 pt-4">
       <div className="flex items-center justify-between">
         {/* Home */}
         <button onClick={() => {

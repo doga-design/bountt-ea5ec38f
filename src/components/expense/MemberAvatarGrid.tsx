@@ -257,10 +257,10 @@ export default function MemberAvatarGrid({
             onClick={onAddMember}
             className="absolute flex items-center justify-center rounded-full"
             style={{
-              width: 36,
-              height: 36,
+              width: 44,
+              height: 44,
               top: '50%',
-              right: -18,
+              right: -22,
               transform: 'translateY(-50%)',
               zIndex: 10,
               backgroundColor: 'white',
@@ -269,7 +269,7 @@ export default function MemberAvatarGrid({
             }}
             aria-label="Add member"
           >
-            <Plus className="w-[18px] h-[18px]" style={{ color: '#888' }} />
+            <Plus className="w-[22px] h-[22px]" style={{ color: '#888' }} />
           </button>
         )}
       </div>
