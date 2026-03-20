@@ -111,7 +111,7 @@ export default function ExpenseCard({ expense, splits, groupMembers, onClick }: 
           {expense.description}
         </p>
         <p className="text-xs mt-0.5 flex items-center gap-0">
-          <span style={{ color: payerLabelColor, fontWeight: isPayer ? 700 : undefined }}>
+          <span className={`text-foreground ${isPayer ? "font-bold" : ""}`}>
             Paid by {payerLabel}
           </span>
           {owesText && (

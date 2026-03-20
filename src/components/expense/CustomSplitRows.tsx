@@ -59,11 +59,7 @@ export default function CustomSplitRows({
                   />
                 </div>
                 <span
-                  className="mt-1 text-xs font-bold truncate w-full text-center"
-                  style={{
-                    color: isSelf ? bg : "hsl(var(--foreground))",
-                    fontWeight: isSelf ? 700 : undefined,
-                  }}
+                  className={`mt-1 text-xs truncate w-full text-center ${isSelf ? "font-bold text-foreground" : "text-foreground"}`}
                 >
                   {isSelf ? "You" : m.name}
                 </span>

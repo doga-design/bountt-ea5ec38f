@@ -46,9 +46,8 @@ export default function SplitSentence({
   const renderName = (member: GroupMember) => {
     const isYou = member.user_id === currentUserId;
     const label = isYou ? "you" : member.name;
-    const nameColor = isYou ? getAvatarColor(member).bg : undefined;
     return (
-      <span key={member.id} className="font-bold text-foreground" style={nameColor ? { color: nameColor } : undefined}>
+      <span key={member.id} className={`text-foreground ${isYou ? "font-bold" : "font-bold"}`}>
         {label}
       </span>
     );

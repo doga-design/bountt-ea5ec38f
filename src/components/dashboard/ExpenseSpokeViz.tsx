@@ -225,7 +225,7 @@ export default function ExpenseSpokeViz({
           const tappable = canTap(m);
           const isMe = m.userId === currentUserId;
           const label = isMe ? "You" : m.name;
-          const labelStyle = isMe && m.member ? { color: getAvatarColor(m.member).bg, fontWeight: 700 as const } : undefined;
+          const labelStyle = isMe ? { fontWeight: 700 as const } : undefined;
 
           return (
             <div

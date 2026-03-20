@@ -137,8 +137,7 @@ export default function MemberAvatarRow({
 
                 {/* Name */}
                 <span
-                  className="text-[12px] font-medium text-foreground truncate w-full text-center leading-tight"
-                  style={isMe ? { color: bgColor, fontWeight: 700 } : undefined}
+                  className={`text-[12px] font-medium text-foreground truncate w-full text-center leading-tight ${isMe ? "font-bold" : ""}`}
                 >
                   {isMe ? "You" : member.name}
                 </span>
