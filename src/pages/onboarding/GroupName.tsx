@@ -4,19 +4,18 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { GROUP_ICON_IDS, getGroupIconSrc } from "@/lib/group-icon-utils";
 
 const SUGGESTIONS = [
-  { label: "Lake House", emoji: "😊" },
-  { label: "The Condo", emoji: "⭐" },
-  { label: "Planners", emoji: "🗂️" },
-  { label: "Road Trip", emoji: "🚗" },
-  { label: "Foodies", emoji: "🍕" },
-  { label: "The Squad", emoji: "👥" },
-  { label: "Beach Trip", emoji: "🏖️" },
-  { label: "Ski Trip", emoji: "⛷️" },
+  { label: "Lake House", icon: "icon-05" },
+  { label: "The Condo", icon: "icon-05" },
+  { label: "Planners", icon: "icon-10" },
+  { label: "Road Trip", icon: "icon-02" },
+  { label: "Foodies", icon: "icon-01" },
+  { label: "The Squad", icon: "icon-03" },
+  { label: "Beach Trip", icon: "icon-06" },
+  { label: "Ski Trip", icon: "icon-09" },
 ];
-
-const EMOJIS = ["🏅", "🏠", "🚗", "🍕", "🌴", "⭐", "🎉", "💫", "🔥", "❤️", "🎸", "🌊"];
 
 export default function GroupName() {
   const navigate = useNavigate();
@@ -24,8 +23,8 @@ export default function GroupName() {
   const { toast } = useToast();
 
   const [name, setName] = useState("");
-  const [emoji, setEmoji] = useState("🏅");
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [icon, setIcon] = useState("icon-01");
+  const [showIconPicker, setShowIconPicker] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleContinue = async () => {
@@ -39,7 +38,7 @@ export default function GroupName() {
     }
 
     setLoading(true);
-    const group = await createGroup(name.trim(), emoji);
+    const group = await createGroup(name.trim(), icon);
     setLoading(false);
 
     if (group) {
@@ -49,9 +48,9 @@ export default function GroupName() {
     }
   };
 
-  const selectSuggestion = (s: { label: string; emoji: string }) => {
+  const selectSuggestion = (s: { label: string; icon: string }) => {
     setName(s.label);
-    setEmoji(s.emoji);
+    setIcon(s.icon);
   };
 
   return (
@@ -113,7 +112,7 @@ export default function GroupName() {
         {/* Header pill */}
         <div className="flex z-10 justify-center mb-10 -mt-16">
           <span className="bg-secondary text-secondary-foreground rounded-2xl px-6 py-4 text-sm font-bold">
-            Name your group 🏅
+            Name your group
           </span>
         </div>
         <p className="text-left text-muted-foreground text-sm mb-2">
@@ -122,13 +121,13 @@ export default function GroupName() {
 
         {/* Group name input */}
         <div className="bg-card rounded-2xl px-4 py-3.5 shadow-sm flex items-center gap-3 mb-4">
-          {/* Emoji picker button */}
+          {/* Icon picker button */}
           <button
             type="button"
-            onClick={() => setShowEmojiPicker((p) => !p)}
-            className="text-2xl flex-shrink-0"
+            onClick={() => setShowIconPicker((p) => !p)}
+            className="flex-shrink-0 w-8 h-8"
           >
-            {emoji}
+            <img src={getGroupIconSrc(icon)} alt="Group icon" className="w-8 h-8" />
           </button>
           <input
             type="text"
@@ -140,17 +139,17 @@ export default function GroupName() {
           />
         </div>
 
-        {/* Emoji picker */}
-        {showEmojiPicker && (
+        {/* Icon picker */}
+        {showIconPicker && (
           <div className="bg-card rounded-2xl p-4 shadow-sm mb-4 animate-fade-in">
-            <div className="grid grid-cols-6 gap-3">
-              {EMOJIS.map((e) => (
+            <div className="grid grid-cols-5 gap-3">
+              {GROUP_ICON_IDS.map((id) => (
                 <button
-                  key={e}
-                  onClick={() => { setEmoji(e); setShowEmojiPicker(false); }}
-                  className={`text-2xl p-1 rounded-xl transition-all ${emoji === e ? "bg-primary/10 scale-110" : "hover:bg-muted"}`}
+                  key={id}
+                  onClick={() => { setIcon(id); setShowIconPicker(false); }}
+                  className={`p-2 rounded-xl transition-all flex items-center justify-center ${icon === id ? "bg-primary/10 scale-110" : "hover:bg-muted"}`}
                 >
-                  {e}
+                  <img src={getGroupIconSrc(id)} alt={id} className="w-8 h-8" />
                 </button>
               ))}
             </div>
@@ -169,7 +168,7 @@ export default function GroupName() {
                   : "bg-card text-foreground border-border"
               }`}
             >
-              {s.label} {s.emoji}
+              {s.label}
             </button>
           ))}
         </div>

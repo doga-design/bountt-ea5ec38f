@@ -260,7 +260,7 @@ export default function Join() {
             bountt<span className="text-primary">.</span>
           </h1>
           <div className="bg-secondary text-secondary-foreground rounded-full px-5 py-2 text-sm font-bold inline-block">
-            Join a group 🔓
+            Join a group
           </div>
         </div>
 

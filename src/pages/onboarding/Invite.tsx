@@ -169,7 +169,7 @@ export default function Invite() {
         {/* Pill — overlapping orange header */}
         <div className="relative z-10 flex justify-center mb-6 -mt-16">
           <span className="bg-secondary text-secondary-foreground rounded-2xl px-6 py-4 text-sm font-bold">
-            Invite your friends to group 🔓
+            Invite your friends
           </span>
         </div>
 

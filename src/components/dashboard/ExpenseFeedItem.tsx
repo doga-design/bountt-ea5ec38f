@@ -176,7 +176,7 @@ export default function ExpenseFeedItem({
       showTotal = false;
       isMuted = true;
     } else if (allSettled) {
-      label = "All square ✌️";
+      label = "All square";
       displayAmount = 0;
       isMuted = true;
     } else if (nonPayerSplits.length === 1) {

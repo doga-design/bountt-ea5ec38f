@@ -83,8 +83,9 @@ export default function Groups() {
                 }}
               >
                 <div>
-                  <div className="text-lg font-bold text-white">
-                    {group.emoji} {group.name}
+                  <div className="text-lg font-bold text-white flex items-center gap-2">
+                    <img src={getGroupIconSrc(group.emoji)} alt="" className="w-6 h-6" />
+                    {group.name}
                   </div>
                   <div className="text-sm text-white/70 mt-0.5">
                     {count} {count === 1 ? "member" : "members"}

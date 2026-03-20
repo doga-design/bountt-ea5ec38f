@@ -791,7 +791,7 @@ export default function ExpenseScreen({
                         if (totalNum === 0) {
                           statusText = "assign to everyone";
                         } else if (isBalanced) {
-                          statusText = "perfectly split ✓";
+                          statusText = "perfectly split";
                           statusColor = "#22C55E";
                         } else if (overBudget) {
                           statusText = `$${Math.abs(remaining).toFixed(2)} over total`;

@@ -108,9 +108,9 @@ export default function ExpenseSheet({
           origin: { y: 0.5 },
           colors: ["#E8480A", "#FFFFFF", "#D4D4D4"],
         });
-        toast({ title: "First expense logged! 🎉" });
+        toast({ title: "First expense logged!" });
       } else {
-        toast({ title: "Expense added ✓" });
+        toast({ title: "Expense added" });
       }
 
       setAmount("0");
