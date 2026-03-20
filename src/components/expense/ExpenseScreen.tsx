@@ -559,14 +559,10 @@ export default function ExpenseScreen({
         await fetchExpenseSplits(currentGroup.id);
 
         if (isFirstExpense) {
-          confetti({
-            particleCount: 160,
-            spread: 100,
-            origin: { y: 0.5 },
-            colors: ["#E8480A", "#FFFFFF", "#D4D4D4"],
-          });
           toast({ title: "First expense logged!" });
         } else {
+          toast({ title: "Expense added" });
+        }
           toast({ title: "Expense added" });
         }
       }
