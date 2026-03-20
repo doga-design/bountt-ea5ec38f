@@ -47,6 +47,7 @@ export default function Dashboard() {
   const [detailExpenseId, setDetailExpenseId] = useState<string | null>(null);
   const [editExpense, setEditExpense] = useState<Expense | undefined>(undefined);
   const [editSplits, setEditSplits] = useState<ExpenseSplit[] | undefined>(undefined);
+  const [filterMemberId, setFilterMemberId] = useState<string | null>(null);
 
   // Confetti: only fire after drawer fully closes
   const pendingConfettiRef = useRef(false);
@@ -120,8 +121,27 @@ export default function Dashboard() {
   const isLoading = membersLoading || expensesLoading;
 
   const { unsettledGroups, settledExpenses } = useMemo(() => {
-    const unsettled = expenses.filter((e) => !e.is_settled);
-    const settled = expenses.filter((e) => e.is_settled);
+    // Apply member filter if active
+    const filtered = filterMemberId
+      ? expenses.filter((e) => {
+          const member = groupMembers.find((m) => m.id === filterMemberId);
+          if (!member) return false;
+          // Match as payer
+          const isPayer = member.user_id
+            ? e.paid_by_user_id === member.user_id
+            : e.paid_by_name === member.name;
+          // Match as split participant
+          const isSplitMember = expenseSplits.some(
+            (s) =>
+              s.expense_id === e.id &&
+              (member.user_id ? s.user_id === member.user_id : s.member_name === member.name)
+          );
+          return isPayer || isSplitMember;
+        })
+      : expenses;
+
+    const unsettled = filtered.filter((e) => !e.is_settled);
+    const settled = filtered.filter((e) => e.is_settled);
 
     const groups: { label: string; items: typeof expenses }[] = [];
     let currentLabel = "";
@@ -134,7 +154,7 @@ export default function Dashboard() {
       groups[groups.length - 1].items.push(expense);
     }
     return { unsettledGroups: groups, settledExpenses: settled };
-  }, [expenses]);
+  }, [expenses, expenseSplits, filterMemberId, groupMembers]);
 
   const groupReady = currentGroup && currentGroup.id === groupId;
   const mode = !hasOtherMembers ? "empty" : !hasExpenses ? "prompt" : "normal";
@@ -169,6 +189,7 @@ export default function Dashboard() {
                   members={groupMembers}
                   currentUserId={user?.id ?? ""}
                   groupInviteCode={currentGroup?.invite_code}
+                  onFilterMember={setFilterMemberId}
                 />
               </div>
 

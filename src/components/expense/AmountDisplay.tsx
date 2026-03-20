@@ -80,7 +80,7 @@ export default function AmountDisplay({
           $
         </span>
         <span
-          className="font-sora font-extrabold text-foreground leading-none"
+          className="font-bringbold text-foreground leading-none"
           style={{
             fontSize: isLarge ? 72 : 52,
             letterSpacing: "-0.07em",

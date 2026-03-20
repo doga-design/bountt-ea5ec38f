@@ -88,7 +88,7 @@ export default function SplitSentence({
             if (hidePayerDrawer) return;
             onPayerDrawerChange(true);
           }}
-          className={`font-extrabold underline decoration-dotted underline-offset-4 text-foreground ${payerIsYou ? "font-bold" : ""}`}
+          className={`font-extrabold underline decoration-dotted underline-offset-4 text-primary ${payerIsYou ? "font-bold" : ""}`}
         >
           {payerDisplay}
         </button>
