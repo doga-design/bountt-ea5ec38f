@@ -122,7 +122,27 @@ export default function ExpenseScreen({
           setActiveIds(ids);
         }
       } else {
-        // Create mode
+        // Create mode — try to restore a persisted draft
+        const saved = draftKey ? sessionStorage.getItem(draftKey) : null;
+        if (saved) {
+          try {
+            const d = JSON.parse(saved);
+            setAmount(d.amount ?? "0");
+            setPrevAmount(d.prevAmount ?? "0");
+            setDescription(d.description ?? "");
+            setSplitMode(d.splitMode ?? "equal");
+            setSlide(d.slide ?? 1);
+            setPayerId(d.payerId ?? null);
+            setActiveIds(new Set(d.activeIds ?? []));
+            setCustomAmounts(new Map(Object.entries(d.customAmounts ?? {})));
+            setFocusedMemberId(d.focusedMemberId ?? null);
+            setShakeButton(false);
+            return; // skip default reset — draft is hydrated
+          } catch {
+            // malformed draft, fall through to defaults
+          }
+        }
+
         setAmount("0");
         setPrevAmount("0");
         setDescription("");
@@ -138,6 +158,23 @@ export default function ExpenseScreen({
       setShakeButton(false);
     }
   }, [open]);
+
+  // Persist draft to sessionStorage while the drawer is open (create mode only)
+  useEffect(() => {
+    if (!open || isEditMode || !draftKey) return;
+    const draft = {
+      amount,
+      prevAmount,
+      description,
+      splitMode,
+      slide,
+      payerId,
+      activeIds: Array.from(activeIds),
+      customAmounts: Object.fromEntries(customAmounts),
+      focusedMemberId,
+    };
+    sessionStorage.setItem(draftKey, JSON.stringify(draft));
+  }, [open, isEditMode, draftKey, amount, prevAmount, description, splitMode, slide, payerId, activeIds, customAmounts, focusedMemberId]);
 
   const payerMember = useMemo(() => {
     const found = activeMembers.find((m) => m.id === payerId);
