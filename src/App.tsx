@@ -36,7 +36,7 @@ const App = () => (
               {/* Public */}
               <Route path="/" element={<Splash />} />
               <Route path="/auth" element={<Auth />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
+              
 
               {/* Empty Groups */}
               <Route path="/groups/empty" element={<AuthGuard><EmptyGroups /></AuthGuard>} />
