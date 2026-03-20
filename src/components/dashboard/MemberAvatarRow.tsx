@@ -49,12 +49,13 @@ export default function MemberAvatarRow({
   }, [inviteCardMemberId]);
 
   const handleTap = (member: GroupMember) => {
+    // Toggle invite card for placeholders (secondary behavior)
     if (member.is_placeholder) {
       setInviteCardMemberId((prev) => (prev === member.id ? null : member.id));
-      return;
+    } else {
+      setInviteCardMemberId(null);
     }
-    // Toggle filter
-    setInviteCardMemberId(null);
+    // Toggle filter for all members (placeholder or real)
     if (selectedMemberId === member.id) {
       setSelectedMemberId(null);
       onFilterMember?.(null);
@@ -98,8 +99,8 @@ export default function MemberAvatarRow({
               <button
                 key={member.id}
                 onClick={() => handleTap(member)}
-                className="flex flex-col items-center gap-1.5 shrink-0 min-w-0"
-                style={{ width: 60 }}
+                className="flex flex-col items-center gap-1.5 shrink-0 min-w-0 transition-opacity duration-200"
+                style={{ width: 60, opacity: selectedMemberId && !isSelected ? 0.4 : 1 }}
               >
                 {/* Avatar circle */}
                 <div className="relative">
