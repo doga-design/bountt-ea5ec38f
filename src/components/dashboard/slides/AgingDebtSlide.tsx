@@ -26,7 +26,7 @@ export default function AgingDebtSlide({ agingDebts }: Props) {
       : <><span className="font-semibold">{debt.personName}</span> still owes you {formatCurrency(debt.amount)} from <span className="font-semibold">{debt.expenseName}</span></>;
 
   return (
-    <div className="flex flex-col justify-center px-6 py-4 min-h-[200px]">
+    <div className="flex flex-col justify-center px-6 py-2 min-h-[150px]">
       <div className="flex items-center gap-3 mb-1">
         <span className="text-6xl font-extrabold text-white">{debt.daysWaiting}</span>
         {hasMultiple && (

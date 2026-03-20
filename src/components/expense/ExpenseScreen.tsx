@@ -736,17 +736,15 @@ export default function ExpenseScreen({
 
                 {/* Member avatar grid — equal mode only */}
                 {splitMode === "equal" && (
-                  <div className="flex justify-center">
-                    <div className="relative" style={{ width: 'fit-content' }}>
-                      <MemberAvatarGrid
-                        members={gridMembers}
-                        activeIds={activeIds}
-                        onToggle={handleToggleGridMember}
-                        currentUserId={user?.id}
-                        onAddMember={activeMembers.length < 6 ? () => setShowAddMember(true) : undefined}
-                        splitAmounts={gridSplitAmounts}
-                      />
-                    </div>
+                  <div className="px-0">
+                    <MemberAvatarGrid
+                      members={gridMembers}
+                      activeIds={activeIds}
+                      onToggle={handleToggleGridMember}
+                      currentUserId={user?.id}
+                      onAddMember={activeMembers.length < 6 ? () => setShowAddMember(true) : undefined}
+                      splitAmounts={gridSplitAmounts}
+                    />
                   </div>
                 )}
 

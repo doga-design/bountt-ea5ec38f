@@ -121,7 +121,7 @@ export default function NetBalanceSlide({ netBalance, totalOwedToYou, totalYouOw
     : "";
 
   return (
-    <div className="flex flex-col justify-center px-6 py-4 min-h-[200px] relative">
+    <div className="flex flex-col justify-center px-6 py-2 min-h-[150px] relative">
       {/* Badge */}
       <div className="mb-2">
         <span className="inline-block bg-white/10 text-white text-xs font-semibold rounded-full px-3 py-1 mb-2">
@@ -134,7 +134,7 @@ export default function NetBalanceSlide({ netBalance, totalOwedToYou, totalYouOw
         {prefix && (
           <span className="text-5xl font-extrabold text-white/40">{prefix}</span>
         )}
-        <span className="text-5xl font-extrabold text-white">{displayAmount}</span>
+        <span className="text-5xl font-bringbold text-white">{displayAmount}</span>
       </div>
 
       {/* Action row */}
