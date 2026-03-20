@@ -269,7 +269,7 @@ export default function MemberAvatarGrid({
             }}
             aria-label="Add member"
           >
-            <Plus className="w-[22px] h-[22px]" style={{ color: '#888' }} />
+            <span className="font-bringbold text-[32px] leading-none text-muted-foreground -translate-y-[1px]">+</span>
           </button>
         )}
       </div>
