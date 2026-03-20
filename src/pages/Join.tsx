@@ -204,7 +204,7 @@ export default function Join() {
     });
 
     await fetchGroups(true);
-    toast({ title: `Joined ${groupName}!`, description: "Welcome to the group 🎉" });
+    toast({ title: `Joined ${groupName}!`, description: "Welcome to the group" });
     navigate(`/dashboard/${groupId}`);
   };
 
