@@ -1,140 +1,48 @@
 
 
-# Plan: Six Targeted Changes
+# Audit & Proposed Approach for Change 1
 
-## Change 1 — SVG Icons White + Icon/Wallpaper Picker in Settings
+## Root Cause Analysis
 
-**White icons**: Apply `style={{ filter: 'brightness(0) invert(1)' }}` to all `<img>` tags rendering group icons in:
-- `HeroCarousel.tsx` (line 89)
-- `GroupBanner.tsx` (line 45)
+**Why arcs don't show in the numpad:**
 
-Do NOT apply to Groups.tsx cards or DashboardHeader.tsx — those will get background images (Change 5) and the icon treatment should match their context.
+MemberAvatarGrid's SVG draws arcs from an **apex point** (`containerWidth/2, 0`) down to each member avatar. But there is **no payer avatar at that apex** — the payer avatar is rendered separately above in `ExpenseScreen.tsx` (line 706, as `PayerAvatar`), completely outside the MemberAvatarGrid component. So the arcs start from empty space above the member row, with no visual anchor.
 
-**Icon picker + Wallpaper picker in GroupBanner.tsx**:
-- Replace the single `GradientPicker` dialog with a combined customization dialog containing two sections:
-  1. **Icon picker**: 10 SVG icons in a grid (2 rows of 5). Tapping selects. Selected icon has a border highlight. Saves to `groups.emoji`.
-  2. **Wallpaper picker**: 5 background image thumbnails + 1 cosmetic "+" slot (Change 5 details). Tapping selects. Saves to `banner_gradient` column (reusing it for `"bg-01"` through `"bg-05"` keys).
+The SVG code itself is structurally correct — paths render, particles animate. The problem is **architectural**: the payer avatar and the member avatars live in different components with no spatial relationship. The arcs connect to a calculated point that doesn't correspond to any visible element.
 
-**Type/context changes**:
-- `src/types/index.ts`: Update `updateGroup` type to include `emoji` in the allowed Partial: `Partial<Pick<Group, 'name' | 'banner_gradient' | 'emoji'>>`
-- `src/contexts/AppContext.tsx`: Same update to `updateGroup` signature (line 385)
+**Can it be fixed with a small targeted change?**
 
-**Delete** `src/components/group-settings/GradientPicker.tsx` — no longer needed.
+No. The fundamental issue is that MemberAvatarGrid doesn't render a payer avatar, so there's nothing for the arcs to connect to. Adding a payer avatar to MemberAvatarGrid would fix it, but that means MemberAvatarGrid becomes essentially the same component as ExpenseSpokeViz — payer at top, members below, arcs between.
 
----
+## Proposed Approach: Enhance MemberAvatarGrid into a Self-Contained Component
 
-## Change 2 — Confetti Triggers
+Rather than layering two components or duplicating code, **add the payer avatar directly into MemberAvatarGrid** as an optional feature:
 
-**Analysis of current state**:
+1. Add new optional props to MemberAvatarGrid: `payerMember?: GroupMember` and `payerOnClick?: () => void`
+2. When `payerMember` is provided, render the payer avatar centered at the top of the component (same styling as ExpenseSpokeViz — 64px, colored border, white shadow)
+3. The SVG arcs connect from the payer avatar's center to each active member avatar's center — using the same `getBoundingClientRect` measurement approach that ExpenseSpokeViz uses (not the current slot-width calculation which doesn't account for actual avatar positions)
+4. Particle animation identical to ExpenseSpokeViz: dashed paths, animated circles traveling bottom→top, opacity fade
+5. Member row stays exactly as-is: toggleable avatars with active/inactive states, names, split amounts, add button
+6. In ExpenseScreen.tsx, remove the separate `PayerAvatar` from slide 2 and pass `payerMember` to MemberAvatarGrid instead
 
-1. **First expense confetti** — `ExpenseScreen.tsx` line 561-567. Fires when `isFirstExpense` is true. `isFirstExpense` is passed from `Dashboard.tsx` line 260 as `mode === "prompt"`. This fires _inside_ the save handler _before_ `onOpenChange(false)`, so the confetti fires while the drawer is still open. This should work but fires behind the drawer overlay.
+**This gives exactly**: payer at top center → dashed arc lines → selected member avatars below → particles animating bottom→top. Single component, no duplicates, no layering.
 
-2. **Settlement confetti** — `Dashboard.tsx` lines 62-85. `pendingConfettiRef` is set by `handleSettlementComplete` callback, which is passed to `ExpenseDetailSheet` as `onSettled`. Inside `ExpenseDetailSheet.tsx` lines 83-93, the auto-close effect calls `onSettled?.()` then `onOpenChange(false)`. The `handleDetailOpenChange` in Dashboard fires confetti when drawer closes with pending flag. This chain looks correct.
+The measurement approach switches from slot-width math to `getBoundingClientRect` (matching ExpenseSpokeViz), which correctly handles varying avatar sizes, gaps, and centering. This is the reason ExpenseSpokeViz works perfectly and MemberAvatarGrid's arcs look wrong even when they render.
 
-**Fix for first expense**: Move confetti from inside ExpenseScreen's save handler to Dashboard.tsx. Add a `pendingFirstExpenseConfettiRef` in Dashboard. Set it when `isFirstExpense` and the expense screen closes. Fire confetti in `onOpenChange` handler for ExpenseScreen after the drawer closes — same pattern as settlement confetti.
-
-**Fix for settlement**: The current chain looks correct architecturally. Verify the `onSettled` prop is connected. Looking at code — `ExpenseDetailSheet` line 88 calls `onSettled?.()` and then line 89 calls `onOpenChange(false)`. But `handleDetailOpenChange` in Dashboard line 67 checks `pendingConfettiRef` only when `!open`. The issue: `onSettled()` sets `pendingConfettiRef.current = true`, then `onOpenChange(false)` triggers `handleDetailOpenChange` which reads it. This should work. If it's broken, it may be because the `onSettled` callback fires _and then_ `onOpenChange(false)` fires in the same tick via `setTimeout` — verify the timing is correct. Add a small delay if needed.
+**Files changed:**
+- `MemberAvatarGrid.tsx` — add payer avatar rendering, switch to getBoundingClientRect measurement for arc endpoints
+- `ExpenseScreen.tsx` — remove standalone PayerAvatar from slide 2, pass `payerMember` prop to MemberAvatarGrid
 
 ---
 
-## Change 3.1 — Hero Less Tall + Remove Header BG Tint
+# Changes 2–4 (Unchanged from approved plan)
 
-**Hero height**: In `NetBalanceSlide.tsx`, `AgingDebtSlide.tsx`, `ContributionSlide.tsx` — change `min-h-[200px]` to `min-h-[150px]`. Reduce `py-4` to `py-2` on each slide.
+## Change 2 — Remove colored bold names, "You" bold black only
+Same as approved. ~10 files, remove all color styling on names, keep only `font-bold` on "You" text with default foreground color.
 
-**Remove header tint**: In `HeroCarousel.tsx` line 85 — delete `<div className="absolute inset-0 bg-black/10" />`. The nav bar row becomes fully transparent over the background image.
+## Change 3 — Hero bg on FAB, dark tint, BringBoldNineties on +/-
+Same as approved. BottomNav gets background image on FAB + font-bringbold on "+". HeroCarousel gets `bg-black/35` overlay. NetBalanceSlide gets font-bringbold on +/- prefix.
 
----
-
-## Change 3.2 — BringBoldNineties Font
-
-**Copy font**: `user-uploads://Bringbold_Nineties_Regular.ttf` → `src/assets/fonts/Bringbold_Nineties_Regular.ttf`
-
-**Add @font-face** in `src/index.css`:
-```css
-@font-face {
-  font-family: 'BringBoldNineties';
-  src: url('@/assets/fonts/Bringbold_Nineties_Regular.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-}
-```
-
-Add utility class `.font-bringbold { font-family: 'BringBoldNineties', sans-serif; }` in the utilities layer.
-
-**Apply**: In `NetBalanceSlide.tsx` line 137, the `<span>` for `displayAmount` — add `font-bringbold` class. Only this element. The badge/label above uses default font.
-
----
-
-## Change 4 — Restore MemberAvatarGrid Animation
-
-**Root cause**: The parent wrapper in `ExpenseScreen.tsx` line 744 uses `style={{ width: 'fit-content' }}`. This constrains the MemberAvatarGrid container, but the ResizeObserver should still measure it. However, the SVG `overflow: "visible"` combined with the `fit-content` parent may cause clipping.
-
-**Investigation + fix approach**:
-- Remove `width: 'fit-content'` from the parent wrapper in ExpenseScreen line 744. Instead use `width: '100%'` or remove the style entirely — let the MemberAvatarGrid fill available width naturally.
-- Verify the SVG renders at `position: absolute, top: 0, left: 0, width: 100%, height: SVG_HEIGHT` with `overflow: visible` and `pointerEvents: none`.
-- Confirm `activeIds` is passed correctly and members with IDs in the set show lines.
-
-The parent div structure becomes:
-```jsx
-<div className="flex justify-center">
-  <MemberAvatarGrid ... />
-</div>
-```
-Remove the intermediate `<div className="relative" style={{ width: 'fit-content' }}>`.
-
----
-
-## Change 5 — Replace Gradients with 5 Background Images
-
-**Copy assets**: 
-- `user-uploads://bg-01.webp` → `src/assets/backgrounds/bg-01.webp`
-- `user-uploads://bg-02.webp` → `src/assets/backgrounds/bg-02.webp`
-- `user-uploads://bg-03.webp` → `src/assets/backgrounds/bg-03.webp`
-- `user-uploads://bg-04.webp` → `src/assets/backgrounds/bg-04.webp`
-- `user-uploads://bg-05.webp` → `src/assets/backgrounds/bg-05.webp`
-
-**Create utility** `src/lib/background-utils.ts`:
-- Import all 5 images
-- Map `"bg-01"` through `"bg-05"` to imports
-- Export `getBackgroundSrc(key: string): string` — returns image URL, fallback to `bg-02` (orange) for unknown/legacy gradient keys
-- Export `BACKGROUND_IDS` array
-
-**Replace GRADIENTS everywhere**:
-- `HeroCarousel.tsx`: Delete `GRADIENTS` map. Use `getBackgroundSrc(currentGroup.banner_gradient)` → `style={{ backgroundImage: url(...), backgroundSize: 'cover', backgroundPosition: 'center' }}`
-- `DashboardHeader.tsx`: Same replacement
-- `GroupBanner.tsx`: Same replacement  
-- `Groups.tsx`: Same replacement for group cards
-
-**Default mapping**: Any `banner_gradient` value not in `"bg-01"`..`"bg-05"` falls back to `"bg-02"` (orange bg, closest to the original orange gradient).
-
-**Sixth slot** in the wallpaper picker (GroupBanner customization dialog): After the 5 thumbnail buttons, add a `<div>` with `border: 1.5px dashed`, muted border color, centered `+` text. No onClick, no functionality. Purely cosmetic.
-
----
-
-## Files Changed Summary
-
-| File | Action |
-|------|--------|
-| `src/assets/backgrounds/bg-01..05.webp` | Create (copy from uploads) |
-| `src/assets/fonts/Bringbold_Nineties_Regular.ttf` | Create (copy from upload) |
-| `src/lib/background-utils.ts` | Create |
-| `src/index.css` | Add font-face + utility class |
-| `src/components/dashboard/HeroCarousel.tsx` | Remove gradients, use bg images, remove header tint, white icon filter |
-| `src/components/dashboard/slides/NetBalanceSlide.tsx` | Reduce height, apply BringBoldNineties to balance number |
-| `src/components/dashboard/slides/AgingDebtSlide.tsx` | Reduce height |
-| `src/components/dashboard/slides/ContributionSlide.tsx` | Reduce height |
-| `src/components/dashboard/slides/useHeroData.ts` | No change |
-| `src/components/dashboard/DashboardHeader.tsx` | Remove gradients, use bg images |
-| `src/components/group-settings/GroupBanner.tsx` | Replace gradient with bg image, add combined icon+wallpaper picker |
-| `src/components/group-settings/GradientPicker.tsx` | Delete |
-| `src/pages/Groups.tsx` | Replace gradients with bg images |
-| `src/pages/Dashboard.tsx` | Fix first-expense confetti trigger |
-| `src/components/expense/ExpenseScreen.tsx` | Remove confetti from save handler, fix MemberAvatarGrid wrapper |
-| `src/components/dashboard/ExpenseDetailSheet.tsx` | Verify settlement confetti path |
-| `src/types/index.ts` | Add `emoji` to updateGroup type |
-| `src/contexts/AppContext.tsx` | Add `emoji` to updateGroup signature |
-
-## Files NOT Changed
-
-Auth, avatar system, RPCs, RLS policies, realtime subscriptions, settlement logic, ExpenseSheet.tsx.
+## Change 4 — Bottom navbar z-[9999]
+Same as approved. Add `z-[9999]` to BottomNav fixed container.
 
