@@ -35,7 +35,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Expenses state
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  
+  const [expensesLoading, setExpensesLoading] = useState(false);
 
   // Expense splits state
   const [expenseSplits, setExpenseSplits] = useState<ExpenseSplit[]>([]);
@@ -222,6 +222,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [user, profile]);
 
   const setCurrentGroup = useCallback((group: Group | null) => {
+    // Skip clearing + re-fetching if navigating back to the same group
+    if (group && currentGroupRef.current?.id === group.id) {
+      setCurrentGroupState(group);
+      return;
+    }
     setCurrentGroupState(group);
     // FIX 1 & 5: Clear arrays synchronously and increment fetch version
     setGroupMembers([]);
@@ -313,7 +318,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // =====================================================
   const fetchExpenses = useCallback(async (groupId: string) => {
     const version = fetchVersionRef.current;
-    
+    setExpensesLoading(true);
     try {
       const { data, error: fetchError } = await supabase
         .from("expenses")
@@ -330,7 +335,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (fetchVersionRef.current !== version) return;
       toast({ title: err instanceof Error ? err.message : "Failed to fetch expenses", variant: "destructive" });
     } finally {
-      
+      if (fetchVersionRef.current === version) setExpensesLoading(false);
     }
   }, []);
 
@@ -603,7 +608,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     groupMembers,
     membersLoading,
     expenses,
-    
+    expensesLoading,
     expenseSplits,
     error,
     setCurrentGroup,
