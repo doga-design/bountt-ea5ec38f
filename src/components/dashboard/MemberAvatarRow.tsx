@@ -136,7 +136,10 @@ export default function MemberAvatarRow({
                 </div>
 
                 {/* Name */}
-                <span className="text-[12px] font-medium text-foreground truncate w-full text-center leading-tight">
+                <span
+                  className="text-[12px] font-medium text-foreground truncate w-full text-center leading-tight"
+                  style={isMe ? { color: bgColor, fontWeight: 700 } : undefined}
+                >
                   {isMe ? "You" : member.name}
                 </span>
               </button>

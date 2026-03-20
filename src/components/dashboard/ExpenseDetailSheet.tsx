@@ -102,6 +102,8 @@ export default function ExpenseDetailSheet({
       return s.member_name !== expense?.paid_by_name;
     })
     .map((s) => (s.user_id === user?.id ? "You" : s.member_name));
+
+  // Build subtitle with colored "You"
   const subtitle = `${payerLabel} paid, splitting with ${otherSplitNames.join(" & ")}`;
 
   // Creator label

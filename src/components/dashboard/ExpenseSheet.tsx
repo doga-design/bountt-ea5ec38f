@@ -163,7 +163,7 @@ export default function ExpenseSheet({
                         : "bg-muted text-muted-foreground"
                     }`}
                   >
-                    {isSelf ? "You" : m.name}
+                    <span style={isSelf ? { color: memberColor, fontWeight: 700 } : undefined}>{isSelf ? "You" : m.name}</span>
                   </button>
                 );
               })}

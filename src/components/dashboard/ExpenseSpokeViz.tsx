@@ -283,7 +283,7 @@ export default function ExpenseSpokeViz({
                 )}
               </div>
 
-              <span className="text-[10px] font-medium text-muted-foreground mt-1 text-center leading-tight max-w-[72px] break-words">
+              <span className="text-[10px] font-medium text-muted-foreground mt-1 text-center leading-tight max-w-[72px] break-words" style={labelStyle}>
                 {m.isSettled ? `${label} settled` : `${label}'s share`}
               </span>
               <span className="text-[11px] font-bold text-foreground">

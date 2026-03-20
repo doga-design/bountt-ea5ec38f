@@ -155,9 +155,10 @@ export default function MemberAvatarGrid({
                   fontSize,
                   color: isActive
                     ? isSelf
-                      ? "hsl(var(--primary))"
+                      ? stroke
                       : "hsl(var(--foreground))"
                     : "hsl(var(--muted-foreground))",
+                  fontWeight: isSelf ? 700 : undefined,
                 }}
               >
                 {isSelf ? "You" : m.name}

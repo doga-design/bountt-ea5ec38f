@@ -94,7 +94,7 @@ export default function SplitSentence({
             onPayerDrawerChange(true);
           }}
           className="font-extrabold underline decoration-dotted underline-offset-4"
-          style={{ color: "#D94F00" }}
+          style={{ color: payerColor }}
         >
           {payerDisplay}
         </button>
