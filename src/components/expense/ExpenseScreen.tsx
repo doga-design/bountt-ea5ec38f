@@ -32,6 +32,7 @@ export default function ExpenseScreen({
   isFirstExpense = false,
   editExpense,
   editSplits,
+  draftKey,
 }: ExpenseScreenProps) {
   const { currentGroup, user, profile, groupMembers, fetchExpenses, fetchExpenseSplits, addPlaceholderMember } = useApp();
   const { toast } = useToast();
