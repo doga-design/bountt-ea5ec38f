@@ -1,17 +1,14 @@
 import { useState } from "react";
 import { Group } from "@/types";
 import { useApp } from "@/contexts/AppContext";
-import GradientPicker from "./GradientPicker";
-import { getGroupIconSrc } from "@/lib/group-icon-utils";
-
-const GRADIENTS: Record<string, { from: string; to: string }> = {
-  "solid-orange": { from: "hsl(18,89%,47%)", to: "hsl(18,89%,47%)" },
-  "orange-red": { from: "hsl(15,90%,55%)", to: "hsl(0,85%,50%)" },
-  "blue-purple": { from: "hsl(220,80%,55%)", to: "hsl(270,70%,55%)" },
-  "green-teal": { from: "hsl(150,60%,45%)", to: "hsl(180,70%,45%)" },
-  "pink-orange": { from: "hsl(330,80%,60%)", to: "hsl(25,90%,55%)" },
-  "gray-black": { from: "hsl(0,0%,40%)", to: "hsl(0,0%,15%)" },
-};
+import { getGroupIconSrc, GROUP_ICON_IDS } from "@/lib/group-icon-utils";
+import { getBackgroundSrc, BACKGROUND_IDS } from "@/lib/background-utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface GroupBannerProps {
   group: Group;
@@ -24,7 +21,7 @@ export default function GroupBanner({ group }: GroupBannerProps) {
   const { updateGroup, user } = useApp();
 
   const isCreator = group.created_by === user?.id;
-  const gradient = GRADIENTS[group.banner_gradient] ?? GRADIENTS["orange-red"];
+  const bgSrc = getBackgroundSrc(group.banner_gradient);
 
   const handleNameSave = async () => {
     setEditing(false);
@@ -38,11 +35,18 @@ export default function GroupBanner({ group }: GroupBannerProps) {
       <div
         className={`relative h-[200px] flex flex-col items-center justify-center ${isCreator ? "cursor-pointer" : ""}`}
         style={{
-          background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`,
+          backgroundImage: `url(${bgSrc})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
         }}
         onClick={() => isCreator && !editing && setShowPicker(true)}
       >
-        <img src={getGroupIconSrc(group.emoji)} alt="" className="w-12 h-12 mb-3" />
+        <img
+          src={getGroupIconSrc(group.emoji)}
+          alt=""
+          className="w-12 h-12 mb-3"
+          style={{ filter: "brightness(0) invert(1)" }}
+        />
         {isCreator && editing ? (
           <input
             className="text-2xl font-bold text-primary-foreground bg-transparent text-center outline-none"
@@ -68,16 +72,113 @@ export default function GroupBanner({ group }: GroupBannerProps) {
       </div>
 
       {isCreator && (
-        <GradientPicker
+        <CustomizePicker
           open={showPicker}
           onOpenChange={setShowPicker}
-          current={group.banner_gradient}
-          onSelect={async (gradient) => {
-            await updateGroup(group.id, { banner_gradient: gradient });
+          currentIcon={group.emoji}
+          currentBg={group.banner_gradient}
+          onSave={async (icon, bg) => {
+            const updates: Record<string, string> = {};
+            if (icon !== group.emoji) updates.emoji = icon;
+            if (bg !== group.banner_gradient) updates.banner_gradient = bg;
+            if (Object.keys(updates).length > 0) {
+              await updateGroup(group.id, updates);
+            }
             setShowPicker(false);
           }}
         />
       )}
     </>
+  );
+}
+
+/* ─── Combined Icon + Wallpaper Picker ─── */
+
+interface CustomizePickerProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  currentIcon: string;
+  currentBg: string;
+  onSave: (icon: string, bg: string) => void;
+}
+
+function CustomizePicker({ open, onOpenChange, currentIcon, currentBg, onSave }: CustomizePickerProps) {
+  const [selectedIcon, setSelectedIcon] = useState(currentIcon);
+  const [selectedBg, setSelectedBg] = useState(currentBg);
+
+  // Reset when dialog opens
+  const handleOpenChange = (o: boolean) => {
+    if (o) {
+      setSelectedIcon(currentIcon);
+      setSelectedBg(currentBg);
+    }
+    onOpenChange(o);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-[350px]">
+        <DialogHeader>
+          <DialogTitle>Customize group</DialogTitle>
+        </DialogHeader>
+
+        {/* Icon picker */}
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-foreground">Icon</p>
+          <div className="grid grid-cols-5 gap-2">
+            {GROUP_ICON_IDS.map((id) => (
+              <button
+                key={id}
+                onClick={() => setSelectedIcon(id)}
+                className={`w-full aspect-square rounded-xl flex items-center justify-center transition-all ${
+                  selectedIcon === id
+                    ? "border-2 border-primary bg-primary/10 scale-105"
+                    : "border border-border bg-muted"
+                }`}
+              >
+                <img src={getGroupIconSrc(id)} alt="" className="w-7 h-7" />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Wallpaper picker */}
+        <div className="space-y-2 mt-2">
+          <p className="text-sm font-semibold text-foreground">Wallpaper</p>
+          <div className="grid grid-cols-3 gap-3">
+            {BACKGROUND_IDS.map((id) => (
+              <button
+                key={id}
+                onClick={() => setSelectedBg(id)}
+                className={`w-full aspect-[3/2] rounded-xl overflow-hidden transition-all ${
+                  selectedBg === id ? "ring-2 ring-primary scale-105" : "ring-1 ring-border"
+                }`}
+              >
+                <img
+                  src={getBackgroundSrc(id)}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              </button>
+            ))}
+            {/* Sixth slot — cosmetic "+" */}
+            <div
+              className="w-full aspect-[3/2] rounded-xl flex items-center justify-center"
+              style={{ border: "1.5px dashed hsl(var(--muted-foreground) / 0.4)" }}
+            >
+              <span className="text-lg text-muted-foreground">+</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Save button */}
+        <button
+          onClick={() => onSave(selectedIcon, selectedBg)}
+          className="w-full mt-3 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm"
+        >
+          Save
+        </button>
+      </DialogContent>
+    </Dialog>
   );
 }

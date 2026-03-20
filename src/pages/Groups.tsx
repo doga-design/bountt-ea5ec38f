@@ -3,17 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { getGroupIconSrc } from "@/lib/group-icon-utils";
+import { getBackgroundSrc } from "@/lib/background-utils";
 import { supabase } from "@/integrations/supabase/client";
 import BottomNav from "@/components/BottomNav";
-
-const GRADIENTS: Record<string, { from: string; to: string }> = {
-  "solid-orange": { from: "hsl(18,89%,47%)", to: "hsl(18,89%,47%)" },
-  "orange-red": { from: "hsl(15,90%,55%)", to: "hsl(0,85%,50%)" },
-  "blue-purple": { from: "hsl(220,80%,55%)", to: "hsl(270,70%,55%)" },
-  "green-teal": { from: "hsl(150,60%,45%)", to: "hsl(180,70%,45%)" },
-  "pink-orange": { from: "hsl(330,80%,60%)", to: "hsl(25,90%,55%)" },
-  "gray-black": { from: "hsl(0,0%,40%)", to: "hsl(0,0%,15%)" },
-};
 
 export default function Groups() {
   const navigate = useNavigate();
@@ -63,7 +55,7 @@ export default function Groups() {
         {/* Group cards */}
         <div className="space-y-3">
           {userGroups.map((group) => {
-            const g = GRADIENTS[group.banner_gradient] ?? GRADIENTS["orange-red"];
+            const bgSrc = getBackgroundSrc(group.banner_gradient);
             const count = memberCounts[group.id] ?? 0;
             return (
               <button
@@ -71,7 +63,9 @@ export default function Groups() {
                 onClick={() => navigate(`/dashboard/${group.id}`)}
                 className="w-full text-left"
                 style={{
-                  background: `linear-gradient(135deg, ${g.from}, ${g.to})`,
+                  backgroundImage: `url(${bgSrc})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
                   border: "4px solid white",
                   borderRadius: "20px",
                   boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
@@ -84,7 +78,12 @@ export default function Groups() {
               >
                 <div>
                   <div className="text-lg font-bold text-white flex items-center gap-2">
-                    <img src={getGroupIconSrc(group.emoji)} alt="" className="w-6 h-6" />
+                    <img
+                      src={getGroupIconSrc(group.emoji)}
+                      alt=""
+                      className="w-6 h-6"
+                      style={{ filter: "brightness(0) invert(1)" }}
+                    />
                     {group.name}
                   </div>
                   <div className="text-sm text-white/70 mt-0.5">
