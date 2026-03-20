@@ -233,7 +233,7 @@ export default function Join() {
 
         toast({
           title: `Joined ${pendingGroup.name}!`,
-          description: `Merged with ${selected?.name}'s expenses 🎉`,
+          description: `Merged with ${selected?.name}'s expenses`,
         });
         navigate(`/dashboard/${pendingGroup.id}`);
       } else {
