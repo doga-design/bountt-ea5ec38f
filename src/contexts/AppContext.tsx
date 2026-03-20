@@ -316,7 +316,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (fetchVersionRef.current !== version) return;
       toast({ title: err instanceof Error ? err.message : "Failed to fetch expenses", variant: "destructive" });
     } finally {
-      if (fetchVersionRef.current === version) setExpensesLoading(false);
+      
     }
   }, []);
 
