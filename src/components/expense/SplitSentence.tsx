@@ -35,6 +35,7 @@ export default function SplitSentence({
 }: SplitSentenceProps) {
 
   const payerIsYou = payerMember?.user_id === currentUserId;
+  const payerColor = payerMember ? getAvatarColor(payerMember).bg : "#D94F00";
   const payerDisplay = payerIsYou ? "You" : payerMember?.name ?? "You";
 
   const isEqual = splitMode === "equal";
