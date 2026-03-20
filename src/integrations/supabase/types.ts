@@ -513,6 +513,14 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_placeholders_for_join: {
+        Args: { p_group_id: string }
+        Returns: {
+          id: string
+          name: string
+          total_expenses: number
+        }[]
+      }
       is_group_member: {
         Args: { p_group_id: string; p_user_id: string }
         Returns: boolean
