@@ -43,7 +43,7 @@ export default function Join() {
     try {
       // Look up group by invite code using secure RPC
       const { data: groups, error: groupError } = await supabase
-        .rpc("lookup_group_by_invite", { p_invite_code: code.toUpperCase().trim() });
+        .rpc("lookup_group_by_invite", { p_invite_code: ("BNTT-" + code).toUpperCase().trim() });
 
       const group = groups?.[0] ?? null;
 
