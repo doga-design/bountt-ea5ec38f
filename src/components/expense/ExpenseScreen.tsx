@@ -616,7 +616,7 @@ export default function ExpenseScreen({
               </div>
 
               {/* Headline */}
-              <div className="text-center px-6 pb-2 flex-shrink-0">
+              <div className="text-center px-6 flex-shrink-0 mt-2.5 mb-2.5">
                 <h2 className="font-sora text-xl font-bold text-foreground">
                   What did{" "}
                   <button
@@ -627,12 +627,23 @@ export default function ExpenseScreen({
                       }
                       setPayerDrawerOpen(true);
                     }}
-                    className="font-extrabold underline decoration-dotted underline-offset-4 text-foreground"
+                    className="font-extrabold underline decoration-dotted underline-offset-4 text-primary"
                   >
                     {payerMember?.user_id === user?.id ? "you" : payerMember?.name ?? "you"}
                   </button>
                   {" "}pay?
                 </h2>
+                {/* Description input */}
+                <div className="mt-2.5">
+                  <input
+                    type="text"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value.slice(0, 50))}
+                    placeholder="What is it? (e.g Ski Pass)"
+                    className="w-full px-4 py-3 rounded-xl text-sm font-medium text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    style={{ backgroundColor: "white", border: "1px solid #D4D4D4" }}
+                  />
+                </div>
               </div>
 
               {/* Amount display */}
@@ -646,18 +657,6 @@ export default function ExpenseScreen({
                   I am covering for someone
                   <RotateCcw className="w-3 h-3" />
                 </span>
-              </div>
-
-              {/* Description input */}
-              <div className="px-6 pb-2 flex-shrink-0">
-                <input
-                  type="text"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value.slice(0, 50))}
-                  placeholder="What is it? (e.g Ski Pass)"
-                  className="w-full px-4 py-3 rounded-xl text-sm font-medium text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  style={{ backgroundColor: "white", border: "1px solid #D4D4D4" }}
-                />
               </div>
 
               {/* Log cost button */}
