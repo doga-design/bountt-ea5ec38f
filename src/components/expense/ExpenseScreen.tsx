@@ -732,6 +732,14 @@ export default function ExpenseScreen({
                       currentUserId={user?.id}
                       onAddMember={activeMembers.length < 6 ? () => setShowAddMember(true) : undefined}
                       splitAmounts={gridSplitAmounts}
+                      payerMember={payerMember}
+                      payerOnClick={() => {
+                        if (isEditMode) {
+                          toast({ title: "To change the payer, delete this expense and log a new one" });
+                          return;
+                        }
+                        setPayerDrawerOpen(true);
+                      }}
                     />
                   </div>
                 )}
