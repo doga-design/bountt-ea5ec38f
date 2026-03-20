@@ -178,7 +178,7 @@ export default function MemberAvatarGrid({
             </div>
           </button>
           <span className="mt-1 text-xs font-medium text-muted-foreground">
-            <span className={payerMember.user_id === currentUserId ? "font-bold text-foreground" : ""}>
+            <span className={payerMember.user_id === currentUserId ? "font-bold text-primary" : ""}>
               {payerMember.user_id === currentUserId ? "You" : payerMember.name}
             </span>
             {" paid"}
