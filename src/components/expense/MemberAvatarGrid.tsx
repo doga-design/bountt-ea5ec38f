@@ -73,6 +73,8 @@ export default function MemberAvatarGrid({
             const ctrlX = endX;
             const ctrlY = 0;
             const d = `M ${apexX} 0 Q ${ctrlX} ${ctrlY} ${endX} ${endY}`;
+            // Reversed path for animation: bottom (member) → top (payer)
+            const dReversed = `M ${endX} ${endY} Q ${ctrlX} ${ctrlY} ${apexX} 0`;
             const dur = `${1.2 + (i * 0.3) % 1.2}s`;
             const begin = `${i * 0.4}s`;
 
