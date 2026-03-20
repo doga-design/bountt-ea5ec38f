@@ -2,12 +2,14 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { Loader2 } from "lucide-react";
 
-/** Wraps routes that require authentication. Redirects to /auth if not logged in. */
+/** Wraps routes that require authentication. Only blocks on initial auth bootstrap.
+ *  groupsLoading is NOT included — it can flip during background refreshes and
+ *  must never unmount the authenticated component tree mid-use. */
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, authLoading, groupsLoading } = useApp();
+  const { user, authLoading } = useApp();
   const location = useLocation();
 
-  if (authLoading || groupsLoading) {
+  if (authLoading) {
     return (
       <div className="screen-container bg-background items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />

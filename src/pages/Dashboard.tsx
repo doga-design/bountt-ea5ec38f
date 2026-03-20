@@ -34,7 +34,15 @@ export default function Dashboard() {
     groupsLoading,
   } = useApp();
 
-  const [sheetOpen, setSheetOpen] = useState(false);
+  // Auto-restore expense sheet if a draft was in progress before remount
+  const draftKey = user?.id && groupId ? `expense_draft_${groupId}_${user.id}` : null;
+  const sheetMarkerKey = user?.id && groupId ? `expense_sheet_open_${groupId}_${user.id}` : null;
+  const [sheetOpen, setSheetOpen] = useState(() => {
+    if (sheetMarkerKey && draftKey) {
+      return sessionStorage.getItem(sheetMarkerKey) === "1" && !!sessionStorage.getItem(draftKey);
+    }
+    return false;
+  });
   // Store ID instead of full object so we always derive from live data
   const [detailExpenseId, setDetailExpenseId] = useState<string | null>(null);
   const [editExpense, setEditExpense] = useState<Expense | undefined>(undefined);
@@ -232,14 +240,25 @@ export default function Dashboard() {
         open={sheetOpen}
         onOpenChange={(o) => {
           setSheetOpen(o);
+          // Persist / clear sheet-open marker for remount recovery
+          if (sheetMarkerKey) {
+            if (o) {
+              sessionStorage.setItem(sheetMarkerKey, "1");
+            } else {
+              sessionStorage.removeItem(sheetMarkerKey);
+            }
+          }
           if (!o) {
             setEditExpense(undefined);
             setEditSplits(undefined);
+            // Clear draft on intentional close
+            if (draftKey) sessionStorage.removeItem(draftKey);
           }
         }}
         editExpense={editExpense}
         editSplits={editSplits}
         isFirstExpense={mode === "prompt"}
+        draftKey={draftKey}
       />
     </div>
   );
