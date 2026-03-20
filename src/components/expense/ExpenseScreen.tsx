@@ -5,7 +5,6 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { distributeCents } from "@/lib/bountt-utils";
 import { GroupMember, Expense, ExpenseSplit } from "@/types";
-import { GroupMember, Expense, ExpenseSplit } from "@/types";
 
 import AmountDisplay from "./AmountDisplay";
 import SplitSentence from "./SplitSentence";
