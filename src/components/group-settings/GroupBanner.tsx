@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Group } from "@/types";
 import { useApp } from "@/contexts/AppContext";
 import GradientPicker from "./GradientPicker";
+import { getGroupIconSrc } from "@/lib/group-icon-utils";
 
 const GRADIENTS: Record<string, { from: string; to: string }> = {
   "solid-orange": { from: "hsl(18,89%,47%)", to: "hsl(18,89%,47%)" },
