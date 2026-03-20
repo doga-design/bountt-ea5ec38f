@@ -10,7 +10,7 @@ import AuthGuard from "@/components/AuthGuard";
 // Pages
 import Splash from "./pages/Splash";
 import Auth from "./pages/Auth";
-import ResetPassword from "./pages/ResetPassword";
+
 import GroupName from "./pages/onboarding/GroupName";
 import Invite from "./pages/onboarding/Invite";
 import Join from "./pages/Join";
@@ -36,7 +36,7 @@ const App = () => (
               {/* Public */}
               <Route path="/" element={<Splash />} />
               <Route path="/auth" element={<Auth />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
+              
 
               {/* Empty Groups */}
               <Route path="/groups/empty" element={<AuthGuard><EmptyGroups /></AuthGuard>} />
