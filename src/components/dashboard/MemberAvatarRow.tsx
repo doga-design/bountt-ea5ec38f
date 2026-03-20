@@ -176,7 +176,7 @@ export default function MemberAvatarRow({
             <div className="flex items-center gap-3">
               <span className="text-2xl">👻</span>
               <p className="text-sm text-foreground leading-snug">
-                <span className="font-semibold" style={{ color: "#D94F00" }}>
+                <span className="font-semibold text-foreground">
                   {inviteMember.name}
                 </span>{" "}
                 is still a placeholder, try inviting them for the best experience!
