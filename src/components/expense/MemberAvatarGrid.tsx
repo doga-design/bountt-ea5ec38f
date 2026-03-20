@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { GroupMember } from "@/types";
 import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
-
+import { Plus } from "lucide-react";
 
 interface MemberAvatarGridProps {
   members: GroupMember[];
@@ -178,7 +178,7 @@ export default function MemberAvatarGrid({
             </div>
           </button>
           <span className="mt-1 text-xs font-medium text-muted-foreground">
-            <span className={payerMember.user_id === currentUserId ? "font-bold text-primary" : ""}>
+            <span className={payerMember.user_id === currentUserId ? "font-bold text-foreground" : ""}>
               {payerMember.user_id === currentUserId ? "You" : payerMember.name}
             </span>
             {" paid"}
@@ -257,10 +257,10 @@ export default function MemberAvatarGrid({
             onClick={onAddMember}
             className="absolute flex items-center justify-center rounded-full"
             style={{
-              width: 44,
-              height: 44,
+              width: 36,
+              height: 36,
               top: '50%',
-              right: -22,
+              right: -18,
               transform: 'translateY(-50%)',
               zIndex: 10,
               backgroundColor: 'white',
@@ -269,7 +269,7 @@ export default function MemberAvatarGrid({
             }}
             aria-label="Add member"
           >
-            <span className="font-bringbold text-[32px] leading-none text-muted-foreground -translate-y-[1px]">+</span>
+            <Plus className="w-[18px] h-[18px]" style={{ color: '#888' }} />
           </button>
         )}
       </div>
