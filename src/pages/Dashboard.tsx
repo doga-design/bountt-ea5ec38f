@@ -50,6 +50,7 @@ export default function Dashboard() {
 
   // Confetti: only fire after drawer fully closes
   const pendingConfettiRef = useRef(false);
+  const pendingFirstExpenseConfettiRef = useRef(false);
 
   // Derive live expense from expenses array
   const detailExpense = detailExpenseId
@@ -63,26 +64,27 @@ export default function Dashboard() {
     pendingConfettiRef.current = true;
   }, []);
 
-  // Called when the drawer open state changes
+  const fireConfetti = useCallback(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const defaults = { origin: { y: 0.4 }, zIndex: 9999, colors: ["#E8480A", "#FFFFFF", "#D4D4D4"] };
+        confetti({ ...defaults, particleCount: 80, spread: 100, angle: 60 });
+        confetti({ ...defaults, particleCount: 80, spread: 100, angle: 120 });
+        confetti({ ...defaults, particleCount: 60, spread: 140, angle: 90 });
+      });
+    });
+  }, []);
+
+  // Called when the detail drawer open state changes
   const handleDetailOpenChange = useCallback((open: boolean) => {
     if (!open) {
       setDetailExpenseId(null);
-      // Fire confetti after drawer close animation completes
       if (pendingConfettiRef.current) {
         pendingConfettiRef.current = false;
-        // Use requestAnimationFrame to ensure drawer is fully gone
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            // Multi-burst full-viewport confetti
-            const defaults = { origin: { y: 0.4 }, zIndex: 9999 };
-            confetti({ ...defaults, particleCount: 80, spread: 100, angle: 60 });
-            confetti({ ...defaults, particleCount: 80, spread: 100, angle: 120 });
-            confetti({ ...defaults, particleCount: 60, spread: 140, angle: 90 });
-          });
-        });
+        fireConfetti();
       }
     }
-  }, []);
+  }, [fireConfetti]);
 
   // ... keep existing code
   useEffect(() => {
