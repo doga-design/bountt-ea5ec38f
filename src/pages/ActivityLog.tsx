@@ -141,7 +141,7 @@ function ActivityCard({ entry, currentUserId }: { entry: ActivityLogEntry; curre
       {/* Body */}
       <div className="flex-1 min-w-0">
         <p className="text-sm leading-snug">
-          <span className="font-bold" style={{ color: "#D94F00" }}>{actorLabel}</span>
+          <span className={`${entry.actor_id === currentUserId ? "font-bold" : "font-bold"} text-foreground`}>{actorLabel}</span>
           {" "}
           {entry.action_type === "joined" ? (
             <span className="text-muted-foreground">joined the group</span>

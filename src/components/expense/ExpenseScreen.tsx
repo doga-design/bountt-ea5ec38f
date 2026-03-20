@@ -12,7 +12,7 @@ import CustomSplitRows from "./CustomSplitRows";
 import NumpadGrid from "./NumpadGrid";
 import SaveButton from "./SaveButton";
 import MemberAvatarGrid from "./MemberAvatarGrid";
-import PayerAvatar from "./PayerAvatar";
+// PayerAvatar removed — payer is now rendered inside MemberAvatarGrid
 import AddMemberSheet from "@/components/group-settings/AddMemberSheet";
 
 interface ExpenseScreenProps {
@@ -627,8 +627,7 @@ export default function ExpenseScreen({
                       }
                       setPayerDrawerOpen(true);
                     }}
-                    className="font-extrabold underline decoration-dotted underline-offset-4"
-                    style={{ color: "#D94F00" }}
+                    className="font-extrabold underline decoration-dotted underline-offset-4 text-foreground"
                   >
                     {payerMember?.user_id === user?.id ? "you" : payerMember?.name ?? "you"}
                   </button>
@@ -699,21 +698,9 @@ export default function ExpenseScreen({
                 </button>
               </div>
 
-              {/* Amount + Payer avatar */}
+              {/* Amount display */}
               <div className="flex items-center justify-center gap-2 py-2 flex-shrink-0">
                 <AmountDisplay amount={amount} size="medium" />
-                {payerMember && (
-                  <PayerAvatar
-                    payer={payerMember}
-                    onClick={() => {
-                      if (isEditMode) {
-                        toast({ title: "To change the payer, delete this expense and log a new one" });
-                        return;
-                      }
-                      setPayerDrawerOpen(true);
-                    }}
-                  />
-                )}
               </div>
 
               {/* Scrollable middle section */}
@@ -744,6 +731,14 @@ export default function ExpenseScreen({
                       currentUserId={user?.id}
                       onAddMember={activeMembers.length < 6 ? () => setShowAddMember(true) : undefined}
                       splitAmounts={gridSplitAmounts}
+                      payerMember={payerMember}
+                      payerOnClick={() => {
+                        if (isEditMode) {
+                          toast({ title: "To change the payer, delete this expense and log a new one" });
+                          return;
+                        }
+                        setPayerDrawerOpen(true);
+                      }}
                     />
                   </div>
                 )}

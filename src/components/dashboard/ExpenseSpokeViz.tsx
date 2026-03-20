@@ -204,7 +204,7 @@ export default function ExpenseSpokeViz({
           )}
         </div>
         <p className="mt-1.5 text-xs text-center">
-          <span className="font-medium text-muted-foreground" style={isPayer ? { color: payerColor, fontWeight: 700 } : undefined}>
+          <span className={`font-medium text-muted-foreground ${isPayer ? "font-bold text-foreground" : ""}`}>
             {isPayer ? "You" : payerName} paid
           </span>
           <span className="text-muted-foreground"> · </span>
@@ -225,7 +225,7 @@ export default function ExpenseSpokeViz({
           const tappable = canTap(m);
           const isMe = m.userId === currentUserId;
           const label = isMe ? "You" : m.name;
-          const labelStyle = isMe && m.member ? { color: getAvatarColor(m.member).bg, fontWeight: 700 as const } : undefined;
+          const labelStyle = isMe ? { fontWeight: 700 as const } : undefined;
 
           return (
             <div

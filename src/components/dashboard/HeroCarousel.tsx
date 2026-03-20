@@ -74,7 +74,8 @@ export default function HeroCarousel() {
 
   return (
     <div className="relative overflow-hidden" style={bgStyle}>
-      {/* Nav bar — fully transparent, no tint */}
+      {/* Dark tint overlay for text readability */}
+      <div className="absolute inset-0 bg-black/35" style={{ zIndex: 0 }} />
       <div className="relative z-10">
         <div className="relative flex items-center justify-between px-5 py-4">
           <div className="flex items-center gap-2">

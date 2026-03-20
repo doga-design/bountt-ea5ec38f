@@ -94,7 +94,6 @@ export default function ExpenseDetailSheet({
 
   // Build subtitle
   const selfMember = groupMembers.find((m) => m.user_id === user?.id && m.status === "active");
-  const selfColor = selfMember ? getAvatarColor(selfMember).bg : undefined;
   const payerLabel = isPayer ? "You" : (expense?.paid_by_name ?? "");
   const otherSplitNames = expenseSplits
     .filter((s) => {

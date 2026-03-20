@@ -49,7 +49,7 @@ export default function MemberCard({ member, balance, isCurrentUser, onClick }: 
 
       {/* Text */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground truncate" style={isCurrentUser ? { color: avatarColor, fontWeight: 700 } : undefined}>
+        <p className={`text-sm font-semibold text-foreground truncate ${isCurrentUser ? "font-bold" : ""}`}>
           {isCurrentUser ? "You" : member.name}
         </p>
         <p className={`text-xs mt-0.5 ${
