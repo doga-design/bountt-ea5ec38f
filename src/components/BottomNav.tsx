@@ -44,7 +44,7 @@ export default function BottomNav({ onFabPress }: BottomNavProps) {
           }}
           aria-label="Add expense"
         >
-          <span className="font-bringbold text-5xl leading-none">+</span>
+          <span className="font-bringbold text-6xl leading-none">+</span>
         </button>
 
         {/* All Groups */}
