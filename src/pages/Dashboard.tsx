@@ -34,7 +34,15 @@ export default function Dashboard() {
     groupsLoading,
   } = useApp();
 
-  const [sheetOpen, setSheetOpen] = useState(false);
+  // Auto-restore expense sheet if a draft was in progress before remount
+  const draftKey = user?.id && groupId ? `expense_draft_${groupId}_${user.id}` : null;
+  const sheetMarkerKey = user?.id && groupId ? `expense_sheet_open_${groupId}_${user.id}` : null;
+  const [sheetOpen, setSheetOpen] = useState(() => {
+    if (sheetMarkerKey && draftKey) {
+      return sessionStorage.getItem(sheetMarkerKey) === "1" && !!sessionStorage.getItem(draftKey);
+    }
+    return false;
+  });
   // Store ID instead of full object so we always derive from live data
   const [detailExpenseId, setDetailExpenseId] = useState<string | null>(null);
   const [editExpense, setEditExpense] = useState<Expense | undefined>(undefined);
