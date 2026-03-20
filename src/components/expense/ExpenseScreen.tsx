@@ -12,7 +12,7 @@ import CustomSplitRows from "./CustomSplitRows";
 import NumpadGrid from "./NumpadGrid";
 import SaveButton from "./SaveButton";
 import MemberAvatarGrid from "./MemberAvatarGrid";
-import PayerAvatar from "./PayerAvatar";
+// PayerAvatar removed — payer is now rendered inside MemberAvatarGrid
 import AddMemberSheet from "@/components/group-settings/AddMemberSheet";
 
 interface ExpenseScreenProps {
