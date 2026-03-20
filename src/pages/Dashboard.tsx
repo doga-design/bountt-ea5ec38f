@@ -148,17 +148,10 @@ export default function Dashboard() {
       {mode === "empty" && <EmptyState />}
 
       {mode === "prompt" && (
-        <>
-          <AddExpensePrompt
-            memberName={latestMemberName}
-            onAddExpense={() => setSheetOpen(true)}
-          />
-          <ExpenseScreen
-            open={sheetOpen}
-            onOpenChange={setSheetOpen}
-            isFirstExpense
-          />
-        </>
+        <AddExpensePrompt
+          memberName={latestMemberName}
+          onAddExpense={() => setSheetOpen(true)}
+        />
       )}
 
       {mode === "normal" && (
@@ -217,18 +210,6 @@ export default function Dashboard() {
           </div>
 
           <BottomNav onFabPress={() => setSheetOpen(true)} />
-          <ExpenseScreen
-            open={sheetOpen}
-            onOpenChange={(o) => {
-              setSheetOpen(o);
-              if (!o) {
-                setEditExpense(undefined);
-                setEditSplits(undefined);
-              }
-            }}
-            editExpense={editExpense}
-            editSplits={editSplits}
-          />
 
           <ExpenseDetailSheet
             open={detailOpen}
@@ -245,6 +226,21 @@ export default function Dashboard() {
           />
         </>
       )}
+
+      {/* Hoisted: single ExpenseScreen instance across all modes */}
+      <ExpenseScreen
+        open={sheetOpen}
+        onOpenChange={(o) => {
+          setSheetOpen(o);
+          if (!o) {
+            setEditExpense(undefined);
+            setEditSplits(undefined);
+          }
+        }}
+        editExpense={editExpense}
+        editSplits={editSplits}
+        isFirstExpense={mode === "prompt"}
+      />
     </div>
   );
 }

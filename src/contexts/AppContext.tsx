@@ -563,11 +563,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           // Check if the split belongs to an expense we know about
           const expenseId = (payload.new as any)?.expense_id || (payload.old as any)?.expense_id;
           if (expenseId) {
-            // Always refetch for current group — the filter is the group channel itself
-            {
-              fetchExpenseSplits(groupId);
-              fetchExpenses(groupId);
-            }
+            // Always refetch splits for current group — expenses sync via their own channel
+            fetchExpenseSplits(groupId);
           }
         }
       )
