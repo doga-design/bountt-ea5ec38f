@@ -820,17 +820,6 @@ export default function ExpenseScreen({
                 </span>
               </div>
 
-              {/* Description input */}
-              <div className="px-6 pb-1 flex-shrink-0">
-                <input
-                  type="text"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value.slice(0, 50))}
-                  placeholder="What is it? (e.g Ski Pass)"
-                  className="w-full px-4 py-3 rounded-xl text-sm font-medium text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  style={{ backgroundColor: "white", border: "1px solid #D4D4D4" }}
-                />
-              </div>
 
               {/* Save button */}
               <div className="flex-shrink-0">
