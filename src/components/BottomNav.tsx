@@ -20,11 +20,15 @@ export default function BottomNav({ onFabPress }: BottomNavProps) {
     <div className="fixed bottom-0 left-0 right-0 z-[9999] bg-card border-t border-border px-12 pb-5 pt-4">
       <div className="flex items-center justify-between">
         {/* Home */}
-        <button onClick={() => {
-          const lastGroupId = localStorage.getItem("bountt_last_group_id");
-          if (lastGroupId) navigate(`/dashboard/${lastGroupId}`);
-          else navigate("/groups");
-        }} className="flex flex-col items-center gap-1" aria-label="Home">
+        <button
+          onClick={() => {
+            const lastGroupId = localStorage.getItem("bountt_last_group_id");
+            if (lastGroupId) navigate(`/dashboard/${lastGroupId}`);
+            else navigate("/groups");
+          }}
+          className="flex flex-col items-center gap-1"
+          aria-label="Home"
+        >
           <Home className={`w-5 h-5 ${isHome ? "text-primary" : "text-muted-foreground"}`} />
           <span className={`text-[10px] font-semibold ${isHome ? "text-primary" : "text-muted-foreground"}`}>Home</span>
         </button>
@@ -40,7 +44,7 @@ export default function BottomNav({ onFabPress }: BottomNavProps) {
           }}
           aria-label="Add expense"
         >
-          <span className="font-bringbold text-3xl leading-none">+</span>
+          <span className="font-bringbold text-5xl leading-none">+</span>
         </button>
 
         {/* All Groups */}
