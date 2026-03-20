@@ -699,21 +699,9 @@ export default function ExpenseScreen({
                 </button>
               </div>
 
-              {/* Amount + Payer avatar */}
+              {/* Amount display */}
               <div className="flex items-center justify-center gap-2 py-2 flex-shrink-0">
                 <AmountDisplay amount={amount} size="medium" />
-                {payerMember && (
-                  <PayerAvatar
-                    payer={payerMember}
-                    onClick={() => {
-                      if (isEditMode) {
-                        toast({ title: "To change the payer, delete this expense and log a new one" });
-                        return;
-                      }
-                      setPayerDrawerOpen(true);
-                    }}
-                  />
-                )}
               </div>
 
               {/* Scrollable middle section */}
