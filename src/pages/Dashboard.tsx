@@ -189,6 +189,7 @@ export default function Dashboard() {
                   members={groupMembers}
                   currentUserId={user?.id ?? ""}
                   groupInviteCode={currentGroup?.invite_code}
+                  onFilterMember={setFilterMemberId}
                 />
               </div>
 
