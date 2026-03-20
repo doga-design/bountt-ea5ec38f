@@ -67,7 +67,6 @@ export default function CustomSplitRows({
                 >
                   {isSelf ? "You" : m.name}
                 </span>
-                </span>
               </div>
 
               {/* Amount box */}

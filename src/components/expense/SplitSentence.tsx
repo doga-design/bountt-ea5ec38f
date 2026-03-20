@@ -53,9 +53,6 @@ export default function SplitSentence({
       </span>
     );
   };
-      </span>
-    );
-  };
 
   let namesDisplay: React.ReactNode;
   if (others.length === 0) {
