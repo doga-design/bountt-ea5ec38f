@@ -10,7 +10,7 @@ import AuthGuard from "@/components/AuthGuard";
 // Pages
 import Splash from "./pages/Splash";
 import Auth from "./pages/Auth";
-import ResetPassword from "./pages/ResetPassword";
+
 import GroupName from "./pages/onboarding/GroupName";
 import Invite from "./pages/onboarding/Invite";
 import Join from "./pages/Join";
