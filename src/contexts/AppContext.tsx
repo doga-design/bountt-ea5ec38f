@@ -95,6 +95,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (fetchError) throw fetchError;
       setUserGroups((data as Group[]) ?? []);
     } catch (err) {
+      groupsFetchedForRef.current = null;
       toast({ title: err instanceof Error ? err.message : "Failed to fetch groups", variant: "destructive" });
     } finally {
       setGroupsLoading(false);
@@ -129,6 +130,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setTimeout(() => fetchProfile(newSession.user.id), 0);
           if (groupsFetchedForRef.current !== newSession.user.id) {
             groupsFetchedForRef.current = newSession.user.id;
+            setGroupsLoading(true);
             setTimeout(() => fetchGroups(newSession.user.id), 0);
           }
         } else {
