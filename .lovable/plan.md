@@ -1,19 +1,45 @@
 
 
-## Three Targeted Fixes
+## One Surgical Fix — Dashboard.tsx
 
-### Fix 1 — Close the race window (`AppContext.tsx` line 128-133)
-In `onAuthStateChange`, when `newSession?.user` exists, `setAuthLoading(false)` runs on line 126 but `fetchGroups` is deferred via `setTimeout` on line 132. Meanwhile `groupsLoading` could be `false` (set by `clearAllState` on a prior null-session event, line 116). This creates a frame where `authLoading=false`, `groupsLoading=false`, `userGroups=[]` — triggering navigation to `/groups/empty`.
+### Problem
+Lines 130-136: early return renders spinner and prevents the entire tree (including `ExpenseScreen` at line 231) from mounting. Any loading state flip unmounts ExpenseScreen, destroying local state.
 
-**Change**: Add `setGroupsLoading(true)` synchronously inside the `if (newSession?.user)` block, before the `setTimeout` call. Line 128, right after the opening brace.
+### Change
+Replace the early-return guard with inline conditional rendering. The `!currentGroup || currentGroup.id !== groupId` parity check still needs to gate the main content (it depends on `currentGroup` being valid), but `ExpenseScreen` must always render.
 
-### Fix 2 — Allow retry after fetch failure (`AppContext.tsx` line 97)
-In `fetchGroups` catch block (line 97), `groupsFetchedForRef` remains set to the user ID, permanently blocking retries. Any subsequent `onAuthStateChange` event skips `fetchGroups` because the ref guard on line 130 sees it's already set.
+**Dashboard.tsx lines 129-245** restructured to:
 
-**Change**: Add `groupsFetchedForRef.current = null` as the first line inside the catch block (before the toast on line 98).
+1. Keep the parity check (`!currentGroup || currentGroup.id !== groupId`) — if true, show spinner in the feed area but still render `ExpenseScreen` at the bottom.
+2. Remove `membersLoading || expensesLoading` from the full-page guard entirely — those only affect the feed content area.
+3. Structure:
 
-### Fix 3 — Remove dead fetchGroups call (`Auth.tsx` line 73)
-`await fetchGroups()` on line 73 runs after `signInWithPassword` but before React commits the new `user` state. `fetchGroups` checks `user?.id` which is still null at this point, making the call a no-op. `onAuthStateChange` handles group fetching.
+```text
+return (
+  <div className="screen-container">
+    {/* Parity or loading: show spinner in content area */}
+    {(!currentGroup || currentGroup.id !== groupId || isLoading) ? (
+      <div className="flex-1 flex items-center justify-center">
+        <spinner />
+      </div>
+    ) : (
+      /* Normal dashboard content: header, mode branches, feed, bottom nav, detail sheet */
+    )}
 
-**Change**: Delete line 73 (`await fetchGroups();`).
+    {/* ALWAYS mounted regardless of loading */}
+    <ExpenseScreen ... />
+  </div>
+)
+```
+
+4. `ExpenseScreen` stays at the end of the tree, always rendered, controlled only by `sheetOpen`.
+
+### Files Changed
+- `src/pages/Dashboard.tsx` — only file touched
+
+### What Does NOT Change
+- No AppContext changes
+- No ExpenseScreen changes  
+- No realtime subscription changes
+- No loading state logic changes
 
