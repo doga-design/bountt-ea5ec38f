@@ -563,8 +563,6 @@ export default function ExpenseScreen({
         } else {
           toast({ title: "Expense added" });
         }
-          toast({ title: "Expense added" });
-        }
       }
 
       // Clear draft on successful save
