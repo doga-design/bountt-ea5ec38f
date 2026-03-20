@@ -44,10 +44,15 @@ export default function SplitSentence({
   const others = selectedMembers.filter((m) => m.id !== payerMember?.id);
 
   const renderName = (member: GroupMember) => {
-    const label = member.user_id === currentUserId ? "you" : member.name;
+    const isYou = member.user_id === currentUserId;
+    const label = isYou ? "you" : member.name;
+    const nameColor = isYou ? getAvatarColor(member).bg : undefined;
     return (
-      <span key={member.id} className="font-bold text-foreground">
+      <span key={member.id} className="font-bold text-foreground" style={nameColor ? { color: nameColor } : undefined}>
         {label}
+      </span>
+    );
+  };
       </span>
     );
   };
