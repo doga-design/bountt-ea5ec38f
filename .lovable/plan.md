@@ -1,119 +1,113 @@
 
 
-# Two Changes: Replace Emojis with SVG Icons + Simplify Hero
+# Plan: 6 UI/UX Changes
 
-## CHANGE 1 — Replace All Emojis with SVG Icons
+## 1. Revert Hero Carousel to Previous State (minus labels)
 
-### Step 1: Copy SVG files to project
-Copy 10 uploaded SVGs to `src/assets/icons/`:
-- `icon-01.svg` (burger), `icon-02.svg` (car), `icon-03.svg` (friends), `icon-04.svg` (hearts), `icon-05.svg` (home), `icon-06.svg` (palmtree), `icon-07.svg` (party), `icon-08.svg` (plane), `icon-09.svg` (tent), `icon-10.svg` (ticket)
+The current HeroCarousel was rewritten as a static single-balance component. The user wants the **full carousel with slides restored** but with "x others pay you" / "x to settle" labels removed, and left-aligned text (not centered).
 
-### Step 2: Create icon utility
-New file `src/lib/group-icon-utils.ts`:
-- Map of icon IDs (`"icon-01"` through `"icon-10"`) to their imported SVG paths
-- Helper `getGroupIcon(id: string): string` returns the SVG path
-- Export `GROUP_ICON_IDS` array for the picker
+Since the original carousel files (NetBalanceSlide.tsx, AgingDebtSlide.tsx, ContributionSlide.tsx) were deleted and the full useHeroData.ts was gutted, these need to be **reconstructed** from scratch based on the architecture described in project history and memory context.
 
-### Step 3: Replace emoji picker in GroupName.tsx (onboarding)
-- Replace `EMOJIS` array with `GROUP_ICON_IDS`
-- Replace `SUGGESTIONS` emoji values with icon IDs (map each suggestion to a relevant icon)
-- Replace emoji picker grid: render `<img>` tags for each icon instead of emoji text
-- Replace emoji button in input row: render `<img>` of selected icon
-- Default `emoji` state from `"🏅"` to `"icon-01"`
-- Remove `"Name your group 🏅"` pill emoji — becomes `"Name your group"`
-- Remove emojis from suggestion chip labels (`{s.label}` only, no emoji)
-- `Continue →` arrow stays (→ is not an emoji, it's a text character)
+**Files:**
+- `src/components/dashboard/HeroCarousel.tsx` — Restore embla-carousel, multiple slides, dots, swipe. Keep nav bar (group icon + name + settings). Left-align hero content (not centered). Remove any "X others pay you" / "X to settle" text labels from slides.
+- `src/components/dashboard/slides/useHeroData.ts` — Restore full debt calculation logic (debtsYouOwe, agingDebts, per-member breakdowns) needed for slides. Keep netBalance.
+- `src/components/dashboard/slides/NetBalanceSlide.tsx` — Recreate: shows net balance with "you're up"/"you owe"/"all settled" label. Remove any "X others pay you" / "X to settle" breakdown text. Left-aligned.
+- `src/components/dashboard/slides/AgingDebtSlide.tsx` — Recreate: shows aging debt info without the summary labels.
+- `src/components/dashboard/slides/ContributionSlide.tsx` — Recreate: shows contribution stats.
 
-### Step 4: Replace emoji rendering everywhere else
-Files with `group.emoji` rendering:
-- **Groups.tsx** line 86: `{group.emoji} {group.name}` → `<img>` + `{group.name}`
-- **GroupBanner.tsx** line 44: `{group.emoji}` → `<img>` sized at ~48px
-- **HeroCarousel.tsx** line 87: `{currentGroup.emoji}` → `<img>` sized at ~24px
-- **DashboardHeader.tsx** line 106-107: emoji overlapping circle → `<img>` inside the circle
-
-### Step 5: Remove all other emojis
-| File | Line | Emoji | Action |
-|------|------|-------|--------|
-| ExpenseFeedItem.tsx | 179 | `"All square ✌️"` | → `"All square"` |
-| Join.tsx | 113 | `"Welcome back 🎉"` | → `"Welcome back"` |
-| Join.tsx | 207 | `"Welcome to the group 🎉"` | → `"Welcome to the group"` |
-| Join.tsx | 236 | `"Merged with ${selected?.name}'s expenses 🎉"` | → `"Merged with ${selected?.name}'s expenses"` |
-| Join.tsx | 263 | `"Join a group 🔓"` | → `"Join a group"` |
-| Invite.tsx | 172 | `"Invite your friends to group 🔓"` | → `"Invite your friends"` |
-| ComingSoon.tsx | 16 | `"Stay tuned! 🚀"` | → `"Stay tuned!"` |
-| ExpenseSheet.tsx | 111 | `"First expense logged! 🎉"` | → `"First expense logged!"` |
-| ExpenseSheet.tsx | 113 | `"Expense added ✓"` | → `"Expense added"` |
-| ExpenseScreen.tsx | 568 | `"First expense logged! 🎉"` | → `"First expense logged!"` |
-| ExpenseScreen.tsx | 570 | `"Expense added ✓"` | → `"Expense added"` |
-| AmountDisplay.tsx | 41 | `"perfectly split ✓"` | → `"perfectly split"` |
-| ExpenseScreen.tsx | 794 | `"perfectly split ✓"` | → `"perfectly split"` |
-| NetBalanceSlide.tsx | 75 | `"Share settled ✓"` | → `"Share settled"` |
-
-Note: `→` characters in button labels (e.g., `"Continue →"`, `"Join Group →"`, `"Remove $X →"`, `"Distribute $X →"`) and `→` in ActivityLog change detail text are arrow symbols, not emojis. They stay.
-
-Note: `#22C55E` (green) in AmountDisplay.tsx and ExpenseScreen.tsx statusColor — this is a pre-existing style issue per the brand guide. Not changing logic in this PR, but the `✓` emoji removal addresses the text.
-
-### Step 6: Verify zero emojis
-Final search for all Unicode emoji ranges.
+**Note:** Since the original code is no longer available, these will be rebuilt to match the described architecture. The critical constraint is: **no "X others pay you" or "X to settle" labels**, left-aligned text, carousel with dots and swipe.
 
 ---
 
-## CHANGE 2 — Simplify Hero to Single Balance Display
+## 2. Reverse Particle Direction in ExpenseSpokeViz
 
-### Step 1: Files to delete entirely
-- `src/components/dashboard/slides/AgingDebtSlide.tsx`
-- `src/components/dashboard/slides/ContributionSlide.tsx`
-- `src/components/dashboard/slides/NetBalanceSlide.tsx`
+The animated dots currently travel from payer (top) to members (bottom). Reverse so they travel from members (bottom) to payer (top), indicating money flowing from splitters to payer.
 
-### Step 2: Simplify useHeroData.ts
-Keep only what's needed for the single balance number:
-- Keep: `netBalance` calculation (totalOwedToYou - totalYouOwe)
-- Remove: `debtsYouOwe`, `agingDebts`, contribution stats, slide visibility flags
-- Remove: `DebtItem`, `AgingDebt` interfaces
-- Simplified `HeroData`: just `{ netBalance: number }`
+**Files:**
+- `src/components/dashboard/ExpenseSpokeViz.tsx` — Reverse the `animateMotion` path direction. Currently path goes `M payer Q ctrl member`. Change to `M member Q ctrl payer` for the animation only (keep the visual path the same).
+- `src/components/expense/MemberAvatarGrid.tsx` — Same reversal: path currently goes from apex (top) to member (bottom). Reverse the `animateMotion` path.
 
-### Step 3: Rewrite HeroCarousel.tsx → SimpleHero
-Replace the entire carousel with a static component:
-- Remove embla-carousel import (only used here; `carousel.tsx` UI component keeps its own import)
-- Keep: gradient background, nav bar with group icon + name + settings gear
-- Body: single centered section showing:
-  - Small label: `"you're up"` (positive), `"you owe"` (negative), `"all settled"` (zero)
-  - Large balance number: `$X` or `$X.XX` (no +/- prefix, no color coding)
-  - No breakdown lines ("others pay you" / "to settle")
-  - No action row, no debt cycling, no "Not yet" button
-  - No dots, no swipe
+**Technical:** For both files, reverse the `d` string used in `<animateMotion path="...">` while keeping the `<path d="...">` the same (so the dashed line stays, but dots move bottom→top).
 
-### Step 4: Update Dashboard.tsx
-- Import stays the same (HeroCarousel component, just simplified internally)
-- No changes needed to Dashboard.tsx itself since it just renders `<HeroCarousel />`
+---
 
-### Step 5: Clean dead code
-- Remove `DebtItem` and `AgingDebt` type exports from useHeroData
-- Check if any other file imports from the deleted slide files — remove those imports
-- `NetBalanceSlide` had PayPal/settlement logic — all removed with the file
+## 3. GroupName CTA Turns Orange When Input Has Text
 
-### Files changed summary
-| File | Action |
-|------|--------|
-| `src/assets/icons/icon-01.svg` through `icon-10.svg` | Create (copy from uploads) |
-| `src/lib/group-icon-utils.ts` | Create |
-| `src/pages/onboarding/GroupName.tsx` | Rewrite emoji picker → icon picker |
-| `src/pages/Groups.tsx` | Replace emoji with `<img>` |
-| `src/components/group-settings/GroupBanner.tsx` | Replace emoji with `<img>` |
-| `src/components/dashboard/DashboardHeader.tsx` | Replace emoji with `<img>` |
-| `src/components/dashboard/HeroCarousel.tsx` | Rewrite: remove carousel, single balance |
-| `src/components/dashboard/slides/useHeroData.ts` | Simplify to netBalance only |
-| `src/components/dashboard/slides/NetBalanceSlide.tsx` | Delete |
-| `src/components/dashboard/slides/AgingDebtSlide.tsx` | Delete |
-| `src/components/dashboard/slides/ContributionSlide.tsx` | Delete |
-| `src/components/dashboard/ExpenseFeedItem.tsx` | Remove ✌️ |
-| `src/pages/Join.tsx` | Remove 🎉, 🔓 |
-| `src/pages/onboarding/Invite.tsx` | Remove 🔓 |
-| `src/pages/ComingSoon.tsx` | Remove 🚀 |
-| `src/components/dashboard/ExpenseSheet.tsx` | Remove 🎉, ✓ |
-| `src/components/expense/ExpenseScreen.tsx` | Remove 🎉, ✓ |
-| `src/components/expense/AmountDisplay.tsx` | Remove ✓ |
+Currently the bottom CTA button uses `bg-muted text-foreground`. When `name.trim()` is non-empty, switch to `bg-primary text-primary-foreground`.
 
-### Files NOT changed
-AppContext, AuthGuard, Splash, Auth, types/index.ts (emoji field name stays), any RPC, any migration, any RLS policy, avatar system, BottomNav.
+**File:** `src/pages/onboarding/GroupName.tsx` line 182
+- Change class from static `bg-muted text-foreground` to conditional: `name.trim() ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"`
+
+---
+
+## 4. "You" Text Always Bold + User's Avatar Color
+
+Everywhere "You" appears as a label for the current user, render it in **bold** and in the **user's assigned avatar color** (from their group member record's `avatar_color`).
+
+**Affected files and locations:**
+- `ExpenseFeedItem.tsx` line 103/240 — payerName "You"
+- `ExpenseCard.tsx` line 45 — "You" in "Paid by You"
+- `ExpenseSpokeViz.tsx` line 206/225 — "You" in payer/member labels
+- `MemberAvatarGrid.tsx` line 161 — "You" label under avatar
+- `MemberCard.tsx` line 53 — "You" in member card
+- `MemberAvatarRow.tsx` line 140 — "You" label
+- `ExpenseDetailSheet.tsx` lines 96, 102, 476, 504 — "You" in subtitle, activity log
+- `ExpenseSheet.tsx` line 165 — "You" in member chips
+- `CustomSplitRows.tsx` — "You" label in custom split rows
+- `SplitSentence.tsx` — "You" in split sentence
+
+**Approach:** In each location, find the current user's GroupMember record via `groupMembers.find(m => m.user_id === user?.id)`, get their color via `getAvatarColor(member).bg`, and apply `style={{ color, fontWeight: 'bold' }}` to the "You" text span.
+
+---
+
+## 5. BNTT- Prefix Permanently in Invite Code Input
+
+In `src/pages/Join.tsx`, the invite code input should show a permanent grayed-out "BNTT-" prefix. The user only types the 4-character suffix.
+
+**File:** `src/pages/Join.tsx`
+- Replace the plain `<input>` with a flex container: a grayed-out `<span>BNTT-</span>` + an `<input>` that only accepts the 4-char suffix
+- `code` state stores only the suffix (e.g., "ABCD")
+- `maxLength={4}` on the input
+- On submit, prepend "BNTT-" to form the full code: `"BNTT-" + code`
+- Update validation: `code.length < 4` instead of `code.length < 9`
+- Handle `paramCode`: if it starts with "BNTT-", strip the prefix for state
+- Placeholder becomes "XXXX"
+
+---
+
+## 6. Default Everyone Selected on Slide 2
+
+In `src/components/expense/ExpenseScreen.tsx`, when the expense drawer opens in **create mode**, all grid members should be selected by default instead of none.
+
+**File:** `src/components/expense/ExpenseScreen.tsx` line 153-154
+- Change from `setActiveIds(new Set())` to `setActiveIds(new Set(members.filter(m => m.id !== selfMember?.id).map(m => m.id)))` — select all non-payer members by default
+- This means the user deselects people they want to exclude, rather than selecting who to include
+
+---
+
+## Bonus: Clean Up Remaining ✓ Emojis
+
+Three files still have `✓` characters that should have been removed:
+- `MemberCard.tsx` line 18: `"All settled ✓"` → `"All settled"`
+- `ExpenseDetailSheet.tsx` lines 221, 240: `"Share settled ✓"` → `"Share settled"`
+- `MemberDetailSheet.tsx` line 164: `"✓"` → use a Lucide `Check` icon or just remove
+
+---
+
+## Files Summary
+
+| File | Changes |
+|------|---------|
+| `HeroCarousel.tsx` | Restore carousel, remove labels, left-align |
+| `slides/useHeroData.ts` | Restore full data hook |
+| `slides/NetBalanceSlide.tsx` | Recreate |
+| `slides/AgingDebtSlide.tsx` | Recreate |
+| `slides/ContributionSlide.tsx` | Recreate |
+| `ExpenseSpokeViz.tsx` | Reverse particle direction |
+| `MemberAvatarGrid.tsx` | Reverse particle direction |
+| `GroupName.tsx` | Orange CTA on input |
+| `Join.tsx` | BNTT- prefix |
+| `ExpenseScreen.tsx` | Default all selected |
+| Multiple files | Bold + colored "You" text |
+| `MemberCard.tsx`, `ExpenseDetailSheet.tsx`, `MemberDetailSheet.tsx` | Remove remaining ✓ |
 
