@@ -1,35 +1,39 @@
 
 
-## Auth Simplification: Google OAuth Only
+## Root Cause: Stale JWT Lets Deleted Users Through
 
-### Problem
-The app currently has email/password signup, sign-in, forgot password, email confirmation resend, and a dedicated reset-password page. All of this is being removed in favor of a single "Continue with Google" button.
+The app trusts cached JWTs without server-side validation. When you deleted all users, the browser still had a valid JWT in localStorage (JWTs live ~1 hour). `onAuthStateChange` fires `INITIAL_SESSION` with this cached token, the app sets `user` from it, `AuthGuard` sees a user → passes them through to `/groups/empty`.
 
-### Changes
+The previous hardening (`else if (event === "SIGNED_OUT")`) made this worse: it ignores null sessions on non-signout events, so even when token refresh eventually fails (because the user no longer exists), the app doesn't clear state.
 
-**1. Delete `src/pages/ResetPassword.tsx`**
-- Remove this file entirely.
+## Fix
 
-**2. Rewrite `src/pages/Auth.tsx`**
-- Complete replacement. New file contains:
-  - Bountt wordmark at top
-  - Tagline: "Split costs with friends. No drama."
-  - Single "Continue with Google" button using `lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/" })`
-  - Terms/Privacy footer text with placeholder links
-  - Existing redirect logic (if already signed in → dashboard or /groups/empty) stays
-  - No email, password, forgot password, confirmation, or mode-switching state
-  - On error: destructive toast
+### 1. Validate session on boot (`AppContext.tsx`)
+In the `onAuthStateChange` handler, when `INITIAL_SESSION` fires with a session, call `supabase.auth.getUser()` to verify the user still exists server-side. If it returns an error → call `signOut()` to clear the invalid session from storage and trigger `clearAllState()`.
 
-**3. Edit `src/App.tsx`**
-- Remove the `import ResetPassword` line
-- Remove the `<Route path="/reset-password" ...>` route
+### 2. Handle null sessions on non-signout events (`AppContext.tsx`)
+Remove the `event === "SIGNED_OUT"` gate on `clearAllState()`. If the session is null for ANY reason (failed token refresh, deleted user, revoked session), clear state and redirect. The previous "resilience" optimization was wrong — a null session means the user is not authenticated, period.
 
-**4. No other files change**
-- `AppContext.tsx`, `AuthGuard.tsx`, `Splash.tsx`, all group/expense files — untouched
-- No `Profile.tsx` exists, so nothing to modify there
+### 3. No other files change
+- `AuthGuard.tsx` — already correct, checks `user`
+- `Splash.tsx` — already correct, checks `user`
+- `Auth.tsx` — already correct
+- No database changes needed
 
-### Post-Deploy Manual Steps (flagged, not code)
-- Google OAuth provider must be enabled in Lovable Cloud authentication settings
-- `@lovable.dev/cloud-auth-js` handles managed Google OAuth automatically — no client ID needed unless user wants custom branding
-- `handle_new_user` trigger already reads `raw_user_meta_data->>'full_name'` for display name — works with Google out of the box
+### Files changed
+- `src/contexts/AppContext.tsx` — two changes in the `onAuthStateChange` handler
+
+### Technical detail
+
+```text
+Current flow (broken):
+  INITIAL_SESSION + cached JWT → setUser(user) → AuthGuard passes → /groups/empty
+  Token refresh fails → null session, not SIGNED_OUT → state NOT cleared → user stays in
+
+Fixed flow:
+  INITIAL_SESSION + cached JWT → setUser(user) → getUser() validates server-side
+    → user deleted? → signOut() → clearAllState() → redirect to /auth
+    → user valid? → proceed normally
+  Any null session → clearAllState() → redirect to /auth
+```
 
