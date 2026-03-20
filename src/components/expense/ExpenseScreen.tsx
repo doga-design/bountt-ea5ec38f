@@ -561,6 +561,7 @@ export default function ExpenseScreen({
         await fetchExpenseSplits(currentGroup.id);
 
         if (isFirstExpense) {
+          onFirstExpenseSaved?.();
           toast({ title: "First expense logged!" });
         } else {
           toast({ title: "Expense added" });
