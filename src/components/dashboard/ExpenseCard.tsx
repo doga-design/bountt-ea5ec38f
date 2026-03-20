@@ -43,6 +43,8 @@ export default function ExpenseCard({ expense, splits, groupMembers, onClick }: 
 
   // --- Subtitle: "Paid by X · Y owes $Z" ---
   const payerLabel = isPayer ? "You" : expense.paid_by_name;
+  const selfMember = groupMembers.find((m) => m.user_id === user?.id);
+  const selfColor = selfMember ? getAvatarColor(selfMember).bg : undefined;
   const payerLabelColor = expense.is_settled
     ? "hsl(var(--muted-foreground))"
     : isPayer
@@ -116,7 +118,7 @@ export default function ExpenseCard({ expense, splits, groupMembers, onClick }: 
           {expense.description}
         </p>
         <p className="text-xs mt-0.5 flex items-center gap-0">
-          <span style={{ color: payerLabelColor }}>
+          <span style={{ color: payerLabelColor, fontWeight: isPayer ? 700 : undefined }}>
             Paid by {payerLabel}
           </span>
           {owesText && (

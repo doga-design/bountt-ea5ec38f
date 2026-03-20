@@ -1,9 +1,13 @@
+import { useCallback, useEffect, useState } from "react";
+import useEmblaCarousel from "embla-carousel-react";
 import { Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { useHeroData } from "./slides/useHeroData";
 import { getGroupIconSrc } from "@/lib/group-icon-utils";
-import { formatCurrency } from "@/lib/bountt-utils";
+import NetBalanceSlide from "./slides/NetBalanceSlide";
+import AgingDebtSlide from "./slides/AgingDebtSlide";
+import ContributionSlide from "./slides/ContributionSlide";
 
 const GRADIENTS: Record<string, { from: string; to: string }> = {
   "solid-orange": { from: "hsl(18,89%,47%)", to: "hsl(18,89%,47%)" },
@@ -17,7 +21,24 @@ const GRADIENTS: Record<string, { from: string; to: string }> = {
 export default function HeroCarousel() {
   const { currentGroup } = useApp();
   const navigate = useNavigate();
-  const { netBalance } = useHeroData();
+  const heroData = useHeroData();
+
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false });
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const onSelect = useCallback(() => {
+    if (!emblaApi) return;
+    setActiveIndex(emblaApi.selectedScrollSnap());
+  }, [emblaApi]);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    emblaApi.on("select", onSelect);
+    onSelect();
+    return () => {
+      emblaApi.off("select", onSelect);
+    };
+  }, [emblaApi, onSelect]);
 
   if (!currentGroup) return null;
 
@@ -26,16 +47,36 @@ export default function HeroCarousel() {
     background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`,
   };
 
-  const label =
-    netBalance > 0 ? "you're up" : netBalance < 0 ? "you owe" : "all settled";
+  // Build slides array
+  const slides: React.ReactNode[] = [
+    <NetBalanceSlide
+      key="net"
+      netBalance={heroData.netBalance}
+      totalOwedToYou={heroData.totalOwedToYou}
+      totalYouOwe={heroData.totalYouOwe}
+      debtsYouOwe={heroData.debtsYouOwe}
+      groupId={currentGroup.id}
+    />,
+  ];
 
-  const absBalance = Math.abs(netBalance);
-  const displayAmount =
-    absBalance === 0
-      ? "$0"
-      : Number.isInteger(absBalance)
-        ? `$${absBalance}`
-        : formatCurrency(absBalance);
+  if (heroData.showAgingSlide) {
+    slides.push(
+      <AgingDebtSlide key="aging" agingDebts={heroData.agingDebts} />
+    );
+  }
+
+  if (heroData.showContributionSlide) {
+    slides.push(
+      <ContributionSlide
+        key="contribution"
+        contributionPct={heroData.contributionPct}
+        totalUserPaid={heroData.totalUserPaid}
+        totalGroupExpenses={heroData.totalGroupExpenses}
+      />
+    );
+  }
+
+  const showDots = slides.length > 1;
 
   return (
     <div className="relative overflow-hidden" style={bgStyle}>
@@ -61,15 +102,34 @@ export default function HeroCarousel() {
         </div>
       </div>
 
-      {/* Single balance display */}
-      <div className="flex flex-col items-center justify-center px-6 py-8 min-h-[180px]">
-        <span className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-2">
-          {label}
-        </span>
-        <span className="text-5xl font-extrabold text-white">
-          {displayAmount}
-        </span>
+      {/* Carousel viewport */}
+      <div className="overflow-hidden" ref={emblaRef}>
+        <div className="flex">
+          {slides.map((slide, i) => (
+            <div key={i} className="flex-[0_0_100%] min-w-0">
+              {slide}
+            </div>
+          ))}
+        </div>
       </div>
+
+      {/* Dot indicators */}
+      {showDots && (
+        <div className="flex justify-center gap-1.5 pb-4">
+          {slides.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => emblaApi?.scrollTo(i)}
+              className={`rounded-full transition-all ${
+                i === activeIndex
+                  ? "w-6 h-2 bg-white"
+                  : "w-2 h-2 bg-white/50"
+              }`}
+              aria-label={`Go to slide ${i + 1}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

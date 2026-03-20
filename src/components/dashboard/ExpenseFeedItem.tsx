@@ -100,6 +100,8 @@ export default function ExpenseFeedItem({
     ) ?? null;
 
   const isPayer = expense.paid_by_user_id === currentUserId;
+  const selfMember = groupMembers.find((m) => m.user_id === currentUserId);
+  const selfColor = selfMember ? getAvatarColor(selfMember).bg : undefined;
   const payerName = isPayer ? "You" : expense.paid_by_name;
 
   // --- My split ---
@@ -237,7 +239,7 @@ export default function ExpenseFeedItem({
         <Avatar member={payerMember} size={56} />
         <div className="min-w-0 flex-1">
           <p className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{payerName}</span>
+            <span className="font-medium text-foreground" style={isPayer && selfColor ? { color: selfColor, fontWeight: 700 } : undefined}>{payerName}</span>
             <span className="ml-1">paid ${formatAmount(expense.amount)}</span>
           </p>
           <p className="font-extrabold text-base text-foreground truncate max-w-[220px]">

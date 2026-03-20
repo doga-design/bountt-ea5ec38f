@@ -35,6 +35,7 @@ export default function SplitSentence({
 }: SplitSentenceProps) {
 
   const payerIsYou = payerMember?.user_id === currentUserId;
+  const payerColor = payerMember ? getAvatarColor(payerMember).bg : "#D94F00";
   const payerDisplay = payerIsYou ? "You" : payerMember?.name ?? "You";
 
   const isEqual = splitMode === "equal";
@@ -43,9 +44,11 @@ export default function SplitSentence({
   const others = selectedMembers.filter((m) => m.id !== payerMember?.id);
 
   const renderName = (member: GroupMember) => {
-    const label = member.user_id === currentUserId ? "you" : member.name;
+    const isYou = member.user_id === currentUserId;
+    const label = isYou ? "you" : member.name;
+    const nameColor = isYou ? getAvatarColor(member).bg : undefined;
     return (
-      <span key={member.id} className="font-bold text-foreground">
+      <span key={member.id} className="font-bold text-foreground" style={nameColor ? { color: nameColor } : undefined}>
         {label}
       </span>
     );
@@ -88,7 +91,7 @@ export default function SplitSentence({
             onPayerDrawerChange(true);
           }}
           className="font-extrabold underline decoration-dotted underline-offset-4"
-          style={{ color: "#D94F00" }}
+          style={{ color: payerColor }}
         >
           {payerDisplay}
         </button>

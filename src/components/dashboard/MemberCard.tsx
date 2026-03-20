@@ -15,7 +15,7 @@ export default function MemberCard({ member, balance, isCurrentUser, onClick }: 
   const avatarColor = getAvatarColor(member).bg;
 
   const balanceText = (() => {
-    if (balance.direction === "settled") return "All settled ✓";
+    if (balance.direction === "settled") return "All settled";
     if (balance.direction === "you_pay") {
       return isPlaceholder
         ? `You pay ${formatCurrency(balance.amount)}`
@@ -49,7 +49,7 @@ export default function MemberCard({ member, balance, isCurrentUser, onClick }: 
 
       {/* Text */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground truncate">
+        <p className="text-sm font-semibold text-foreground truncate" style={isCurrentUser ? { color: avatarColor, fontWeight: 700 } : undefined}>
           {isCurrentUser ? "You" : member.name}
         </p>
         <p className={`text-xs mt-0.5 ${

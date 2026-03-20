@@ -19,7 +19,11 @@ export default function Join() {
   const { toast } = useToast();
   const { user, fetchGroups, profile } = useApp();
 
-  const [code, setCode] = useState(paramCode ?? "");
+  const [code, setCode] = useState(() => {
+    const initial = paramCode ?? "";
+    // Strip BNTT- prefix if present so state holds only the suffix
+    return initial.toUpperCase().startsWith("BNTT-") ? initial.slice(5) : initial;
+  });
   const [loading, setLoading] = useState(false);
   const [mergeLoading, setMergeLoading] = useState(false);
 
@@ -39,7 +43,7 @@ export default function Join() {
     try {
       // Look up group by invite code using secure RPC
       const { data: groups, error: groupError } = await supabase
-        .rpc("lookup_group_by_invite", { p_invite_code: code.toUpperCase().trim() });
+        .rpc("lookup_group_by_invite", { p_invite_code: ("BNTT-" + code).toUpperCase().trim() });
 
       const group = groups?.[0] ?? null;
 
@@ -269,19 +273,22 @@ export default function Join() {
             <label className="block text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">
               Group Invite Code
             </label>
-            <input
-              type="text"
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="BNTT-XXXX"
-              maxLength={9}
-              className="w-full text-base font-mono text-foreground bg-transparent outline-none placeholder:text-muted-foreground uppercase"
-            />
+            <div className="flex items-center">
+              <span className="text-base font-mono text-muted-foreground select-none">BNTT-</span>
+              <input
+                type="text"
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4))}
+                placeholder="XXXX"
+                maxLength={4}
+                className="flex-1 text-base font-mono text-foreground bg-transparent outline-none placeholder:text-muted-foreground uppercase"
+              />
+            </div>
           </div>
 
           <button
             type="submit"
-            disabled={loading || code.length < 9}
+            disabled={loading || code.length < 4}
             className="w-full bg-primary text-primary-foreground rounded-full py-4 font-bold text-base flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}

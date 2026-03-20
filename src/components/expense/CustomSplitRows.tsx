@@ -61,7 +61,8 @@ export default function CustomSplitRows({
                 <span
                   className="mt-1 text-xs font-bold truncate w-full text-center"
                   style={{
-                    color: isSelf ? "#D94F00" : "hsl(var(--foreground))",
+                    color: isSelf ? bg : "hsl(var(--foreground))",
+                    fontWeight: isSelf ? 700 : undefined,
                   }}
                 >
                   {isSelf ? "You" : m.name}

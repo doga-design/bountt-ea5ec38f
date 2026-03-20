@@ -93,6 +93,8 @@ export default function ExpenseDetailSheet({
   }, [open, expenseFullySettled, onOpenChange, onSettled]);
 
   // Build subtitle
+  const selfMember = groupMembers.find((m) => m.user_id === user?.id && m.status === "active");
+  const selfColor = selfMember ? getAvatarColor(selfMember).bg : undefined;
   const payerLabel = isPayer ? "You" : (expense?.paid_by_name ?? "");
   const otherSplitNames = expenseSplits
     .filter((s) => {
@@ -100,6 +102,8 @@ export default function ExpenseDetailSheet({
       return s.member_name !== expense?.paid_by_name;
     })
     .map((s) => (s.user_id === user?.id ? "You" : s.member_name));
+
+  // Build subtitle with colored "You"
   const subtitle = `${payerLabel} paid, splitting with ${otherSplitNames.join(" & ")}`;
 
   // Creator label
@@ -218,7 +222,7 @@ export default function ExpenseDetailSheet({
       const { error } = await supabase.rpc("settle_my_share", { p_expense_id: expense.id });
       if (error) throw error;
       await Promise.all([fetchExpenses(currentGroup.id), fetchExpenseSplits(currentGroup.id)]);
-      toast({ title: "Share settled ✓" });
+      toast({ title: "Share settled" });
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Something went wrong.", variant: "destructive" });
     } finally {
@@ -237,7 +241,7 @@ export default function ExpenseDetailSheet({
       if (error) throw error;
       await Promise.all([fetchExpenses(currentGroup.id), fetchExpenseSplits(currentGroup.id)]);
       setConfirmSplit(null);
-      toast({ title: "Share settled ✓" });
+      toast({ title: "Share settled" });
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Something went wrong.", variant: "destructive" });
     } finally {

@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { distributeCents } from "@/lib/bountt-utils";
 import confetti from "canvas-confetti";
 import { Expense } from "@/types";
+import { getAvatarColor } from "@/lib/avatar-utils";
 
 interface ExpenseSheetProps {
   open: boolean;
@@ -151,6 +152,7 @@ export default function ExpenseSheet({
             <div className="flex gap-2 overflow-x-auto justify-center">
               {sortedMembers.map((m, i) => {
                 const isSelf = m.user_id === user?.id;
+                const memberColor = isSelf ? getAvatarColor(m).bg : undefined;
                 const selected = i === selectedPayerIdx;
                 return (
                   <button
@@ -162,7 +164,7 @@ export default function ExpenseSheet({
                         : "bg-muted text-muted-foreground"
                     }`}
                   >
-                    {isSelf ? "You" : m.name}
+                    <span style={isSelf ? { color: memberColor, fontWeight: 700 } : undefined}>{isSelf ? "You" : m.name}</span>
                   </button>
                 );
               })}

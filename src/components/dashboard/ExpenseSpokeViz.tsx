@@ -140,6 +140,8 @@ export default function ExpenseSpokeViz({
             const ctrlX = (payerPos.x + mPos.x) / 2;
             const ctrlY = payerPos.y + (mPos.y - payerPos.y) * 0.15;
             const d = `M ${payerPos.x} ${payerPos.y} Q ${ctrlX} ${ctrlY} ${mPos.x} ${mPos.y}`;
+            // Reversed path for animation: bottom (member) → top (payer)
+            const dReversed = `M ${mPos.x} ${mPos.y} Q ${ctrlX} ${ctrlY} ${payerPos.x} ${payerPos.y}`;
             const dur = `${1.2 + (i * 0.3) % 1.2}s`;
             const begin = `${i * 0.4}s`;
 
@@ -155,7 +157,7 @@ export default function ExpenseSpokeViz({
                 {!m.isSettled && (
                   <circle r="4" fill="#D4D4D4">
                     <animateMotion
-                      path={d}
+                      path={dReversed}
                       dur={dur}
                       begin={begin}
                       repeatCount="indefinite"
@@ -202,7 +204,7 @@ export default function ExpenseSpokeViz({
           )}
         </div>
         <p className="mt-1.5 text-xs text-center">
-          <span className="font-medium text-muted-foreground">
+          <span className="font-medium text-muted-foreground" style={isPayer ? { color: payerColor, fontWeight: 700 } : undefined}>
             {isPayer ? "You" : payerName} paid
           </span>
           <span className="text-muted-foreground"> · </span>
@@ -223,6 +225,7 @@ export default function ExpenseSpokeViz({
           const tappable = canTap(m);
           const isMe = m.userId === currentUserId;
           const label = isMe ? "You" : m.name;
+          const labelStyle = isMe && m.member ? { color: getAvatarColor(m.member).bg, fontWeight: 700 as const } : undefined;
 
           return (
             <div
@@ -280,7 +283,7 @@ export default function ExpenseSpokeViz({
                 )}
               </div>
 
-              <span className="text-[10px] font-medium text-muted-foreground mt-1 text-center leading-tight max-w-[72px] break-words">
+              <span className="text-[10px] font-medium text-muted-foreground mt-1 text-center leading-tight max-w-[72px] break-words" style={labelStyle}>
                 {m.isSettled ? `${label} settled` : `${label}'s share`}
               </span>
               <span className="text-[11px] font-bold text-foreground">
