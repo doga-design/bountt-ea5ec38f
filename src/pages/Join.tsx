@@ -19,7 +19,11 @@ export default function Join() {
   const { toast } = useToast();
   const { user, fetchGroups, profile } = useApp();
 
-  const [code, setCode] = useState(paramCode ?? "");
+  const [code, setCode] = useState(() => {
+    const initial = paramCode ?? "";
+    // Strip BNTT- prefix if present so state holds only the suffix
+    return initial.toUpperCase().startsWith("BNTT-") ? initial.slice(5) : initial;
+  });
   const [loading, setLoading] = useState(false);
   const [mergeLoading, setMergeLoading] = useState(false);
 
