@@ -61,7 +61,7 @@ export default function Groups() {
               <button
                 key={group.id}
                 onClick={() => navigate(`/dashboard/${group.id}`)}
-                className="w-full text-left"
+                className="w-full text-left relative overflow-hidden"
                 style={{
                   backgroundImage: `url(${bgSrc})`,
                   backgroundSize: "cover",
@@ -70,27 +70,26 @@ export default function Groups() {
                   borderRadius: "20px",
                   boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
                   minHeight: "80px",
-                  padding: "18px 20px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
                 }}
               >
-                <div>
-                  <div className="text-lg font-bold text-white flex items-center gap-2">
-                    <img
-                      src={getGroupIconSrc(group.emoji)}
-                      alt=""
-                      className="w-6 h-6"
-                      style={{ filter: "brightness(0) invert(1)" }}
-                    />
-                    {group.name}
+                <div className="absolute inset-0 bg-black/35 rounded-[16px]" />
+                <div className="relative flex items-center justify-between px-5 py-[18px]">
+                  <div>
+                    <div className="text-lg font-bold text-white flex items-center gap-2">
+                      <img
+                        src={getGroupIconSrc(group.emoji)}
+                        alt=""
+                        className="w-6 h-6"
+                        style={{ filter: "brightness(0) invert(1)" }}
+                      />
+                      {group.name}
+                    </div>
+                    <div className="text-sm text-white/70 mt-0.5">
+                      {count} {count === 1 ? "member" : "members"}
+                    </div>
                   </div>
-                  <div className="text-sm text-white/70 mt-0.5">
-                    {count} {count === 1 ? "member" : "members"}
-                  </div>
+                  <ChevronRight className="w-5 h-5 text-white flex-shrink-0" />
                 </div>
-                <ChevronRight className="w-5 h-5 text-white flex-shrink-0" />
               </button>
             );
           })}
@@ -113,11 +112,7 @@ export default function Groups() {
           </button>
           <button
             onClick={() => navigate("/join")}
-            className="w-full bg-card text-foreground font-semibold text-base py-4"
-            style={{
-              border: "1.5px dashed hsl(var(--border))",
-              borderRadius: "20px",
-            }}
+            className="w-full bg-primary text-primary-foreground font-bold text-base py-4 rounded-full"
           >
             Join a group
           </button>

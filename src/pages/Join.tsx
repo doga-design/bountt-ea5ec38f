@@ -6,6 +6,7 @@ import { useApp } from "@/contexts/AppContext";
 import { Loader2 } from "lucide-react";
 import PlaceholderSelectDialog from "@/components/join/PlaceholderSelectDialog";
 import { formatCurrency } from "@/lib/bountt-utils";
+import BottomNav from "@/components/BottomNav";
 
 interface PlaceholderWithExpenses {
   id: string;
@@ -258,7 +259,7 @@ export default function Join() {
 
   return (
     <div className="screen-container bg-background items-center justify-center">
-      <div className="w-full px-6">
+      <div className="w-full px-6 pb-24">
         <div className="text-center mb-8">
           <h1 className="bountt-wordmark text-4xl text-foreground mb-2">
             bountt<span className="text-primary">.</span>
@@ -304,6 +305,10 @@ export default function Join() {
         onSelect={handlePlaceholderSelection}
         loading={mergeLoading}
       />
+      <BottomNav onFabPress={() => {
+        const lastGroupId = localStorage.getItem("bountt_last_group_id");
+        if (lastGroupId) navigate(`/dashboard/${lastGroupId}`);
+      }} />
     </div>
   );
 }
