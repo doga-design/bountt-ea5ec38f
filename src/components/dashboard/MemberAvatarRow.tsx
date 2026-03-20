@@ -49,12 +49,13 @@ export default function MemberAvatarRow({
   }, [inviteCardMemberId]);
 
   const handleTap = (member: GroupMember) => {
+    // Toggle invite card for placeholders (secondary behavior)
     if (member.is_placeholder) {
       setInviteCardMemberId((prev) => (prev === member.id ? null : member.id));
-      return;
+    } else {
+      setInviteCardMemberId(null);
     }
-    // Toggle filter
-    setInviteCardMemberId(null);
+    // Toggle filter for all members (placeholder or real)
     if (selectedMemberId === member.id) {
       setSelectedMemberId(null);
       onFilterMember?.(null);
