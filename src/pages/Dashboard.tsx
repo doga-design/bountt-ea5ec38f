@@ -30,7 +30,7 @@ export default function Dashboard() {
     expenseSplits,
     user,
     membersLoading,
-    expensesLoading,
+    
     groupsLoading,
   } = useApp();
 
