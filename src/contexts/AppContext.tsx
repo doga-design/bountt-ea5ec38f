@@ -608,7 +608,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     groupMembers,
     membersLoading,
     expenses,
-    
+    expensesLoading,
     expenseSplits,
     error,
     setCurrentGroup,

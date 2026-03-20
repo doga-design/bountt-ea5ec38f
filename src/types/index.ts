@@ -128,6 +128,7 @@ export interface AppState {
 }
 
 export interface AppContextValue extends AppState {
+  expensesLoading: boolean;
   // Group actions
   setCurrentGroup: (group: Group | null) => void;
   fetchGroups: (forceRefresh?: boolean) => Promise<void>;

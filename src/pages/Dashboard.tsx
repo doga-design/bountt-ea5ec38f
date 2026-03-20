@@ -115,7 +115,7 @@ export default function Dashboard() {
   const hasExpenses = expenses.length > 0;
   const latestMemberName = otherMembers[otherMembers.length - 1]?.name ?? "";
 
-  const isLoading = membersLoading;
+  const isLoading = membersLoading || expensesLoading;
 
   const { unsettledGroups, settledExpenses } = useMemo(() => {
     const unsettled = expenses.filter((e) => !e.is_settled);
