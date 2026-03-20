@@ -112,11 +112,7 @@ export default function Groups() {
           </button>
           <button
             onClick={() => navigate("/join")}
-            className="w-full bg-card text-foreground font-semibold text-base py-4"
-            style={{
-              border: "1.5px dashed hsl(var(--border))",
-              borderRadius: "20px",
-            }}
+            className="w-full bg-primary text-primary-foreground font-bold text-base py-4 rounded-full"
           >
             Join a group
           </button>
