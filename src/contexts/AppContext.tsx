@@ -222,6 +222,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [user, profile]);
 
   const setCurrentGroup = useCallback((group: Group | null) => {
+    // Skip clearing + re-fetching if navigating back to the same group
+    if (group && currentGroupRef.current?.id === group.id) {
+      setCurrentGroupState(group);
+      return;
+    }
     setCurrentGroupState(group);
     // FIX 1 & 5: Clear arrays synchronously and increment fetch version
     setGroupMembers([]);
