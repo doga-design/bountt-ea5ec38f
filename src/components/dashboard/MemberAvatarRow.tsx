@@ -8,12 +8,14 @@ interface MemberAvatarRowProps {
   members: GroupMember[];
   currentUserId: string;
   groupInviteCode?: string;
+  onFilterMember?: (memberId: string | null) => void;
 }
 
 export default function MemberAvatarRow({
   members,
   currentUserId,
   groupInviteCode,
+  onFilterMember,
 }: MemberAvatarRowProps) {
   const { toast } = useToast();
 
@@ -30,13 +32,9 @@ export default function MemberAvatarRow({
   });
 
   const currentUserMember = sorted.find((m) => m.user_id === currentUserId);
-  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(
-    currentUserMember?.id ?? null
-  );
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [inviteCardMemberId, setInviteCardMemberId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  // TODO: filter feed by selected member
 
   // Click-away dismissal
   useEffect(() => {
@@ -51,11 +49,18 @@ export default function MemberAvatarRow({
   }, [inviteCardMemberId]);
 
   const handleTap = (member: GroupMember) => {
-    setSelectedMemberId(member.id);
     if (member.is_placeholder) {
       setInviteCardMemberId((prev) => (prev === member.id ? null : member.id));
+      return;
+    }
+    // Toggle filter
+    setInviteCardMemberId(null);
+    if (selectedMemberId === member.id) {
+      setSelectedMemberId(null);
+      onFilterMember?.(null);
     } else {
-      setInviteCardMemberId(null);
+      setSelectedMemberId(member.id);
+      onFilterMember?.(member.id);
     }
   };
 
@@ -87,7 +92,7 @@ export default function MemberAvatarRow({
             const isSelected = selectedMemberId === member.id;
             const isMe = member.user_id === currentUserId;
             const avatarImg = getAvatarImage(member);
-            const bgColor = getAvatarColor(member).bg;
+            const { bg: bgColor, stroke: strokeColor } = getAvatarColor(member);
 
             return (
               <button
@@ -104,7 +109,7 @@ export default function MemberAvatarRow({
                       width: 56,
                       height: 56,
                       backgroundColor: bgColor,
-                      border: isSelected ? "2.5px solid #D94F00" : "2.5px solid transparent",
+                      border: isSelected ? `2.5px solid ${strokeColor}` : "2.5px solid transparent",
                     }}
                   >
                     <img
