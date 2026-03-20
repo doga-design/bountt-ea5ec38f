@@ -13,7 +13,7 @@ export default function ComingSoon({ title = "Coming Soon" }: { title?: string }
           {title}
         </div>
         <p className="text-muted-foreground mb-8 text-sm">
-          This feature is coming in the next phase. Stay tuned! 🚀
+          This feature is coming in the next phase. Stay tuned!
         </p>
         <button
           onClick={() => navigate(-1)}

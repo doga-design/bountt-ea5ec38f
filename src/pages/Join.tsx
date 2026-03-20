@@ -110,7 +110,7 @@ export default function Join() {
           .eq("id", existing.id);
 
         await fetchGroups(true);
-        toast({ title: `Rejoined ${group.name}!`, description: "Welcome back 🎉" });
+        toast({ title: `Rejoined ${group.name}!`, description: "Welcome back" });
         navigate(`/dashboard/${group.id}`);
         return;
       }
@@ -204,7 +204,7 @@ export default function Join() {
     });
 
     await fetchGroups(true);
-    toast({ title: `Joined ${groupName}!`, description: "Welcome to the group 🎉" });
+    toast({ title: `Joined ${groupName}!`, description: "Welcome to the group" });
     navigate(`/dashboard/${groupId}`);
   };
 
@@ -233,7 +233,7 @@ export default function Join() {
 
         toast({
           title: `Joined ${pendingGroup.name}!`,
-          description: `Merged with ${selected?.name}'s expenses 🎉`,
+          description: `Merged with ${selected?.name}'s expenses`,
         });
         navigate(`/dashboard/${pendingGroup.id}`);
       } else {
@@ -260,7 +260,7 @@ export default function Join() {
             bountt<span className="text-primary">.</span>
           </h1>
           <div className="bg-secondary text-secondary-foreground rounded-full px-5 py-2 text-sm font-bold inline-block">
-            Join a group 🔓
+            Join a group
           </div>
         </div>
 

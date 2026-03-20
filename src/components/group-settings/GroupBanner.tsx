@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Group } from "@/types";
 import { useApp } from "@/contexts/AppContext";
 import GradientPicker from "./GradientPicker";
+import { getGroupIconSrc } from "@/lib/group-icon-utils";
 
 const GRADIENTS: Record<string, { from: string; to: string }> = {
   "solid-orange": { from: "hsl(18,89%,47%)", to: "hsl(18,89%,47%)" },
@@ -41,7 +42,7 @@ export default function GroupBanner({ group }: GroupBannerProps) {
         }}
         onClick={() => isCreator && !editing && setShowPicker(true)}
       >
-        <span className="text-5xl mb-3">{group.emoji}</span>
+        <img src={getGroupIconSrc(group.emoji)} alt="" className="w-12 h-12 mb-3" />
         {isCreator && editing ? (
           <input
             className="text-2xl font-bold text-primary-foreground bg-transparent text-center outline-none"

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
 import BalancePill from "./BalancePill";
+import { getGroupIconSrc } from "@/lib/group-icon-utils";
 
 const GRADIENTS: Record<string, { from: string; to: string }> = {
   "solid-orange": { from: "hsl(18,89%,47%)", to: "hsl(18,89%,47%)" },
@@ -102,9 +103,9 @@ export default function DashboardHeader({ onAddMember, showBalance = false }: Da
         </div>
       </div>
 
-      {/* Group emoji overlapping bottom edge */}
-      <div className="absolute left-5 bottom-0 translate-y-1/2 w-14 h-14 rounded-full bg-card flex items-center justify-center text-2xl border-2 border-background z-10">
-        {currentGroup.emoji}
+      {/* Group icon overlapping bottom edge */}
+      <div className="absolute left-5 bottom-0 translate-y-1/2 w-14 h-14 rounded-full bg-card flex items-center justify-center border-2 border-background z-10">
+        <img src={getGroupIconSrc(currentGroup.emoji)} alt="" className="w-8 h-8" />
       </div>
     </div>
   );

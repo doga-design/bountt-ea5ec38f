@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
+import { getGroupIconSrc } from "@/lib/group-icon-utils";
 import { supabase } from "@/integrations/supabase/client";
 import BottomNav from "@/components/BottomNav";
 
@@ -82,8 +83,9 @@ export default function Groups() {
                 }}
               >
                 <div>
-                  <div className="text-lg font-bold text-white">
-                    {group.emoji} {group.name}
+                  <div className="text-lg font-bold text-white flex items-center gap-2">
+                    <img src={getGroupIconSrc(group.emoji)} alt="" className="w-6 h-6" />
+                    {group.name}
                   </div>
                   <div className="text-sm text-white/70 mt-0.5">
                     {count} {count === 1 ? "member" : "members"}

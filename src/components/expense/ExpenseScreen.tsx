@@ -565,9 +565,9 @@ export default function ExpenseScreen({
             origin: { y: 0.5 },
             colors: ["#E8480A", "#FFFFFF", "#D4D4D4"],
           });
-          toast({ title: "First expense logged! 🎉" });
+          toast({ title: "First expense logged!" });
         } else {
-          toast({ title: "Expense added ✓" });
+          toast({ title: "Expense added" });
         }
       }
 
@@ -791,7 +791,7 @@ export default function ExpenseScreen({
                         if (totalNum === 0) {
                           statusText = "assign to everyone";
                         } else if (isBalanced) {
-                          statusText = "perfectly split ✓";
+                          statusText = "perfectly split";
                           statusColor = "#22C55E";
                         } else if (overBudget) {
                           statusText = `$${Math.abs(remaining).toFixed(2)} over total`;
