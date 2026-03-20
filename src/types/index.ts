@@ -118,7 +118,7 @@ export interface AppState {
 
   // Expenses
   expenses: Expense[];
-  expensesLoading: boolean;
+  
 
   // Expense Splits
   expenseSplits: ExpenseSplit[];

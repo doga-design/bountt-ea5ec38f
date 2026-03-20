@@ -35,7 +35,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Expenses state
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [expensesLoading, setExpensesLoading] = useState(false);
+  
 
   // Expense splits state
   const [expenseSplits, setExpenseSplits] = useState<ExpenseSplit[]>([]);
