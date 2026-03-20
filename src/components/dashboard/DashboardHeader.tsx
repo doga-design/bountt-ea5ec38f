@@ -4,15 +4,7 @@ import { useApp } from "@/contexts/AppContext";
 import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
 import BalancePill from "./BalancePill";
 import { getGroupIconSrc } from "@/lib/group-icon-utils";
-
-const GRADIENTS: Record<string, { from: string; to: string }> = {
-  "solid-orange": { from: "hsl(18,89%,47%)", to: "hsl(18,89%,47%)" },
-  "orange-red": { from: "hsl(15,90%,55%)", to: "hsl(0,85%,50%)" },
-  "blue-purple": { from: "hsl(220,80%,55%)", to: "hsl(270,70%,55%)" },
-  "green-teal": { from: "hsl(150,60%,45%)", to: "hsl(180,70%,45%)" },
-  "pink-orange": { from: "hsl(330,80%,60%)", to: "hsl(25,90%,55%)" },
-  "gray-black": { from: "hsl(0,0%,40%)", to: "hsl(0,0%,15%)" },
-};
+import { getBackgroundSrc } from "@/lib/background-utils";
 
 interface DashboardHeaderProps {
   onAddMember?: () => void;
@@ -25,6 +17,7 @@ export default function DashboardHeader({ onAddMember, showBalance = false }: Da
   if (!currentGroup) return null;
 
   const activeMembers = groupMembers.filter((m) => m.status === "active");
+  const bgSrc = getBackgroundSrc(currentGroup.banner_gradient);
 
   return (
     <div className="relative">
@@ -32,10 +25,9 @@ export default function DashboardHeader({ onAddMember, showBalance = false }: Da
       <div
         className="px-5 pt-5 pb-10"
         style={{
-          background: (() => {
-            const g = GRADIENTS[currentGroup.banner_gradient] ?? GRADIENTS["orange-red"];
-            return `linear-gradient(135deg, ${g.from}, ${g.to})`;
-          })(),
+          backgroundImage: `url(${bgSrc})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
         }}
       >
         {/* Top row: avatars + settings */}
@@ -44,7 +36,6 @@ export default function DashboardHeader({ onAddMember, showBalance = false }: Da
           <div className="flex items-center">
             {activeMembers.map((member, i) => {
               const isCurrentUser = member.user_id === user?.id;
-              const isPlaceholder = member.is_placeholder;
               const { bg } = getAvatarColor(member);
 
               return (

@@ -5,18 +5,10 @@ import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { useHeroData } from "./slides/useHeroData";
 import { getGroupIconSrc } from "@/lib/group-icon-utils";
+import { getBackgroundSrc } from "@/lib/background-utils";
 import NetBalanceSlide from "./slides/NetBalanceSlide";
 import AgingDebtSlide from "./slides/AgingDebtSlide";
 import ContributionSlide from "./slides/ContributionSlide";
-
-const GRADIENTS: Record<string, { from: string; to: string }> = {
-  "solid-orange": { from: "hsl(18,89%,47%)", to: "hsl(18,89%,47%)" },
-  "orange-red": { from: "hsl(15,90%,55%)", to: "hsl(0,85%,50%)" },
-  "blue-purple": { from: "hsl(220,80%,55%)", to: "hsl(270,70%,55%)" },
-  "green-teal": { from: "hsl(150,60%,45%)", to: "hsl(180,70%,45%)" },
-  "pink-orange": { from: "hsl(330,80%,60%)", to: "hsl(25,90%,55%)" },
-  "gray-black": { from: "hsl(0,0%,40%)", to: "hsl(0,0%,15%)" },
-};
 
 export default function HeroCarousel() {
   const { currentGroup } = useApp();
@@ -42,9 +34,11 @@ export default function HeroCarousel() {
 
   if (!currentGroup) return null;
 
-  const gradient = GRADIENTS[currentGroup.banner_gradient] ?? GRADIENTS["orange-red"];
+  const bgSrc = getBackgroundSrc(currentGroup.banner_gradient);
   const bgStyle = {
-    background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`,
+    backgroundImage: `url(${bgSrc})`,
+    backgroundSize: "cover",
+    backgroundPosition: "center",
   };
 
   // Build slides array
@@ -80,15 +74,15 @@ export default function HeroCarousel() {
 
   return (
     <div className="relative overflow-hidden" style={bgStyle}>
-      {/* Nav bar with darker tint */}
+      {/* Nav bar — fully transparent, no tint */}
       <div className="relative z-10">
-        <div className="absolute inset-0 bg-black/10" />
         <div className="relative flex items-center justify-between px-5 py-4">
           <div className="flex items-center gap-2">
             <img
               src={getGroupIconSrc(currentGroup.emoji)}
               alt=""
               className="w-6 h-6"
+              style={{ filter: "brightness(0) invert(1)" }}
             />
             <h1 className="text-lg font-bold text-white">{currentGroup.name}</h1>
           </div>

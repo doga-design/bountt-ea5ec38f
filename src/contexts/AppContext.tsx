@@ -382,7 +382,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // =====================================================
   // GROUP MANAGEMENT
   // =====================================================
-  const updateGroup = useCallback(async (groupId: string, updates: Partial<Pick<Group, 'name' | 'banner_gradient'>>) => {
+  const updateGroup = useCallback(async (groupId: string, updates: Partial<Pick<Group, 'name' | 'banner_gradient' | 'emoji'>>) => {
     try {
       const { error: updateError } = await supabase
         .from("groups")

@@ -4,7 +4,6 @@ import { useApp } from "@/contexts/AppContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { distributeCents } from "@/lib/bountt-utils";
-import confetti from "canvas-confetti";
 import { GroupMember, Expense, ExpenseSplit } from "@/types";
 
 import AmountDisplay from "./AmountDisplay";
@@ -24,6 +23,7 @@ interface ExpenseScreenProps {
   editSplits?: ExpenseSplit[];
   /** sessionStorage key for persisting in-progress draft (create mode only) */
   draftKey?: string | null;
+  onFirstExpenseSaved?: () => void;
 }
 
 export default function ExpenseScreen({
@@ -33,6 +33,7 @@ export default function ExpenseScreen({
   editExpense,
   editSplits,
   draftKey,
+  onFirstExpenseSaved,
 }: ExpenseScreenProps) {
   const { currentGroup, user, profile, groupMembers, fetchExpenses, fetchExpenseSplits, addPlaceholderMember } = useApp();
   const { toast } = useToast();
@@ -559,12 +560,7 @@ export default function ExpenseScreen({
         await fetchExpenseSplits(currentGroup.id);
 
         if (isFirstExpense) {
-          confetti({
-            particleCount: 160,
-            spread: 100,
-            origin: { y: 0.5 },
-            colors: ["#E8480A", "#FFFFFF", "#D4D4D4"],
-          });
+          onFirstExpenseSaved?.();
           toast({ title: "First expense logged!" });
         } else {
           toast({ title: "Expense added" });
@@ -740,17 +736,15 @@ export default function ExpenseScreen({
 
                 {/* Member avatar grid — equal mode only */}
                 {splitMode === "equal" && (
-                  <div className="flex justify-center">
-                    <div className="relative" style={{ width: 'fit-content' }}>
-                      <MemberAvatarGrid
-                        members={gridMembers}
-                        activeIds={activeIds}
-                        onToggle={handleToggleGridMember}
-                        currentUserId={user?.id}
-                        onAddMember={activeMembers.length < 6 ? () => setShowAddMember(true) : undefined}
-                        splitAmounts={gridSplitAmounts}
-                      />
-                    </div>
+                  <div className="px-0">
+                    <MemberAvatarGrid
+                      members={gridMembers}
+                      activeIds={activeIds}
+                      onToggle={handleToggleGridMember}
+                      currentUserId={user?.id}
+                      onAddMember={activeMembers.length < 6 ? () => setShowAddMember(true) : undefined}
+                      splitAmounts={gridSplitAmounts}
+                    />
                   </div>
                 )}
 

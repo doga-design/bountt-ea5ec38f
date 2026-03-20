@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'BringBoldNineties';
+  src: url('@/assets/fonts/Bringbold_Nineties_Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 /* Bountt Design System — All colors are HSL */
 
 @layer base {
@@ -85,6 +92,10 @@
 @layer utilities {
   .font-sora {
     font-family: 'Sora', sans-serif;
+  }
+
+  .font-bringbold {
+    font-family: 'BringBoldNineties', sans-serif;
   }
 
   .bountt-wordmark {
