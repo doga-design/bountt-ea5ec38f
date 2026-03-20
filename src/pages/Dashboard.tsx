@@ -251,6 +251,11 @@ export default function Dashboard() {
             }
           }
           if (!o) {
+            // Fire first-expense confetti after drawer closes
+            if (pendingFirstExpenseConfettiRef.current) {
+              pendingFirstExpenseConfettiRef.current = false;
+              fireConfetti();
+            }
             setEditExpense(undefined);
             setEditSplits(undefined);
             // Clear draft on intentional close
