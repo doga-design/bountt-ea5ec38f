@@ -126,108 +126,108 @@ export default function Dashboard() {
     return { unsettledGroups: groups, settledExpenses: settled };
   }, [expenses]);
 
-  // FIX 4: Group parity guard — show spinner if data doesn't match current URL group
-  if (!currentGroup || currentGroup.id !== groupId || membersLoading || expensesLoading) {
-    return (
-      <div className="screen-container items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
-      </div>
-    );
-  }
-
+  const groupReady = currentGroup && currentGroup.id === groupId;
   const mode = !hasOtherMembers ? "empty" : !hasExpenses ? "prompt" : "normal";
 
   return (
     <div className="screen-container">
-      {mode === "normal" ? (
-        <HeroCarousel />
+      {!groupReady || isLoading ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
+        </div>
       ) : (
-        <DashboardHeader onAddMember={undefined} showBalance={false} />
-      )}
-
-      {mode === "empty" && <EmptyState />}
-
-      {mode === "prompt" && (
-        <AddExpensePrompt
-          memberName={latestMemberName}
-          onAddExpense={() => setSheetOpen(true)}
-        />
-      )}
-
-      {mode === "normal" && (
         <>
-          <div className="mt-4">
-            <MemberAvatarRow
-              members={groupMembers}
-              currentUserId={user?.id ?? ""}
-              groupInviteCode={currentGroup?.invite_code}
+          {mode === "normal" ? (
+            <HeroCarousel />
+          ) : (
+            <DashboardHeader onAddMember={undefined} showBalance={false} />
+          )}
+
+          {mode === "empty" && <EmptyState />}
+
+          {mode === "prompt" && (
+            <AddExpensePrompt
+              memberName={latestMemberName}
+              onAddExpense={() => setSheetOpen(true)}
             />
-          </div>
+          )}
 
-          <div className="flex-1 px-4 py-4 space-y-4 pb-24">
-            {unsettledGroups.map((group, idx) => (
-              <div key={group.label}>
-                {idx > 0 && <div className="border-t border-border mb-3" />}
-                <p className="text-xs font-medium text-muted-foreground tracking-wider mb-2 px-1">
-                  {group.label}
-                </p>
-                <div className="divide-y divide-border">
-                  {group.items.map((expense) => (
-                    <ExpenseFeedItem
-                      key={expense.id}
-                      expense={expense}
-                      splits={expenseSplits.filter((s) => s.expense_id === expense.id)}
-                      groupMembers={groupMembers}
-                      onClick={() => setDetailExpenseId(expense.id)}
-                    />
-                  ))}
-                </div>
+          {mode === "normal" && (
+            <>
+              <div className="mt-4">
+                <MemberAvatarRow
+                  members={groupMembers}
+                  currentUserId={user?.id ?? ""}
+                  groupInviteCode={currentGroup?.invite_code}
+                />
               </div>
-            ))}
 
-            {settledExpenses.length > 0 && (
-              <Collapsible>
-                <div className="border-t border-border mb-3" />
-                <CollapsibleTrigger className="flex items-center gap-1 text-xs font-medium text-muted-foreground tracking-wider px-1 mb-2 w-full">
-                  SETTLED
-                  <ChevronDown className="w-3.5 h-3.5" />
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="divide-y divide-border">
-                    {settledExpenses.map((expense) => (
-                      <ExpenseFeedItem
-                        key={expense.id}
-                        expense={expense}
-                        splits={expenseSplits.filter((s) => s.expense_id === expense.id)}
-                        groupMembers={groupMembers}
-                        onClick={() => setDetailExpenseId(expense.id)}
-                      />
-                    ))}
+              <div className="flex-1 px-4 py-4 space-y-4 pb-24">
+                {unsettledGroups.map((group, idx) => (
+                  <div key={group.label}>
+                    {idx > 0 && <div className="border-t border-border mb-3" />}
+                    <p className="text-xs font-medium text-muted-foreground tracking-wider mb-2 px-1">
+                      {group.label}
+                    </p>
+                    <div className="divide-y divide-border">
+                      {group.items.map((expense) => (
+                        <ExpenseFeedItem
+                          key={expense.id}
+                          expense={expense}
+                          splits={expenseSplits.filter((s) => s.expense_id === expense.id)}
+                          groupMembers={groupMembers}
+                          onClick={() => setDetailExpenseId(expense.id)}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
-          </div>
+                ))}
 
-          <BottomNav onFabPress={() => setSheetOpen(true)} />
+                {settledExpenses.length > 0 && (
+                  <Collapsible>
+                    <div className="border-t border-border mb-3" />
+                    <CollapsibleTrigger className="flex items-center gap-1 text-xs font-medium text-muted-foreground tracking-wider px-1 mb-2 w-full">
+                      SETTLED
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="divide-y divide-border">
+                        {settledExpenses.map((expense) => (
+                          <ExpenseFeedItem
+                            key={expense.id}
+                            expense={expense}
+                            splits={expenseSplits.filter((s) => s.expense_id === expense.id)}
+                            groupMembers={groupMembers}
+                            onClick={() => setDetailExpenseId(expense.id)}
+                          />
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+              </div>
 
-          <ExpenseDetailSheet
-            open={detailOpen}
-            onOpenChange={handleDetailOpenChange}
-            expense={detailExpense}
-            splits={expenseSplits}
-            groupMembers={groupMembers}
-            onSettled={handleSettlementComplete}
-            onEdit={(exp, splits) => {
-              setEditExpense(exp);
-              setEditSplits(splits);
-              setSheetOpen(true);
-            }}
-          />
+              <BottomNav onFabPress={() => setSheetOpen(true)} />
+
+              <ExpenseDetailSheet
+                open={detailOpen}
+                onOpenChange={handleDetailOpenChange}
+                expense={detailExpense}
+                splits={expenseSplits}
+                groupMembers={groupMembers}
+                onSettled={handleSettlementComplete}
+                onEdit={(exp, splits) => {
+                  setEditExpense(exp);
+                  setEditSplits(splits);
+                  setSheetOpen(true);
+                }}
+              />
+            </>
+          )}
         </>
       )}
 
-      {/* Hoisted: single ExpenseScreen instance across all modes */}
+      {/* ALWAYS mounted — never unmounted by loading states */}
       <ExpenseScreen
         open={sheetOpen}
         onOpenChange={(o) => {
