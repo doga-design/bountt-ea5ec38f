@@ -120,43 +120,16 @@ export default function Join() {
         return;
       }
 
-      // Fetch placeholders for this group
-      const { data: placeholderMembers } = await supabase
-        .from("group_members")
-        .select("id, name")
-        .eq("group_id", group.id)
-        .eq("is_placeholder", true)
-        .is("user_id", null);
+      // Fetch placeholders for this group via scoped RPC
+      const { data: placeholderData } = await supabase
+        .rpc("get_placeholders_for_join", { p_group_id: group.id });
 
-      if (placeholderMembers && placeholderMembers.length > 0) {
-        // Compute expense totals for each placeholder
-        const withExpenses: PlaceholderWithExpenses[] = await Promise.all(
-          placeholderMembers.map(async (ph) => {
-            const { data: splits } = await supabase
-              .from("expense_splits")
-              .select("share_amount, expense_id")
-              .eq("member_name", ph.name)
-              .is("user_id", null);
-
-            // Filter splits to only this group's expenses
-            let total = 0;
-            if (splits && splits.length > 0) {
-              const expenseIds = [...new Set(splits.map((s) => s.expense_id))];
-              const { data: expenses } = await supabase
-                .from("expenses")
-                .select("id")
-                .eq("group_id", group.id)
-                .in("id", expenseIds);
-
-              const validIds = new Set(expenses?.map((e) => e.id) ?? []);
-              total = splits
-                .filter((s) => validIds.has(s.expense_id))
-                .reduce((sum, s) => sum + Number(s.share_amount), 0);
-            }
-
-            return { id: ph.id, name: ph.name, totalExpenses: total };
-          })
-        );
+      if (placeholderData && placeholderData.length > 0) {
+        const withExpenses: PlaceholderWithExpenses[] = placeholderData.map((ph) => ({
+          id: ph.id,
+          name: ph.name,
+          totalExpenses: Number(ph.total_expenses),
+        }));
 
         setPendingGroup({ id: group.id, name: group.name });
         setPlaceholders(withExpenses);
