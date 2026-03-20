@@ -22,6 +22,8 @@ interface ExpenseScreenProps {
   isFirstExpense?: boolean;
   editExpense?: Expense;
   editSplits?: ExpenseSplit[];
+  /** sessionStorage key for persisting in-progress draft (create mode only) */
+  draftKey?: string | null;
 }
 
 export default function ExpenseScreen({
