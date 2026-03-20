@@ -218,7 +218,7 @@ export default function ExpenseDetailSheet({
       const { error } = await supabase.rpc("settle_my_share", { p_expense_id: expense.id });
       if (error) throw error;
       await Promise.all([fetchExpenses(currentGroup.id), fetchExpenseSplits(currentGroup.id)]);
-      toast({ title: "Share settled ✓" });
+      toast({ title: "Share settled" });
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Something went wrong.", variant: "destructive" });
     } finally {
