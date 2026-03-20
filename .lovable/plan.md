@@ -1,20 +1,25 @@
 
-Root cause identified (from current code in `MemberAvatarGrid.tsx`):
-- The button container is already 44×44, so touch target is not the problem.
-- The visible `+` is a Lucide stroke icon (`<Plus className="w-[22px] h-[22px]" />`), and Lucide’s plus path is inset inside a 24×24 viewBox with thin stroke.  
-- Effective visible mark is much smaller than 22px, so it looks “pushed inward/shrunk” even when icon size is increased.
+Root cause (verified in code):
+- In `src/components/BottomNav.tsx`, the FAB uses a text glyph:  
+  `&lt;span className="font-bringbold text-3xl leading-none"&gt;+&lt;/span&gt;`
+- The container is already large (`w-16 h-16`), so touch target is fine.
+- The visible `+` is small because this is a font glyph problem, not a container-size problem: the `+` character has intrinsic side bearings/ink bounds that occupy a relatively small center area, so it looks “pushed inward” even when font-size increases.
 
-Clean fix (single-component, targeted):
-1. In `src/components/expense/MemberAvatarGrid.tsx`, keep the add-member button at 44×44 (or 46×46 if needed after visual check), but replace the Lucide `<Plus>` with a text `+` glyph using `BringBoldNineties`:
-   - `font-bringbold`
-   - larger font size (about 30–34px)
-   - `leading-none`
-   - tiny vertical nudge (`-translate-y-[1px]`) for optical centering
-2. Remove the hardcoded pale icon color (`#888`) and use a stronger token-based color (`text-foreground` or `text-muted-foreground`) so the mark reads heavier.
-3. Keep absolute placement logic (`top: 50%`, `translateY(-50%)`, right offset) unchanged unless overlap needs minor tuning after glyph swap.
-4. Do not touch other flows or logic. This is a visual/icon rendering fix only.
+Implementation plan:
+1. Update only `src/components/BottomNav.tsx` and replace the text `+` glyph with a geometric plus shape that is dimension-controlled by CSS (not font metrics).
+2. Inside the FAB button, render a `relative` square wrapper (e.g. `w-9 h-9` or `w-10 h-10`), then draw:
+   - one full-height vertical bar (`h-full`, fixed thickness like `w-[5px]`)
+   - one full-width horizontal bar (`w-full`, fixed thickness like `h-[5px]`)
+   Both bars centered absolutely, rounded, white.
+3. Keep existing FAB behavior and layout unchanged:
+   - same button size (`w-16 h-16`)
+   - same background image/tint logic
+   - same press animation and navigation callback
+4. Remove no-longer-needed font dependency for this icon in FAB (`font-bringbold` not used for the plus here anymore).
+5. Visual outcome target:
+   - plus mark fills most of the inner icon area (near “full width/full height” perception),
+   - remains optically centered,
+   - clearly readable on varied hero backgrounds.
 
-Why this works:
-- It removes the intrinsic inset/thin-stroke behavior of Lucide that made the mark look tiny.
-- The button remains tappable and visually peer-sized with nearby avatars.
-- The plus shape itself becomes visibly bold and large, which is what you asked for.
+Files to change:
+- `src/components/BottomNav.tsx` only.
