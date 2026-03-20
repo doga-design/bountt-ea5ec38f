@@ -40,7 +40,10 @@ export default function BottomNav({ onFabPress }: BottomNavProps) {
           }}
           aria-label="Add expense"
         >
-          <span className="font-bringbold text-3xl leading-none">+</span>
+          <div className="relative h-10 w-10" aria-hidden="true">
+            <span className="absolute left-1/2 top-0 h-full w-[5px] -translate-x-1/2 rounded-full bg-primary-foreground" />
+            <span className="absolute left-0 top-1/2 h-[5px] w-full -translate-y-1/2 rounded-full bg-primary-foreground" />
+          </div>
         </button>
 
         {/* All Groups */}
