@@ -99,8 +99,8 @@ export default function MemberAvatarRow({
               <button
                 key={member.id}
                 onClick={() => handleTap(member)}
-                className="flex flex-col items-center gap-1.5 shrink-0 min-w-0"
-                style={{ width: 60 }}
+                className="flex flex-col items-center gap-1.5 shrink-0 min-w-0 transition-opacity duration-200"
+                style={{ width: 60, opacity: selectedMemberId && !isSelected ? 0.4 : 1 }}
               >
                 {/* Avatar circle */}
                 <div className="relative">
