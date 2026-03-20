@@ -95,6 +95,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (fetchError) throw fetchError;
       setUserGroups((data as Group[]) ?? []);
     } catch (err) {
+      groupsFetchedForRef.current = null;
       toast({ title: err instanceof Error ? err.message : "Failed to fetch groups", variant: "destructive" });
     } finally {
       setGroupsLoading(false);
