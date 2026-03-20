@@ -1,48 +1,50 @@
+# Plan: Four Small Fixes
 
+## FIX 1 — Add Member Button Too Small
 
-# Audit & Proposed Approach for Change 1
+**Current**: 36×36px, positioned absolute on right edge of member row. Plus icon 18px.(but for some weird spacing/padding whatever issue, it looks wayy too smaller, make sure u identify that first whatever is forcing btn "+" icon to be that small)
 
-## Root Cause Analysis
+**Fix**: Increase to 44×44px with 22px icon. Adjust `right` offset to `-22` to keep alignment. This meets minimum touch target and matches the visual weight of member avatars.
 
-**Why arcs don't show in the numpad:**
-
-MemberAvatarGrid's SVG draws arcs from an **apex point** (`containerWidth/2, 0`) down to each member avatar. But there is **no payer avatar at that apex** — the payer avatar is rendered separately above in `ExpenseScreen.tsx` (line 706, as `PayerAvatar`), completely outside the MemberAvatarGrid component. So the arcs start from empty space above the member row, with no visual anchor.
-
-The SVG code itself is structurally correct — paths render, particles animate. The problem is **architectural**: the payer avatar and the member avatars live in different components with no spatial relationship. The arcs connect to a calculated point that doesn't correspond to any visible element.
-
-**Can it be fixed with a small targeted change?**
-
-No. The fundamental issue is that MemberAvatarGrid doesn't render a payer avatar, so there's nothing for the arcs to connect to. Adding a payer avatar to MemberAvatarGrid would fix it, but that means MemberAvatarGrid becomes essentially the same component as ExpenseSpokeViz — payer at top, members below, arcs between.
-
-## Proposed Approach: Enhance MemberAvatarGrid into a Self-Contained Component
-
-Rather than layering two components or duplicating code, **add the payer avatar directly into MemberAvatarGrid** as an optional feature:
-
-1. Add new optional props to MemberAvatarGrid: `payerMember?: GroupMember` and `payerOnClick?: () => void`
-2. When `payerMember` is provided, render the payer avatar centered at the top of the component (same styling as ExpenseSpokeViz — 64px, colored border, white shadow)
-3. The SVG arcs connect from the payer avatar's center to each active member avatar's center — using the same `getBoundingClientRect` measurement approach that ExpenseSpokeViz uses (not the current slot-width calculation which doesn't account for actual avatar positions)
-4. Particle animation identical to ExpenseSpokeViz: dashed paths, animated circles traveling bottom→top, opacity fade
-5. Member row stays exactly as-is: toggleable avatars with active/inactive states, names, split amounts, add button
-6. In ExpenseScreen.tsx, remove the separate `PayerAvatar` from slide 2 and pass `payerMember` to MemberAvatarGrid instead
-
-**This gives exactly**: payer at top center → dashed arc lines → selected member avatars below → particles animating bottom→top. Single component, no duplicates, no layering.
-
-The measurement approach switches from slot-width math to `getBoundingClientRect` (matching ExpenseSpokeViz), which correctly handles varying avatar sizes, gaps, and centering. This is the reason ExpenseSpokeViz works perfectly and MemberAvatarGrid's arcs look wrong even when they render.
-
-**Files changed:**
-- `MemberAvatarGrid.tsx` — add payer avatar rendering, switch to getBoundingClientRect measurement for arc endpoints
-- `ExpenseScreen.tsx` — remove standalone PayerAvatar from slide 2, pass `payerMember` prop to MemberAvatarGrid
+**File**: `src/components/expense/MemberAvatarGrid.tsx` lines 258-273 — change width/height from 36 to 44, icon from 18 to 22, right from -18 to -22.
 
 ---
 
-# Changes 2–4 (Unchanged from approved plan)
+## FIX 2 — "You" Label Orange in Numpad Payer
 
-## Change 2 — Remove colored bold names, "You" bold black only
-Same as approved. ~10 files, remove all color styling on names, keep only `font-bold` on "You" text with default foreground color.
+**Current**: Line 181 in MemberAvatarGrid — payer "You" label uses `font-bold text-foreground`.
 
-## Change 3 — Hero bg on FAB, dark tint, BringBoldNineties on +/-
-Same as approved. BottomNav gets background image on FAB + font-bringbold on "+". HeroCarousel gets `bg-black/35` overlay. NetBalanceSlide gets font-bringbold on +/- prefix.
+**Fix**: Change to `font-bold text-primary` to apply the brand orange color. The condition `payerMember.user_id === currentUserId` already correctly identifies when it's "You". Non-self payer names keep default color.
 
-## Change 4 — Bottom navbar z-[9999]
-Same as approved. Add `z-[9999]` to BottomNav fixed container.
+**File**: `src/components/expense/MemberAvatarGrid.tsx` line 181 — change `text-foreground` to `text-primary`.
 
+---
+
+## FIX 3 — Bottom Navbar Below Modals
+
+**Current**: BottomNav uses `z-[9999]`. Drawers and sheets use `z-50` (z-index: 50). The navbar sits ABOVE all modals — this is wrong.
+
+**Fix**: Change BottomNav from `z-[9999]` to `z-40`. This keeps it above regular page content (which has no explicit z-index) but below all drawers/sheets/overlays at z-50.
+
+**File**: `src/components/BottomNav.tsx` line 20 — change `z-[9999]` to `z-40`.
+
+---
+
+## FIX 4 — Bottom Navbar on EmptyGroups Page
+
+**Current**: EmptyGroups renders no BottomNav.
+
+**Fix**: Import and render BottomNav at the bottom of EmptyGroups. The `onFabPress` handler navigates to `/onboarding/group-name` (same as the "Create New Group" button). Add bottom padding to prevent content from being hidden behind the navbar.
+
+**File**: `src/pages/EmptyGroups.tsx` — import BottomNav, render it, add `pb-24` to main container.
+
+---
+
+## Files Changed
+
+
+| File                   | Change                                                                        |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| `MemberAvatarGrid.tsx` | Enlarge add button to 44×44, icon to 22px; "You" payer label → `text-primary` |
+| `BottomNav.tsx`        | `z-[9999]` → `z-40`                                                           |
+| `EmptyGroups.tsx`      | Add BottomNav at bottom                                                       |
