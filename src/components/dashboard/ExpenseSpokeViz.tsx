@@ -140,6 +140,8 @@ export default function ExpenseSpokeViz({
             const ctrlX = (payerPos.x + mPos.x) / 2;
             const ctrlY = payerPos.y + (mPos.y - payerPos.y) * 0.15;
             const d = `M ${payerPos.x} ${payerPos.y} Q ${ctrlX} ${ctrlY} ${mPos.x} ${mPos.y}`;
+            // Reversed path for animation: bottom (member) → top (payer)
+            const dReversed = `M ${mPos.x} ${mPos.y} Q ${ctrlX} ${ctrlY} ${payerPos.x} ${payerPos.y}`;
             const dur = `${1.2 + (i * 0.3) % 1.2}s`;
             const begin = `${i * 0.4}s`;
 
