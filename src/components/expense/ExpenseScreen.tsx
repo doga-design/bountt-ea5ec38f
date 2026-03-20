@@ -627,8 +627,7 @@ export default function ExpenseScreen({
                       }
                       setPayerDrawerOpen(true);
                     }}
-                    className="font-extrabold underline decoration-dotted underline-offset-4"
-                    style={{ color: "#D94F00" }}
+                    className="font-extrabold underline decoration-dotted underline-offset-4 text-foreground"
                   >
                     {payerMember?.user_id === user?.id ? "you" : payerMember?.name ?? "you"}
                   </button>
