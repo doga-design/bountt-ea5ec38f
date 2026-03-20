@@ -273,14 +273,17 @@ export default function Join() {
             <label className="block text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">
               Group Invite Code
             </label>
-            <input
-              type="text"
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="BNTT-XXXX"
-              maxLength={9}
-              className="w-full text-base font-mono text-foreground bg-transparent outline-none placeholder:text-muted-foreground uppercase"
-            />
+            <div className="flex items-center">
+              <span className="text-base font-mono text-muted-foreground select-none">BNTT-</span>
+              <input
+                type="text"
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4))}
+                placeholder="XXXX"
+                maxLength={4}
+                className="flex-1 text-base font-mono text-foreground bg-transparent outline-none placeholder:text-muted-foreground uppercase"
+              />
+            </div>
           </div>
 
           <button
