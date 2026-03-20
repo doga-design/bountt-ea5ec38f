@@ -100,6 +100,8 @@ export default function ExpenseFeedItem({
     ) ?? null;
 
   const isPayer = expense.paid_by_user_id === currentUserId;
+  const selfMember = groupMembers.find((m) => m.user_id === currentUserId);
+  const selfColor = selfMember ? getAvatarColor(selfMember).bg : undefined;
   const payerName = isPayer ? "You" : expense.paid_by_name;
 
   // --- My split ---
