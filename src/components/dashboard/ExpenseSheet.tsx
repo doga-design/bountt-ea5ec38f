@@ -151,6 +151,7 @@ export default function ExpenseSheet({
             <div className="flex gap-2 overflow-x-auto justify-center">
               {sortedMembers.map((m, i) => {
                 const isSelf = m.user_id === user?.id;
+                const memberColor = isSelf ? getAvatarColor(m).bg : undefined;
                 const selected = i === selectedPayerIdx;
                 return (
                   <button
