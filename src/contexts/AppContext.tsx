@@ -299,7 +299,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // =====================================================
   const fetchExpenses = useCallback(async (groupId: string) => {
     const version = fetchVersionRef.current;
-    setExpensesLoading(true);
+    
     try {
       const { data, error: fetchError } = await supabase
         .from("expenses")
