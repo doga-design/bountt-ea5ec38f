@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { GroupMember } from "@/types";
 import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
 import { Plus } from "lucide-react";
@@ -10,17 +10,19 @@ interface MemberAvatarGridProps {
   currentUserId: string | undefined;
   onAddMember?: () => void;
   splitAmounts?: Map<string, number>;
+  payerMember?: GroupMember;
+  payerOnClick?: () => void;
 }
 
-function getSizingTier(memberCount: number) {
-  if (memberCount <= 2) return { avatarSize: 100, fontSize: 18, gap: 16, verticalSpacing: 10 };
-  if (memberCount <= 3) return { avatarSize: 92, fontSize: 18, gap: 14, verticalSpacing: 8 };
-  if (memberCount <= 4) return { avatarSize: 75, fontSize: 16, gap: 12, verticalSpacing: 6 };
-  if (memberCount <= 5) return { avatarSize: 60, fontSize: 15, gap: 10, verticalSpacing: 6 };
-  return { avatarSize: 48, fontSize: 13, gap: 8, verticalSpacing: 4 };
-}
+const PAYER_SIZE = 64;
 
-const SVG_HEIGHT = 60;
+function getMemberSize(count: number) {
+  if (count <= 2) return { avatarSize: 80, fontSize: 16, gap: 14 };
+  if (count <= 3) return { avatarSize: 72, fontSize: 15, gap: 12 };
+  if (count <= 4) return { avatarSize: 64, fontSize: 14, gap: 10 };
+  if (count <= 5) return { avatarSize: 56, fontSize: 13, gap: 8 };
+  return { avatarSize: 48, fontSize: 12, gap: 6 };
+}
 
 export default function MemberAvatarGrid({
   members,
@@ -29,57 +31,92 @@ export default function MemberAvatarGrid({
   currentUserId,
   onAddMember,
   splitAmounts,
+  payerMember,
+  payerOnClick,
 }: MemberAvatarGridProps) {
-  const memberCount = members.length;
-  const { avatarSize, fontSize, gap, verticalSpacing } = getSizingTier(memberCount);
-
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
+  const payerRef = useRef<HTMLDivElement>(null);
+  const memberRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  const [payerPos, setPayerPos] = useState<{ x: number; y: number } | null>(null);
+  const [memberPositions, setMemberPositions] = useState<Record<string, { x: number; y: number }>>({});
+  const [containerSize, setContainerSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+
+  const { avatarSize, fontSize, gap } = getMemberSize(members.length);
+
+  const measureAll = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const cRect = container.getBoundingClientRect();
+    setContainerSize({ w: cRect.width, h: cRect.height });
+
+    if (payerRef.current) {
+      const pRect = payerRef.current.getBoundingClientRect();
+      setPayerPos({
+        x: pRect.left + pRect.width / 2 - cRect.left,
+        y: pRect.top + pRect.height / 2 - cRect.top,
+      });
+    }
+
+    const positions: Record<string, { x: number; y: number }> = {};
+    memberRefs.current.forEach((el, id) => {
+      if (el) {
+        const mRect = el.getBoundingClientRect();
+        positions[id] = {
+          x: mRect.left + mRect.width / 2 - cRect.left,
+          y: mRect.top + mRect.height / 2 - cRect.top,
+        };
+      }
+    });
+    setMemberPositions(positions);
+  }, []);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const measure = () => setContainerWidth(el.offsetWidth);
-    measure();
-    const ro = new ResizeObserver(measure);
+    const raf = requestAnimationFrame(measureAll);
+    const ro = new ResizeObserver(measureAll);
     ro.observe(el);
-    return () => ro.disconnect();
-  }, [memberCount]);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [members.length, activeIds.size, measureAll]);
 
-  // Spoke calculations
-  const apexX = containerWidth / 2;
-  const totalSlots = memberCount;
-  const slotWidth = containerWidth / totalSlots;
+  // Determine active members that have positions
+  const activeMembers = members.filter((m) => activeIds.has(m.id));
+  const hasPositions = payerMember && payerPos && activeMembers.length > 0;
+
+  const payerColor = payerMember ? getAvatarColor(payerMember).bg : "#B984E5";
+  const payerImg = payerMember ? getAvatarImage(payerMember) : undefined;
 
   return (
-    <div className="relative px-4" ref={containerRef} style={{ paddingTop: SVG_HEIGHT }}>
-      {/* Multi-spoke dashed arc SVG */}
-      {memberCount >= 2 && containerWidth > 0 && (
+    <div ref={containerRef} className="relative flex flex-col items-center w-full px-4 py-2">
+      {/* SVG arc overlay */}
+      {hasPositions && containerSize.w > 0 && (
         <svg
           style={{
             position: "absolute",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: SVG_HEIGHT,
+            inset: 0,
+            width: containerSize.w,
+            height: containerSize.h,
             overflow: "visible",
             pointerEvents: "none",
+            zIndex: 1,
           }}
         >
-          {members.map((m, i) => {
-            if (!activeIds.has(m.id)) return null;
-            const endX = slotWidth * i + slotWidth / 2;
-            const endY = SVG_HEIGHT;
-            const ctrlX = endX;
-            const ctrlY = 0;
-            const d = `M ${apexX} 0 Q ${ctrlX} ${ctrlY} ${endX} ${endY}`;
-            // Reversed path for animation: bottom (member) → top (payer)
-            const dReversed = `M ${endX} ${endY} Q ${ctrlX} ${ctrlY} ${apexX} 0`;
+          {activeMembers.map((m, i) => {
+            const mPos = memberPositions[m.id];
+            if (!mPos || !payerPos) return null;
+            const ctrlX = (payerPos.x + mPos.x) / 2;
+            const ctrlY = payerPos.y + (mPos.y - payerPos.y) * 0.15;
+            const d = `M ${payerPos.x} ${payerPos.y} Q ${ctrlX} ${ctrlY} ${mPos.x} ${mPos.y}`;
+            const dReversed = `M ${mPos.x} ${mPos.y} Q ${ctrlX} ${ctrlY} ${payerPos.x} ${payerPos.y}`;
             const dur = `${1.2 + (i * 0.3) % 1.2}s`;
             const begin = `${i * 0.4}s`;
 
             return (
-              <g key={i}>
+              <g key={m.id}>
                 <path
                   d={d}
                   stroke="#D4D4D4"
@@ -112,10 +149,50 @@ export default function MemberAvatarGrid({
         </svg>
       )}
 
-      {/* Avatar row */}
+      {/* Payer avatar at top center */}
+      {payerMember && (
+        <div className="flex flex-col items-center z-10 mb-2">
+          <button
+            onClick={payerOnClick}
+            className="rounded-full flex items-center justify-center overflow-hidden transition-transform active:scale-95"
+          >
+            <div
+              ref={payerRef}
+              className="rounded-full flex items-center justify-center overflow-hidden"
+              style={{
+                width: PAYER_SIZE,
+                height: PAYER_SIZE,
+                backgroundColor: payerColor,
+                border: "3px solid white",
+                boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
+              }}
+            >
+              {payerImg && (
+                <img
+                  src={payerImg}
+                  alt={payerMember.name}
+                  className="w-[75%] h-[75%] object-contain"
+                  draggable={false}
+                />
+              )}
+            </div>
+          </button>
+          <span className="mt-1 text-xs font-medium text-muted-foreground">
+            <span className={payerMember.user_id === currentUserId ? "font-bold text-foreground" : ""}>
+              {payerMember.user_id === currentUserId ? "You" : payerMember.name}
+            </span>
+            {" paid"}
+          </span>
+        </div>
+      )}
+
+      {/* Spacer for arc paths when payer is present */}
+      {payerMember && activeMembers.length > 0 && <div style={{ height: 40 }} />}
+
+      {/* Member avatars row */}
       <div
-        className="flex justify-center relative"
-        style={{ gap, paddingTop: verticalSpacing, paddingBottom: verticalSpacing }}
+        className="flex justify-center relative z-10"
+        style={{ gap, paddingTop: 4, paddingBottom: 4 }}
       >
         {members.map((m) => {
           const isActive = activeIds.has(m.id);
@@ -131,6 +208,10 @@ export default function MemberAvatarGrid({
               style={{ width: avatarSize }}
             >
               <div
+                ref={(el) => {
+                  if (el) memberRefs.current.set(m.id, el);
+                  else memberRefs.current.delete(m.id);
+                }}
                 className="rounded-full flex items-center justify-center transition-all overflow-hidden"
                 style={{
                   width: avatarSize,
@@ -150,14 +231,10 @@ export default function MemberAvatarGrid({
                 />
               </div>
               <span
-                className="mt-1 font-bold text-center truncate w-full"
+                className="mt-1 text-center truncate w-full"
                 style={{
                   fontSize,
-                  color: isActive
-                    ? isSelf
-                      ? stroke
-                      : "hsl(var(--foreground))"
-                    : "hsl(var(--muted-foreground))",
+                  color: isActive ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))",
                   fontWeight: isSelf ? 700 : undefined,
                 }}
               >
