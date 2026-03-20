@@ -6,6 +6,7 @@ import { useApp } from "@/contexts/AppContext";
 import { Loader2 } from "lucide-react";
 import PlaceholderSelectDialog from "@/components/join/PlaceholderSelectDialog";
 import { formatCurrency } from "@/lib/bountt-utils";
+import BottomNav from "@/components/BottomNav";
 
 interface PlaceholderWithExpenses {
   id: string;
