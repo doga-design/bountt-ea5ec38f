@@ -150,8 +150,9 @@ export default function ExpenseScreen({
         setSlide(1);
         const selfMember = members.find((m) => m.user_id === user?.id);
         setPayerId(selfMember?.id ?? null);
-        // Default: no members selected (deselected state)
-        setActiveIds(new Set());
+        // Default: all non-payer members selected
+        const selfMember = members.find((m) => m.user_id === user?.id);
+        setActiveIds(new Set(members.filter((m) => m.id !== selfMember?.id).map((m) => m.id)));
       }
       setFocusedMemberId(null);
       setCustomAmounts(new Map());

@@ -179,7 +179,9 @@ export default function GroupName() {
         <button
           onClick={handleContinue}
           disabled={loading || !name.trim()}
-          className="w-full bg-muted text-foreground rounded-full py-4 font-bold text-base flex items-center justify-center gap-2 disabled:opacity-50"
+          className={`w-full rounded-full py-4 font-bold text-base flex items-center justify-center gap-2 disabled:opacity-50 transition-colors ${
+            name.trim() ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
+          }`}
         >
           {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
           Continue →

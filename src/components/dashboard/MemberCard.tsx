@@ -15,7 +15,7 @@ export default function MemberCard({ member, balance, isCurrentUser, onClick }: 
   const avatarColor = getAvatarColor(member).bg;
 
   const balanceText = (() => {
-    if (balance.direction === "settled") return "All settled ✓";
+    if (balance.direction === "settled") return "All settled";
     if (balance.direction === "you_pay") {
       return isPlaceholder
         ? `You pay ${formatCurrency(balance.amount)}`

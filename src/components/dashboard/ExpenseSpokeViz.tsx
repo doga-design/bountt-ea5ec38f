@@ -157,7 +157,7 @@ export default function ExpenseSpokeViz({
                 {!m.isSettled && (
                   <circle r="4" fill="#D4D4D4">
                     <animateMotion
-                      path={d}
+                      path={dReversed}
                       dur={dur}
                       begin={begin}
                       repeatCount="indefinite"

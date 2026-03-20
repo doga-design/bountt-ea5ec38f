@@ -161,7 +161,7 @@ export default function MemberDetailSheet({
                   ? "text-destructive"
                   : "text-emerald-600"
               }`}>
-                {balance.direction === "settled" ? "✓" : formatCurrency(balance.amount)}
+                {balance.direction === "settled" ? "—" : formatCurrency(balance.amount)}
               </p>
             </div>
 
