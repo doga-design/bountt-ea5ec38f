@@ -132,7 +132,7 @@ export default function NetBalanceSlide({ netBalance, totalOwedToYou, totalYouOw
       {/* Large balance */}
       <div className="flex items-baseline gap-0.5 mb-2">
         {prefix && (
-          <span className="text-5xl font-extrabold text-white/40">{prefix}</span>
+          <span className="text-5xl font-extrabold text-white/40 font-bringbold">{prefix}</span>
         )}
         <span className="text-5xl font-bringbold text-white">{displayAmount}</span>
       </div>
