@@ -571,6 +571,8 @@ export default function ExpenseScreen({
         }
       }
 
+      // Clear draft on successful save
+      if (draftKey) sessionStorage.removeItem(draftKey);
       onOpenChange(false);
     } catch (err) {
       toast({
