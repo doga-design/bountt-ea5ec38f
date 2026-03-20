@@ -697,8 +697,13 @@ export default function ExpenseScreen({
                 </button>
               </div>
 
-              {/* Amount display */}
-              <div className="flex items-center justify-center gap-2 py-2 flex-shrink-0">
+              {/* Cost name label + Amount display */}
+              <div className="flex flex-col items-center justify-center gap-1 py-2 flex-shrink-0">
+                {description.trim() && (
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {description.trim()}
+                  </span>
+                )}
                 <AmountDisplay amount={amount} size="medium" />
               </div>
 
