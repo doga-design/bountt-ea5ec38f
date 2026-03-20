@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { distributeCents } from "@/lib/bountt-utils";
 import confetti from "canvas-confetti";
 import { Expense } from "@/types";
+import { getAvatarColor } from "@/lib/avatar-utils";
 
 interface ExpenseSheetProps {
   open: boolean;
