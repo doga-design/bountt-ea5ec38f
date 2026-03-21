@@ -198,6 +198,7 @@ export default function Join() {
         // Merge with placeholder using RPC
         const { error } = await supabase.rpc("claim_placeholder", {
           p_placeholder_id: placeholderId,
+          p_invite_code: pendingGroup.inviteCode,
         });
 
         if (error) throw error;
