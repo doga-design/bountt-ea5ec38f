@@ -58,7 +58,7 @@ export default function Auth() {
         className="pointer-events-none absolute left-1/2 z-0 h-[600px] w-[600px] -translate-x-1/2 rounded-full -bottom-[300px] blur-[72px]"
         style={{
           background:
-            "radial-gradient(circle at 50% 50%,rgb(250, 240, 202) 0%, rgba(250, 240, 202, 0.45) 42%, transparent 60%)",
+            "radial-gradient(circle at 50% 50%,rgb(255, 244, 199) 0%, rgba(250, 240, 202, 0.45) 42%, transparent 60%)",
         }}
       />
       <div
