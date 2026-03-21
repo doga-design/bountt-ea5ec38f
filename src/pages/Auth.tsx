@@ -49,28 +49,7 @@ export default function Auth() {
             "linear-gradient(to top, rgb(255, 238, 166) 0%, rgba(255, 238, 166, 0.8) 28%, rgba(255, 238, 166, 0.18) 58%, hsl(var(--background)) 100%)",
         }}
       />
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-[min(46vh,340px)]">
-        {FLOAT_ICONS.map((item) => (
-          <div key={item.src} className={`absolute ${item.className}`}>
-            <span
-              aria-hidden
-              className={`block h-full w-full opacity-[0.88] ${item.anim}`}
-              style={{
-                backgroundColor: "hsl(var(--primary))",
-                opacity: item.opacity ?? 0.88,
-                WebkitMaskImage: `url(${item.src})`,
-                WebkitMaskRepeat: "no-repeat",
-                WebkitMaskPosition: "center",
-                WebkitMaskSize: "contain",
-                maskImage: `url(${item.src})`,
-                maskRepeat: "no-repeat",
-                maskPosition: "center",
-                maskSize: "contain",
-              }}
-            />
-          </div>
-        ))}
-      </div>
+      <FloatingIcons />
       <div className="relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center px-6">
         <div className="w-full max-w-sm flex flex-col items-center">
           <img src={authLogoImg} alt="" className="w-[59px] h-[62px] mb-4" />
