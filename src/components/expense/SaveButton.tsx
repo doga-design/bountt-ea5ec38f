@@ -27,7 +27,7 @@ export default function SaveButton({
       <button
         onClick={handleClick}
         disabled={loading}
-        className="w-full rounded-[18px] py-4 font-sora text-[17px] font-extrabold transition-all active:scale-[0.985] flex items-center justify-center gap-2"
+        className="w-full rounded-[18px] py-4 font-sans text-[17px] font-extrabold transition-all active:scale-[0.985] flex items-center justify-center gap-2"
         style={{
           backgroundColor: active ? "#D94F00" : "#EAEAE6",
           color: active ? "#FFFFFF" : "#C0C0BC",

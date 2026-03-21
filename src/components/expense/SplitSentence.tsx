@@ -107,7 +107,7 @@ export default function SplitSentence({
       <Drawer open={payerDrawerOpen} onOpenChange={onPayerDrawerChange}>
         <DrawerContent>
           <DrawerHeader>
-            <DrawerTitle className="font-sora">Who paid?</DrawerTitle>
+            <DrawerTitle className="font-sans">Who paid?</DrawerTitle>
           </DrawerHeader>
           <div className="px-4 pb-6 space-y-1">
             {allActiveMembers.map((m) => {

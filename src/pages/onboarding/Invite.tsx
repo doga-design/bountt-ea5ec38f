@@ -183,8 +183,8 @@ export default function Invite() {
             Your Bountt group code
           </p>
 
-          {/* Code — Sora accent font */}
-          <p className="font-sora text-3xl font-black text-foreground mb-5 text-center">
+          {/* Code */}
+          <p className="font-sans text-3xl font-black text-foreground mb-5 text-center">
             {group.invite_code}
           </p>
 

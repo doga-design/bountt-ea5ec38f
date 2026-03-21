@@ -275,7 +275,7 @@ export default function ActivityLog() {
           <ArrowLeft className="w-5 h-5 text-foreground" />
         </button>
         <div>
-          <h1 className="font-sora text-lg font-bold text-foreground">Activity log</h1>
+          <h1 className="font-sans text-lg font-bold text-foreground">Activity log</h1>
           <p className="text-xs text-muted-foreground">Every change, visible to all members</p>
         </div>
       </div>

@@ -3,6 +3,20 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { lovable } from "@/integrations/lovable/index";
 import { useToast } from "@/hooks/use-toast";
 import { useApp } from "@/contexts/AppContext";
+import authLogoImg from "@/assets/auth-logo-img.svg";
+import icon01 from "@/assets/icons/icon-01.svg";
+import icon03 from "@/assets/icons/icon-03.svg";
+import icon05 from "@/assets/icons/icon-05.svg";
+import icon07 from "@/assets/icons/icon-10.svg";
+import icon09 from "@/assets/icons/icon-02.svg";
+
+const FLOAT_ICONS: { src: string; anim: string; className: string }[] = [
+  { src: icon01, anim: "auth-float-1", className: "left-[15%] bottom-[18%] w-[52px] h-[44px]" },
+  { src: icon03, anim: "auth-float-2", className: "left-[38%] bottom-[8%] w-[48px] h-[60px]" },
+  { src: icon05, anim: "auth-float-3", className: "left-1/2 bottom-[30%] w-[66px] h-[62px] -translate-x-1/2" },
+  { src: icon07, anim: "auth-float-4", className: "right-[25%] bottom-[18%] w-[55px] h-[66px]" },
+  { src: icon09, anim: "auth-float-5", className: "right-[20%] bottom-[3%] w-[64px] h-[50px]" },
+];
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -38,14 +52,43 @@ export default function Auth() {
   if (user && !authLoading) return null;
 
   return (
-    <div className="screen-container bg-background">
-      <div className="flex flex-col items-center justify-center min-h-screen px-6">
+    <div className="screen-container bg-background relative h-[100svh] max-h-[100svh] min-h-0 overflow-hidden">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 z-0 h-[600px] w-[600px] -translate-x-1/2 rounded-full -bottom-[300px] blur-[72px]"
+        style={{
+          background:
+            "radial-gradient(circle at 50% 50%,rgb(250, 240, 202) 0%, rgba(250, 240, 202, 0.45) 42%, transparent 60%)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-[min(46vh,340px)]"
+      >
+        {FLOAT_ICONS.map((item) => (
+          <div key={item.src} className={`absolute ${item.className}`}>
+            <div
+              className={`h-full w-full bg-primary opacity-[0.88] ${item.anim}`}
+              style={{
+                maskImage: `url(${item.src})`,
+                WebkitMaskImage: `url(${item.src})`,
+                maskSize: "contain",
+                maskRepeat: "no-repeat",
+                maskPosition: "center",
+                WebkitMaskSize: "contain",
+                WebkitMaskRepeat: "no-repeat",
+                WebkitMaskPosition: "center",
+              }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center px-6">
         <div className="w-full max-w-sm flex flex-col items-center">
-          <h1 className="bountt-wordmark text-5xl text-foreground mb-3">
-            bountt<span className="text-primary">.</span>
-          </h1>
+          <img src={authLogoImg} alt="" className="w-[59px] h-[62px] mb-4" />
+          <h1 className="bountt-wordmark text-5xl text-primary mb-1">bountt.</h1>
 
-          <p className="text-muted-foreground text-base mb-10">
+          <p className="text-muted-foreground text-base font-medium mb-10">
             Split costs with friends. No drama.
           </p>
 
@@ -75,7 +118,7 @@ export default function Auth() {
             Continue with Google
           </button>
 
-          <p className="text-xs text-muted-foreground text-center mt-6 leading-relaxed">
+          <p className="text-xs text-muted-foreground text-center mt-5 leading-relaxed">
             By continuing you agree to our{" "}
             <a href="https://bountt.app/terms" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
               Terms of Service

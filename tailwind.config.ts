@@ -14,8 +14,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        sora: ['Sora', 'sans-serif'],
-        'dm-sans': ['DM Sans', 'sans-serif'],
+        sans: ['Geist Sans', '-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'Segoe UI', 'system-ui', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",

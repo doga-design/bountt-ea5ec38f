@@ -29,7 +29,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 10%;
 
-    --primary: 18 89% 47%;
+    --primary: 206 100% 21%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 0 0% 10%;
@@ -38,7 +38,7 @@
     --muted: 0 0% 85%;
     --muted-foreground: 0 0% 45%;
 
-    --accent: 18 89% 47%;
+    --accent: 206 100% 21%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
@@ -46,7 +46,7 @@
 
     --border: 0 0% 82%;
     --input: 0 0% 100%;
-    --ring: 18 89% 47%;
+    --ring: 206 100% 21%;
 
     --radius: 1rem;
 
@@ -57,7 +57,7 @@
     --sidebar-accent: 240 4.8% 95.9%;
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 18 89% 47%;
+    --sidebar-ring: 206 100% 21%;
   }
 }
 
@@ -75,7 +75,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+    font-family: 'Geist Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
 
@@ -90,18 +90,13 @@
 }
 
 @layer utilities {
-  .font-sora {
-    font-family: 'Sora', sans-serif;
-  }
-
   .font-bringbold {
     font-family: 'BringBoldNineties', sans-serif;
   }
 
   .bountt-wordmark {
-    font-family: Georgia, 'Times New Roman', serif;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+    font-family:  'BringBoldNineties', 'Times New Roman', serif;
+    letter-spacing: -0.01em;
   }
 
   .screen-container {
@@ -127,5 +122,101 @@
 
 .animate-blink {
   animation: blink-cursor 1s step-end infinite;
+}
+
+/* Auth page — floating group icons (subtle, independent motion) */
+@keyframes auth-float-1 {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-11deg);
+  }
+  50% {
+    transform: translate3d(5px, -11px, 0) rotate(-7deg);
+  }
+}
+
+@keyframes auth-float-2 {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(9deg);
+  }
+  50% {
+    transform: translate3d(-6px, -9px, 0) rotate(13deg);
+  }
+}
+
+@keyframes auth-float-3 {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-4deg);
+  }
+  50% {
+    transform: translate3d(4px, -7px, 0) rotate(-8deg);
+  }
+}
+
+@keyframes auth-float-4 {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(14deg);
+  }
+  50% {
+    transform: translate3d(-4px, -12px, 0) rotate(10deg);
+  }
+}
+
+@keyframes auth-float-5 {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-6deg);
+  }
+  50% {
+    transform: translate3d(7px, -8px, 0) rotate(-10deg);
+  }
+}
+
+.auth-float-1 {
+  transform: translate3d(0, 0, 0) rotate(-11deg);
+  animation: auth-float-1 5.2s ease-in-out infinite;
+  animation-fill-mode: both;
+  will-change: transform;
+}
+.auth-float-2 {
+  transform: translate3d(0, 0, 0) rotate(9deg);
+  animation: auth-float-2 4.4s ease-in-out infinite;
+  animation-delay: 0.35s;
+  animation-fill-mode: both;
+  will-change: transform;
+}
+.auth-float-3 {
+  transform: translate3d(0, 0, 0) rotate(-4deg);
+  animation: auth-float-3 5.8s ease-in-out infinite;
+  animation-delay: 0.7s;
+  animation-fill-mode: both;
+  will-change: transform;
+}
+.auth-float-4 {
+  transform: translate3d(0, 0, 0) rotate(14deg);
+  animation: auth-float-4 4.9s ease-in-out infinite;
+  animation-delay: 0.2s;
+  animation-fill-mode: both;
+  will-change: transform;
+}
+.auth-float-5 {
+  transform: translate3d(0, 0, 0) rotate(-6deg);
+  animation: auth-float-5 5.5s ease-in-out infinite;
+  animation-delay: 0.55s;
+  animation-fill-mode: both;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-float-1,
+  .auth-float-2,
+  .auth-float-3,
+  .auth-float-4,
+  .auth-float-5 {
+    animation: none !important;
+  }
 }
 

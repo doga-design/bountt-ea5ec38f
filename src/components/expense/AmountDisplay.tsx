@@ -76,7 +76,7 @@ export default function AmountDisplay({
   return (
     <div className="flex flex-col items-center transition-all">
       <div className="flex items-baseline justify-center">
-        <span className="font-sora font-bold text-muted-foreground mr-1" style={{ fontSize: isLarge ? 34 : 24 }}>
+        <span className="font-sans font-bold text-muted-foreground mr-1" style={{ fontSize: isLarge ? 34 : 24 }}>
           $
         </span>
         <span

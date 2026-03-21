@@ -348,7 +348,7 @@ export default function ExpenseDetailSheet({
           <div className="flex items-start justify-between gap-3 shrink-0 pb-3">
             {/* Left: title, subtitle, date */}
             <div className="min-w-0 flex-1">
-              <h2 className="font-sora text-lg font-bold text-foreground truncate">
+              <h2 className="font-sans text-lg font-bold text-foreground truncate">
                 {expense.description} · {formatCurrency(Number(expense.amount))}
               </h2>
               <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{subtitle}</p>

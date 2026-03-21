@@ -29,7 +29,7 @@ export default function NumpadGrid({ onKey }: NumpadGridProps) {
         <button
           key={key}
           onClick={() => onKey(key)}
-          className="flex flex-col items-center justify-center font-sora transition-colors active:bg-muted rounded-xl min-h-[62px]"
+          className="flex flex-col items-center justify-center font-sans transition-colors active:bg-muted rounded-xl min-h-[62px]"
           style={{
             backgroundColor: "hsl(var(--card))",
             boxShadow: "0 1px 2px rgba(0,0,0,0.04)",

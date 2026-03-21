@@ -79,7 +79,7 @@ export default function CustomSplitRows({
                 <div className="flex items-baseline">
                   <span className="text-sm font-bold text-muted-foreground mr-0.5">$</span>
                   <span
-                    className="text-[26px] font-extrabold font-sora"
+                    className="text-[26px] font-extrabold font-sans"
                     style={{
                       color: isFocused
                         ? isSelf ? "#D94F00" : "#2563EB"

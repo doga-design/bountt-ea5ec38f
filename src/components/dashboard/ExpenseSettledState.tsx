@@ -22,7 +22,7 @@ export default function ExpenseSettledState({ members }: ExpenseSettledStateProp
         <Check className="w-10 h-10 text-background" strokeWidth={3} />
       </div>
 
-      <p className="text-lg font-bold text-foreground font-sora">All settled up!</p>
+      <p className="text-lg font-bold text-foreground font-sans">All settled up!</p>
 
       {/* Overlapping avatar stack */}
       <div className="flex items-center justify-center">

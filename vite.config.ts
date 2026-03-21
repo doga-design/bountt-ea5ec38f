@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => ({
         short_name: "Bountt",
         start_url: "/",
         display: "standalone",
-        theme_color: "#E35205",
+        theme_color: "#003C69",
         background_color: "#EBEBEB",
         icons: [
           {

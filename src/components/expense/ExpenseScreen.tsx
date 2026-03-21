@@ -617,7 +617,7 @@ export default function ExpenseScreen({
 
               {/* Headline */}
               <div className="text-center px-6 flex-shrink-0 mt-2.5 mb-2.5">
-                <h2 className="font-sora text-xl font-bold text-foreground">
+                <h2 className="font-sans text-xl font-bold text-foreground">
                   What did{" "}
                   <button
                     onClick={() => {
