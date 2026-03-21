@@ -147,7 +147,7 @@ export default function Join() {
     }
   };
 
-  const joinAsNewMember = async (groupId: string, groupName: string) => {
+  const joinAsNewMember = async (groupId: string, groupName: string, inviteCode?: string) => {
     const { data: existingMembers } = await supabase
       .from("group_members")
       .select("avatar_color, avatar_index")
@@ -167,11 +167,13 @@ export default function Join() {
     const { color: newColor, index: newIndex } = pickAvailableColor(existingColors, existingIndices);
 
     const displayName = profile?.display_name ?? user!.email?.split("@")[0] ?? "Member";
+    const resolvedCode = inviteCode ?? pendingGroup?.inviteCode ?? "";
     const { error: joinError } = await supabase.rpc("join_group", {
       p_group_id: groupId,
       p_display_name: displayName,
       p_avatar_color: newColor,
       p_avatar_index: newIndex,
+      p_invite_code: resolvedCode,
     });
 
     if (joinError) throw joinError;
