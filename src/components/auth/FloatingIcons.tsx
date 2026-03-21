@@ -55,7 +55,7 @@ const Icon03 = () => (
 );
 
 const Icon05 = () => (
-  <svg width="97" height="80" viewBox="0 0 97 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg viewBox="0 0 97 80" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto">
     <g clipPath="url(#c05)">
       <mask id="m05" style={{ maskType: "luminance" }} maskUnits="userSpaceOnUse" x="0" y="0" width="97" height="80">
         <path d="M96.9007 0H0V79.853H96.9007V0Z" fill="white" />
