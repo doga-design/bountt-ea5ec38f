@@ -67,52 +67,37 @@ export default function Join() {
         return;
       }
 
-      // If user was previously in group but left, rejoin
+      // If user was previously in group but left, rejoin via RPC (validates invite code server-side)
       if (existing && existing.status === "left") {
-        // Check 6-member limit before rejoin
+        const fullInviteCode = ("BNTT-" + code).toUpperCase().trim();
+        
         const { data: activeMembersData } = await supabase
           .from("group_members")
-          .select("id, avatar_color, avatar_index")
+          .select("avatar_color, avatar_index")
           .eq("group_id", group.id)
           .eq("status", "active");
-        if ((activeMembersData?.length ?? 0) >= 6) {
-          toast({ title: "This group is full (6/6 members)" });
-          return;
-        }
 
         const activeColors = activeMembersData?.filter((m) => m.avatar_color).map((m) => m.avatar_color!) ?? [];
         const activeIndices = activeMembersData?.filter((m) => m.avatar_index != null).map((m) => m.avatar_index!) ?? [];
 
-        // Get the member's current color and index
-        const { data: memberRow } = await supabase
-          .from("group_members")
-          .select("avatar_color, avatar_index")
-          .eq("id", existing.id)
-          .single();
+        const { pickAvailableColor } = await import("@/lib/avatar-utils");
+        const { color, index } = pickAvailableColor(activeColors, activeIndices);
 
-        const { pickAvailableColor, AVATAR_COLOR_KEYS } = await import("@/lib/avatar-utils");
-        const validColorKeys = new Set(AVATAR_COLOR_KEYS);
+        const displayName = profile?.display_name ?? user!.email?.split("@")[0] ?? "Member";
+        const { error: rejoinError } = await supabase.rpc("join_group", {
+          p_group_id: group.id,
+          p_display_name: displayName,
+          p_avatar_color: color,
+          p_avatar_index: index,
+          p_invite_code: fullInviteCode,
+        });
 
-        let updateFields: Record<string, unknown> = { status: "active", left_at: null };
+        if (rejoinError) throw rejoinError;
 
-        const currentColor = memberRow?.avatar_color;
-        const currentIndex = memberRow?.avatar_index;
-        const colorValid = currentColor && validColorKeys.has(currentColor) && !activeColors.includes(currentColor);
-        const indexValid = currentIndex != null && currentIndex >= 1 && currentIndex <= 6 && !activeIndices.includes(currentIndex);
-
-        if (!colorValid || !indexValid) {
-          const { color, index } = pickAvailableColor(activeColors, activeIndices);
-          updateFields.avatar_color = color;
-          updateFields.avatar_index = index;
-        } else {
-          updateFields.avatar_color = currentColor;
-          updateFields.avatar_index = currentIndex;
-        }
-
-        await supabase
-          .from("group_members")
-          .update(updateFields)
-          .eq("id", existing.id);
+        await supabase.rpc("log_member_joined", {
+          p_group_id: group.id,
+          p_actor_name: displayName,
+        });
 
         await fetchGroups(true);
         toast({ title: `Rejoined ${group.name}!`, description: "Welcome back" });
