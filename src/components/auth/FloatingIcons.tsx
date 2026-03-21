@@ -75,11 +75,11 @@ interface IconConfig {
 }
 
 const ICONS: IconConfig[] = [
-  { Icon: Icon01, anim: "auth-float-1", className: "left-[15%] bottom-[18%] w-[52px] h-[44px]", opacity: 0.88 },
-  { Icon: Icon03, anim: "auth-float-2", className: "left-[38%] bottom-[8%] w-[48px] h-[60px]", opacity: 0.78 },
-  { Icon: Icon05, anim: "auth-float-3", className: "left-1/2 bottom-[30%] w-[66px] h-[62px] -translate-x-1/2", opacity: 0.88 },
-  { Icon: Icon10, anim: "auth-float-4", className: "right-[25%] bottom-[18%] w-[55px] h-[66px]", opacity: 0.88 },
-  { Icon: Icon02, anim: "auth-float-5", className: "right-[20%] bottom-[3%] w-[64px] h-[50px]", opacity: 0.62 },
+  { Icon: Icon01, anim: "auth-float-1", className: "left-[15%] bottom-[18%] w-[65px]", opacity: 0.88 },
+  { Icon: Icon03, anim: "auth-float-2", className: "left-[38%] bottom-[8%] w-[65px]", opacity: 0.78 },
+  { Icon: Icon05, anim: "auth-float-3", className: "left-1/2 bottom-[30%] w-[65px] -translate-x-1/2", opacity: 0.88 },
+  { Icon: Icon10, anim: "auth-float-4", className: "right-[25%] bottom-[18%] w-[65px]", opacity: 0.88 },
+  { Icon: Icon02, anim: "auth-float-5", className: "right-[20%] bottom-[3%] w-[65px]", opacity: 0.62 },
 ];
 
 export default function FloatingIcons() {
