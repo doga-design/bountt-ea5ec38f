@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { lovable } from "@/integrations/lovable/index";
 import { useToast } from "@/hooks/use-toast";
 import { useApp } from "@/contexts/AppContext";
-import authLogoImg from "@/assets/bountt-thumb.png";
+import authLogoImg from "@/assets/auth-logo-img.svg";
 import icon01 from "@/assets/icons/icon-01.svg";
 import icon03 from "@/assets/icons/icon-03.svg";
 import icon05 from "@/assets/icons/icon-05.svg";
@@ -85,7 +85,7 @@ export default function Auth() {
       </div>
       <div className="relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center px-6">
         <div className="w-full max-w-sm flex flex-col items-center">
-          <img src={authLogoImg} alt="Bountt preview" className="w-[132px] h-auto mb-4" />
+          <img src={authLogoImg} alt="" className="w-[59px] h-[62px] mb-4" />
           <h1 className="bountt-wordmark text-5xl text-primary mb-1">bountt.</h1>
 
           <p className="text-muted-foreground text-base font-medium mb-10">
