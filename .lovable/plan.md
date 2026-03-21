@@ -1,27 +1,32 @@
 
-Assessment result:
-- I verified the current source (`src/pages/Auth.tsx`) uses `<img>` rendering (not CSS mask), and in Preview all 5 floating icons render correctly.
-- I also checked the Published URL and reproduced your exact issue: 4 primary-colored rectangles + 1 working icon.
-- That pattern matches the old mask-based implementation (where only one SVG mask resolves correctly), so the bug is a runtime/deployment cache mismatch, not the current Auth.tsx code in preview.
 
-Implementation plan:
-1. Sync production to latest frontend build
-- Publish the latest version so production gets the `<img>` icon renderer already present in code.
+## Redesign Splash Screen
 
-2. Add a one-time cache migration safeguard
-- Add a startup routine to detect and unregister old service workers/caches from previous auth-icon-mask builds.
-- Force a one-time reload after cleanup so users move to the new bundle.
+### Current state
+- Splash shows wordmark + tagline + hand PNG asset
+- Uses a fixed 2200ms timer, then waits for auth/groups data — sequential, not parallel
+- The logic is already *close* to correct (it waits for both timer AND data), but the min timer is too long and the visual design needs simplifying
 
-3. Harden icon rendering against future regressions
-- Keep direct `<img>` usage for all auth floating icons.
-- Avoid SVG-as-mask for these assets entirely.
-- (Optional) switch from CSS filter tinting to pre-tinted SVGs or `currentColor` SVGs for predictable rendering.
+### Design changes
 
-4. Verification checklist
-- Test `/auth` in Preview and Published.
-- Test normal tab + installed PWA + hard refresh scenario.
-- Confirm all 5 silhouettes are visible (no rectangles) and animations still run.
+**Visual**: Remove the hand PNG entirely. Center the wordmark vertically on a `bg-primary` (Bountt Orange) background. The dot in "bountt." rendered in brand yellow/white for contrast. Remove the tagline. Clean, minimal launch screen.
 
-Technical details:
-- Root cause is likely stale PWA/service-worker-cached JS serving the previous mask-based auth icon code in production.
-- Evidence: preview (latest code) renders correctly; published reproduces legacy mask failure behavior.
+**Logic**: Already implements the "good" pattern (waits for BOTH min time AND data), but reduce min time from 2200ms → 1500ms to feel snappier while still preventing flash.
+
+### Changes
+
+**File: `src/pages/Splash.tsx`** — Full rewrite:
+- Remove `bountt-splash-hand.png` import
+- Set background to `bg-primary` (Bountt Orange)
+- Center wordmark vertically with white text + yellow dot
+- Add a subtle fade-in animation via Tailwind `animate-` class
+- Reduce timer from 2200ms → 1500ms
+- Keep existing navigation logic unchanged (it's already the "good" parallel pattern)
+
+**File: `src/index.css`** — Add a simple `fade-in` keyframe animation for the wordmark entrance
+
+**File: `src/assets/bountt-splash-hand.png`** — Delete (no longer referenced)
+
+### Technical detail
+The current logic already runs the timer and data fetching in parallel (AppContext fetches on mount, timer runs independently, navigation fires when both resolve). We're just tightening the minimum visual time.
+
