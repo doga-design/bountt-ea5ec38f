@@ -1,31 +1,45 @@
 
 
-## Fix: Import all needed Geist Sans font weights
+## Fix: Auth page icons showing as colored rectangles
 
 ### Problem
-Only the regular (400) weight of Geist Sans is being imported via `@fontsource/geist-sans`. When Tailwind classes like `font-medium`, `font-semibold`, or `font-bold` are used, the browser fakes (synthesizes) those weights from the 400 file — this looks noticeably different from native Geist Sans at those weights.
+The floating icons on the Auth page use a CSS `mask-image` technique — a `bg-primary` div is masked by the SVG URL so only the icon shape shows through. When the mask image fails to load (service worker interception, caching, or browser rendering quirk), the entire div renders as a solid primary-colored rectangle.
 
 ### Solution
-Update `src/main.tsx` to import the specific weight variants used throughout the app.
+Replace the fragile CSS mask approach with direct `<img>` tags. To keep the primary color tinting, apply a CSS `filter` that shifts black SVGs to the primary color, or simply render the icons in their native black at reduced opacity (which fits the subtle floating aesthetic).
 
-**File: `src/main.tsx`**
-Replace the single `@fontsource/geist-sans` import with individual weight imports:
-```ts
-import "@fontsource/geist-sans/400.css";
-import "@fontsource/geist-sans/500.css";
-import "@fontsource/geist-sans/600.css";
-import "@fontsource/geist-sans/700.css";
+### Changes
+
+**File: `src/pages/Auth.tsx`** (lines 68–84)
+
+Replace the mask-based div with a straightforward `<img>` element:
+
+```tsx
+{FLOAT_ICONS.map((item) => (
+  <div key={item.src} className={`absolute ${item.className}`}>
+    <img
+      src={item.src}
+      alt=""
+      draggable={false}
+      className={`h-full w-full object-contain opacity-[0.88] ${item.anim}`}
+      style={{
+        filter:
+          "brightness(0) saturate(100%) invert(14%) sepia(72%) saturate(2848%) hue-rotate(192deg) brightness(94%) contrast(107%)",
+      }}
+    />
+  </div>
+))}
 ```
 
-This ensures all 4 commonly used weights load their proper font files instead of relying on browser synthesis.
+The CSS `filter` chain converts the black SVG paths to the primary brand color (#003C69). This is more reliable than `mask-image` and works consistently across all browsers.
 
-### What this fixes
-- `font-medium` (500) text will render with the real Geist Sans medium weight
-- `font-semibold` (600) and `font-bold` (700) will use proper font files
-- Eliminates the "slightly off" look on bold/medium text throughout the app
+### Why this is better
+- `<img>` tags are natively supported and don't depend on mask rendering
+- No service worker or caching issues with mask-image URL resolution
+- CSS filter color tinting is well-supported and predictable
+- Animations and layout stay exactly the same
 
-### No other changes needed
-- The CSS `font-family` declarations are already correct
-- Tailwind config already maps `font-sans` to Geist Sans
-- Both fonts (Geist Sans and BringBoldNineties) are loading successfully
+### Notes
+- The filter values target #003C69 (the project's primary color). If the primary color changes, the filter string would need recalculating.
+- An alternative: skip color tinting entirely and use `opacity-[0.15]` on the raw black SVGs for a subtle watermark effect — simpler and theme-proof.
 
