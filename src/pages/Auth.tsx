@@ -10,12 +10,12 @@ import icon05 from "@/assets/icons/icon-05.svg";
 import icon07 from "@/assets/icons/icon-10.svg";
 import icon09 from "@/assets/icons/icon-02.svg";
 
-const FLOAT_ICONS: { src: string; anim: string; className: string }[] = [
+const FLOAT_ICONS: { src: string; anim: string; className: string; opacity?: number }[] = [
   { src: icon01, anim: "auth-float-1", className: "left-[15%] bottom-[18%] w-[52px] h-[44px]" },
-  { src: icon03, anim: "auth-float-2", className: "left-[38%] bottom-[8%] w-[48px] h-[60px]" },
+  { src: icon03, anim: "auth-float-2", className: "left-[38%] bottom-[8%] w-[48px] h-[60px]", opacity: 0.78 },
   { src: icon05, anim: "auth-float-3", className: "left-1/2 bottom-[30%] w-[66px] h-[62px] -translate-x-1/2" },
   { src: icon07, anim: "auth-float-4", className: "right-[25%] bottom-[18%] w-[55px] h-[66px]" },
-  { src: icon09, anim: "auth-float-5", className: "right-[20%] bottom-[3%] w-[64px] h-[50px]" },
+  { src: icon09, anim: "auth-float-5", className: "right-[20%] bottom-[3%] w-[64px] h-[50px]", opacity: 0.62 },
 ];
 
 export default function Auth() {
@@ -55,10 +55,10 @@ export default function Auth() {
     <div className="screen-container bg-background relative h-[100svh] max-h-[100svh] min-h-0 overflow-hidden">
       <div
         aria-hidden
-        className="pointer-events-none absolute left-1/2 z-0 h-[600px] w-[600px] -translate-x-1/2 rounded-full -bottom-[300px] blur-[72px]"
+        className="pointer-events-none absolute left-1/2 z-0 h-[600px] w-[600px] -translate-x-1/2 rounded-full -bottom-[250px] blur-[72px]"
         style={{
           background:
-            "radial-gradient(circle at 50% 50%,rgb(255, 244, 199) 0%, rgba(250, 240, 202, 0.45) 42%, transparent 60%)",
+            "linear-gradient(to top, rgb(255, 238, 166) 0%, rgba(255, 238, 166, 0.8) 28%, rgba(255, 238, 166, 0.18) 58%, hsl(var(--background)) 100%)",
         }}
       />
       <div
@@ -67,14 +67,20 @@ export default function Auth() {
       >
         {FLOAT_ICONS.map((item) => (
           <div key={item.src} className={`absolute ${item.className}`}>
-            <img
-              src={item.src}
-              alt=""
-              draggable={false}
-              className={`h-full w-full object-contain opacity-[0.88] ${item.anim}`}
+            <span
+              aria-hidden
+              className={`block h-full w-full opacity-[0.88] ${item.anim}`}
               style={{
-                filter:
-                  "brightness(0) saturate(100%) invert(14%) sepia(72%) saturate(2848%) hue-rotate(192deg) brightness(94%) contrast(107%)",
+                backgroundColor: "hsl(var(--primary))",
+                opacity: item.opacity ?? 0.88,
+                WebkitMaskImage: `url(${item.src})`,
+                WebkitMaskRepeat: "no-repeat",
+                WebkitMaskPosition: "center",
+                WebkitMaskSize: "contain",
+                maskImage: `url(${item.src})`,
+                maskRepeat: "no-repeat",
+                maskPosition: "center",
+                maskSize: "contain",
               }}
             />
           </div>
