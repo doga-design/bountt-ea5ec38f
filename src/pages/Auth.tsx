@@ -61,10 +61,7 @@ export default function Auth() {
             "linear-gradient(to top, rgb(255, 238, 166) 0%, rgba(255, 238, 166, 0.8) 28%, rgba(255, 238, 166, 0.18) 58%, hsl(var(--background)) 100%)",
         }}
       />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-[min(46vh,340px)]"
-      >
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-[min(46vh,340px)]">
         {FLOAT_ICONS.map((item) => (
           <div key={item.src} className={`absolute ${item.className}`}>
             <span
@@ -91,9 +88,7 @@ export default function Auth() {
           <img src={authLogoImg} alt="" className="w-[59px] h-[62px] mb-4" />
           <h1 className="bountt-wordmark text-5xl text-primary mb-1">bountt.</h1>
 
-          <p className="text-muted-foreground text-base font-medium mb-10">
-            Split costs with friends. No drama.
-          </p>
+          <p className="text-muted-foreground text-base font-medium mb-10">Split costs with friends. No drama.</p>
 
           <button
             type="button"
@@ -123,11 +118,21 @@ export default function Auth() {
 
           <p className="text-xs text-muted-foreground text-center mt-5 leading-relaxed">
             By continuing you agree to our{" "}
-            <a href="https://bountt.app/terms" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+            <a
+              href="https://bountt.app/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2"
+            >
               Terms of Service
             </a>{" "}
             and{" "}
-            <a href="https://bountt.app/privacy" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+            <a
+              href="https://bountt.app/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2"
+            >
               Privacy Policy
             </a>
           </p>
