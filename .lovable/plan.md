@@ -1,27 +1,31 @@
 
 
-# Audit Results: Avatar Filter Row
+## Fix: Import all needed Geist Sans font weights
 
-## What Works Correctly
-- Selection state uses `member.id` consistently — no ID mismatch between MemberAvatarRow and Dashboard
-- Dashboard filter logic at lines 123-141 correctly handles both real users and placeholders (name-based fallback for null user_id)
-- `expenseSplits` is populated when filter runs
-- Stroke color correctly uses `getAvatarColor(member).stroke`
-- Current user is sorted first and labeled "You"
-- Filtered results flow correctly into the rendered feed
+### Problem
+Only the regular (400) weight of Geist Sans is being imported via `@fontsource/geist-sans`. When Tailwind classes like `font-medium`, `font-semibold`, or `font-bold` are used, the browser fakes (synthesizes) those weights from the 400 file — this looks noticeably different from native Geist Sans at those weights.
 
-## What Is Broken
+### Solution
+Update `src/main.tsx` to import the specific weight variants used throughout the app.
 
-| # | Bug | File | Line | Root Cause |
-|---|-----|------|------|------------|
-| 1 | **Placeholder members cannot be filtered** | `MemberAvatarRow.tsx` | 52-54 | `if (member.is_placeholder) { return; }` exits before the filter toggle code. Placeholders only show the invite card — `onFilterMember` is never called for them. |
-| 2 | **No visual muting on non-selected avatars** | `MemberAvatarRow.tsx` | 98-101 | When an avatar is selected, all other avatars remain at full opacity. There is no dim/fade applied to unselected members. |
+**File: `src/main.tsx`**
+Replace the single `@fontsource/geist-sans` import with individual weight imports:
+```ts
+import "@fontsource/geist-sans/400.css";
+import "@fontsource/geist-sans/500.css";
+import "@fontsource/geist-sans/600.css";
+import "@fontsource/geist-sans/700.css";
+```
 
-## Minimal Fix (2 changes, same file)
+This ensures all 4 commonly used weights load their proper font files instead of relying on browser synthesis.
 
-**Fix 1** — `MemberAvatarRow.tsx` lines 51-65: Remove the early return for placeholders. Let all members (placeholder or real) flow into the same selection toggle logic. Optionally keep the invite card as a secondary behavior (show invite card AND filter simultaneously).
+### What this fixes
+- `font-medium` (500) text will render with the real Geist Sans medium weight
+- `font-semibold` (600) and `font-bold` (700) will use proper font files
+- Eliminates the "slightly off" look on bold/medium text throughout the app
 
-**Fix 2** — `MemberAvatarRow.tsx` line 98 `<button>` element: Add `opacity: selectedMemberId && !isSelected ? 0.4 : 1` so non-selected avatars fade when a filter is active.
-
-No other files need changes. The Dashboard filter logic and stroke rendering are already correct.
+### No other changes needed
+- The CSS `font-family` declarations are already correct
+- Tailwind config already maps `font-sans` to Geist Sans
+- Both fonts (Geist Sans and BringBoldNineties) are loading successfully
 
