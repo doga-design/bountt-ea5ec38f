@@ -1,45 +1,27 @@
 
+Assessment result:
+- I verified the current source (`src/pages/Auth.tsx`) uses `<img>` rendering (not CSS mask), and in Preview all 5 floating icons render correctly.
+- I also checked the Published URL and reproduced your exact issue: 4 primary-colored rectangles + 1 working icon.
+- That pattern matches the old mask-based implementation (where only one SVG mask resolves correctly), so the bug is a runtime/deployment cache mismatch, not the current Auth.tsx code in preview.
 
-## Fix: Auth page icons showing as colored rectangles
+Implementation plan:
+1. Sync production to latest frontend build
+- Publish the latest version so production gets the `<img>` icon renderer already present in code.
 
-### Problem
-The floating icons on the Auth page use a CSS `mask-image` technique — a `bg-primary` div is masked by the SVG URL so only the icon shape shows through. When the mask image fails to load (service worker interception, caching, or browser rendering quirk), the entire div renders as a solid primary-colored rectangle.
+2. Add a one-time cache migration safeguard
+- Add a startup routine to detect and unregister old service workers/caches from previous auth-icon-mask builds.
+- Force a one-time reload after cleanup so users move to the new bundle.
 
-### Solution
-Replace the fragile CSS mask approach with direct `<img>` tags. To keep the primary color tinting, apply a CSS `filter` that shifts black SVGs to the primary color, or simply render the icons in their native black at reduced opacity (which fits the subtle floating aesthetic).
+3. Harden icon rendering against future regressions
+- Keep direct `<img>` usage for all auth floating icons.
+- Avoid SVG-as-mask for these assets entirely.
+- (Optional) switch from CSS filter tinting to pre-tinted SVGs or `currentColor` SVGs for predictable rendering.
 
-### Changes
+4. Verification checklist
+- Test `/auth` in Preview and Published.
+- Test normal tab + installed PWA + hard refresh scenario.
+- Confirm all 5 silhouettes are visible (no rectangles) and animations still run.
 
-**File: `src/pages/Auth.tsx`** (lines 68–84)
-
-Replace the mask-based div with a straightforward `<img>` element:
-
-```tsx
-{FLOAT_ICONS.map((item) => (
-  <div key={item.src} className={`absolute ${item.className}`}>
-    <img
-      src={item.src}
-      alt=""
-      draggable={false}
-      className={`h-full w-full object-contain opacity-[0.88] ${item.anim}`}
-      style={{
-        filter:
-          "brightness(0) saturate(100%) invert(14%) sepia(72%) saturate(2848%) hue-rotate(192deg) brightness(94%) contrast(107%)",
-      }}
-    />
-  </div>
-))}
-```
-
-The CSS `filter` chain converts the black SVG paths to the primary brand color (#003C69). This is more reliable than `mask-image` and works consistently across all browsers.
-
-### Why this is better
-- `<img>` tags are natively supported and don't depend on mask rendering
-- No service worker or caching issues with mask-image URL resolution
-- CSS filter color tinting is well-supported and predictable
-- Animations and layout stay exactly the same
-
-### Notes
-- The filter values target #003C69 (the project's primary color). If the primary color changes, the filter string would need recalculating.
-- An alternative: skip color tinting entirely and use `opacity-[0.15]` on the raw black SVGs for a subtle watermark effect — simpler and theme-proof.
-
+Technical details:
+- Root cause is likely stale PWA/service-worker-cached JS serving the previous mask-based auth icon code in production.
+- Evidence: preview (latest code) renders correctly; published reproduces legacy mask failure behavior.
