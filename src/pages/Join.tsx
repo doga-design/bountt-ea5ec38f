@@ -131,7 +131,8 @@ export default function Join() {
           totalExpenses: Number(ph.total_expenses),
         }));
 
-        setPendingGroup({ id: group.id, name: group.name });
+        const fullInviteCode = ("BNTT-" + code).toUpperCase().trim();
+        setPendingGroup({ id: group.id, name: group.name, inviteCode: fullInviteCode });
         setPlaceholders(withExpenses);
         setShowPlaceholderDialog(true);
         return;
