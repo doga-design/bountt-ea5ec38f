@@ -34,35 +34,36 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Routes>
-              {/* Public */}
-              <Route path="/" element={<Splash />} />
-              <Route path="/auth" element={<Auth />} />
-              
+            <Suspense fallback={null}>
+              <Routes>
+                {/* Public */}
+                <Route path="/" element={<Splash />} />
+                <Route path="/auth" element={<Auth />} />
 
-              {/* Empty Groups */}
-              <Route path="/groups/empty" element={<AuthGuard><EmptyGroups /></AuthGuard>} />
+                {/* Empty Groups */}
+                <Route path="/groups/empty" element={<AuthGuard><EmptyGroups /></AuthGuard>} />
 
-              {/* Protected — Onboarding */}
-              <Route path="/onboarding/group-name" element={<AuthGuard><GroupName /></AuthGuard>} />
-              <Route path="/onboarding/invite" element={<AuthGuard><Invite /></AuthGuard>} />
+                {/* Protected — Onboarding */}
+                <Route path="/onboarding/group-name" element={<AuthGuard><GroupName /></AuthGuard>} />
+                <Route path="/onboarding/invite" element={<AuthGuard><Invite /></AuthGuard>} />
 
-              {/* Protected — Join */}
-              <Route path="/join" element={<AuthGuard><Join /></AuthGuard>} />
-              <Route path="/join/:inviteCode" element={<AuthGuard><Join /></AuthGuard>} />
+                {/* Protected — Join */}
+                <Route path="/join" element={<AuthGuard><Join /></AuthGuard>} />
+                <Route path="/join/:inviteCode" element={<AuthGuard><Join /></AuthGuard>} />
 
-              {/* Protected — Dashboard */}
-              <Route path="/dashboard/:groupId" element={<AuthGuard><Dashboard /></AuthGuard>} />
+                {/* Protected — Dashboard */}
+                <Route path="/dashboard/:groupId" element={<AuthGuard><Dashboard /></AuthGuard>} />
 
-              {/* Protected — Phase 2 stubs */}
-              <Route path="/groups" element={<AuthGuard><Groups /></AuthGuard>} />
-              <Route path="/groups/:groupId/members" element={<AuthGuard><ComingSoon title="Members — Phase 2" /></AuthGuard>} />
-              <Route path="/groups/:groupId/settings" element={<AuthGuard><GroupSettings /></AuthGuard>} />
-              <Route path="/groups/:groupId/activity" element={<AuthGuard><ActivityLog /></AuthGuard>} />
+                {/* Protected — Phase 2 stubs */}
+                <Route path="/groups" element={<AuthGuard><Groups /></AuthGuard>} />
+                <Route path="/groups/:groupId/members" element={<AuthGuard><ComingSoon title="Members — Phase 2" /></AuthGuard>} />
+                <Route path="/groups/:groupId/settings" element={<AuthGuard><GroupSettings /></AuthGuard>} />
+                <Route path="/groups/:groupId/activity" element={<AuthGuard><ActivityLog /></AuthGuard>} />
 
-              {/* Catch-all */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+                {/* Catch-all */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
           </BrowserRouter>
         </TooltipProvider>
       </AppProvider>
