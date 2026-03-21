@@ -67,17 +67,14 @@ export default function Auth() {
       >
         {FLOAT_ICONS.map((item) => (
           <div key={item.src} className={`absolute ${item.className}`}>
-            <div
-              className={`h-full w-full bg-primary opacity-[0.88] ${item.anim}`}
+            <img
+              src={item.src}
+              alt=""
+              draggable={false}
+              className={`h-full w-full object-contain opacity-[0.88] ${item.anim}`}
               style={{
-                maskImage: `url(${item.src})`,
-                WebkitMaskImage: `url(${item.src})`,
-                maskSize: "contain",
-                maskRepeat: "no-repeat",
-                maskPosition: "center",
-                WebkitMaskSize: "contain",
-                WebkitMaskRepeat: "no-repeat",
-                WebkitMaskPosition: "center",
+                filter:
+                  "brightness(0) saturate(100%) invert(14%) sepia(72%) saturate(2848%) hue-rotate(192deg) brightness(94%) contrast(107%)",
               }}
             />
           </div>
