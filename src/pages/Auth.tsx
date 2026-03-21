@@ -4,19 +4,7 @@ import { lovable } from "@/integrations/lovable/index";
 import { useToast } from "@/hooks/use-toast";
 import { useApp } from "@/contexts/AppContext";
 import authLogoImg from "@/assets/auth-logo-img.svg";
-import icon01 from "@/assets/icons/icon-01.svg";
-import icon03 from "@/assets/icons/icon-03.svg";
-import icon05 from "@/assets/icons/icon-05.svg";
-import icon07 from "@/assets/icons/icon-10.svg";
-import icon09 from "@/assets/icons/icon-02.svg";
-
-const FLOAT_ICONS: { src: string; anim: string; className: string; opacity?: number }[] = [
-  { src: icon01, anim: "auth-float-1", className: "left-[15%] bottom-[18%] w-[52px] h-[44px]" },
-  { src: icon03, anim: "auth-float-2", className: "left-[38%] bottom-[8%] w-[48px] h-[60px]", opacity: 0.78 },
-  { src: icon05, anim: "auth-float-3", className: "left-1/2 bottom-[30%] w-[66px] h-[62px] -translate-x-1/2" },
-  { src: icon07, anim: "auth-float-4", className: "right-[25%] bottom-[18%] w-[55px] h-[66px]" },
-  { src: icon09, anim: "auth-float-5", className: "right-[20%] bottom-[3%] w-[64px] h-[50px]", opacity: 0.62 },
-];
+import FloatingIcons from "@/components/auth/FloatingIcons";
 
 export default function Auth() {
   const navigate = useNavigate();
