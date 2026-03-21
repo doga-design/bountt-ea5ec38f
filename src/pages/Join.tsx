@@ -31,7 +31,7 @@ export default function Join() {
   // Placeholder dialog state
   const [showPlaceholderDialog, setShowPlaceholderDialog] = useState(false);
   const [placeholders, setPlaceholders] = useState<PlaceholderWithExpenses[]>([]);
-  const [pendingGroup, setPendingGroup] = useState<{ id: string; name: string } | null>(null);
+  const [pendingGroup, setPendingGroup] = useState<{ id: string; name: string; inviteCode: string } | null>(null);
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
