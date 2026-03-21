@@ -139,7 +139,7 @@ export default function Join() {
       }
 
       // No placeholders — join as new member directly
-      await joinAsNewMember(group.id, group.name);
+      await joinAsNewMember(group.id, group.name, ("BNTT-" + code).toUpperCase().trim());
     } catch (err) {
       toast({ title: "Failed to join", description: err instanceof Error ? err.message : "Please try again.", variant: "destructive" });
     } finally {
