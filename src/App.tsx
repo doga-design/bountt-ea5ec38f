@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,20 +8,21 @@ import { AppProvider } from "@/contexts/AppContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AuthGuard from "@/components/AuthGuard";
 
-// Pages
+// Eagerly loaded (landing pages)
 import Splash from "./pages/Splash";
 import Auth from "./pages/Auth";
 
-import GroupName from "./pages/onboarding/GroupName";
-import Invite from "./pages/onboarding/Invite";
-import Join from "./pages/Join";
-import Dashboard from "./pages/Dashboard";
-import ComingSoon from "./pages/ComingSoon";
-import Groups from "./pages/Groups";
-import GroupSettings from "./pages/GroupSettings";
-import ActivityLog from "./pages/ActivityLog";
-import NotFound from "./pages/NotFound";
-import EmptyGroups from "./pages/EmptyGroups";
+// Lazy loaded
+const GroupName = lazy(() => import("./pages/onboarding/GroupName"));
+const Invite = lazy(() => import("./pages/onboarding/Invite"));
+const Join = lazy(() => import("./pages/Join"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const ComingSoon = lazy(() => import("./pages/ComingSoon"));
+const Groups = lazy(() => import("./pages/Groups"));
+const GroupSettings = lazy(() => import("./pages/GroupSettings"));
+const ActivityLog = lazy(() => import("./pages/ActivityLog"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const EmptyGroups = lazy(() => import("./pages/EmptyGroups"));
 
 const queryClient = new QueryClient();
 
