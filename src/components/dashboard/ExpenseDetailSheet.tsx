@@ -20,11 +20,7 @@ interface ExpenseDetailSheetProps {
   splits: ExpenseSplit[];
   groupMembers: GroupMember[];
   onEdit: (expense: Expense, splits: ExpenseSplit[]) => void;
-  onSettled?: () => void;
 }
-
-/* ───────────────────────── Fixed heights for stable layout ───────────────────────── */
-const VIZ_HEIGHT = 260; // spoke viz & settled state share the same height
 
 export default function ExpenseDetailSheet({
   open,
@@ -33,7 +29,6 @@ export default function ExpenseDetailSheet({
   splits,
   groupMembers,
   onEdit,
-  onSettled,
 }: ExpenseDetailSheetProps) {
   const { user, profile, currentGroup, fetchExpenses, fetchExpenseSplits } = useApp();
   const { toast } = useToast();
