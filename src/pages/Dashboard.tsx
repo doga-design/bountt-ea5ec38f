@@ -49,9 +49,6 @@ export default function Dashboard() {
   const [editSplits, setEditSplits] = useState<ExpenseSplit[] | undefined>(undefined);
   const [filterMemberId, setFilterMemberId] = useState<string | null>(null);
 
-  // Confetti: only fire after drawer fully closes
-  const pendingConfettiRef = useRef(false);
-  const pendingFirstExpenseConfettiRef = useRef(false);
 
   // Derive live expense from expenses array
   const detailExpense = detailExpenseId
