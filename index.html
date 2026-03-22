@@ -3,7 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://storage.googleapis.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.lovable.dev https://*.lovable.app; frame-ancestors 'none';" />
+    <link rel="preload" href="/fonts/BringBoldNineties.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/GeistSans-400.woff2" as="font" type="font/woff2" crossorigin />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https://storage.googleapis.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.lovable.dev https://*.lovable.app; frame-ancestors 'none';" />
     <title>Bountt</title>
     <meta name="description" content="Shared expenses made simple.">
     <meta name="author" content="Bountt" />
