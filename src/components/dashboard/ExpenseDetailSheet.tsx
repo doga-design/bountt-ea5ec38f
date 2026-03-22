@@ -24,8 +24,7 @@ interface ExpenseDetailSheetProps {
 
 /* ───────────────────────── Fixed heights for stable layout ───────────────────────── */
 const VIZ_HEIGHT = 260; // spoke viz & settled state share the same height
-
-
+export default function ExpenseDetailSheet({
   open,
   onOpenChange,
   expense,
