@@ -1,4 +1,4 @@
-import { Settings, Plus, ChevronDown } from "lucide-react";
+import { Settings, Plus, ChevronDown, CircleUser } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
@@ -71,14 +71,23 @@ export default function DashboardHeader({ onAddMember, showBalance = false }: Da
             )}
           </div>
 
-          {/* Settings gear */}
-          <button
-            className="w-10 h-10 flex items-center justify-center rounded-full"
-            aria-label="Group settings"
-            onClick={() => navigate(`/groups/${currentGroup.id}/settings`)}
-          >
-            <Settings className="w-5 h-5 text-primary-foreground" />
-          </button>
+          {/* Profile + Settings */}
+          <div className="flex items-center gap-1">
+            <button
+              className="w-10 h-10 flex items-center justify-center rounded-full"
+              aria-label="Profile"
+              onClick={() => navigate("/profile")}
+            >
+              <CircleUser className="w-5 h-5 text-primary-foreground" />
+            </button>
+            <button
+              className="w-10 h-10 flex items-center justify-center rounded-full"
+              aria-label="Group settings"
+              onClick={() => navigate(`/groups/${currentGroup.id}/settings`)}
+            >
+              <Settings className="w-5 h-5 text-primary-foreground" />
+            </button>
+          </div>
         </div>
 
         {/* Bottom row: group name + balance */}
