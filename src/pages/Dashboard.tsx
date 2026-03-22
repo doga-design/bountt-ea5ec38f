@@ -239,7 +239,6 @@ export default function Dashboard() {
         open={sheetOpen}
         onOpenChange={(o) => {
           setSheetOpen(o);
-          // Persist / clear sheet-open marker for remount recovery
           if (sheetMarkerKey) {
             if (o) {
               sessionStorage.setItem(sheetMarkerKey, "1");
@@ -248,22 +247,14 @@ export default function Dashboard() {
             }
           }
           if (!o) {
-            // Fire first-expense confetti after drawer closes
-            if (pendingFirstExpenseConfettiRef.current) {
-              pendingFirstExpenseConfettiRef.current = false;
-              fireConfetti();
-            }
             setEditExpense(undefined);
             setEditSplits(undefined);
-            // Clear draft on intentional close
             if (draftKey) sessionStorage.removeItem(draftKey);
           }
         }}
         editExpense={editExpense}
         editSplits={editSplits}
-        isFirstExpense={mode === "prompt"}
         draftKey={draftKey}
-        onFirstExpenseSaved={() => { pendingFirstExpenseConfettiRef.current = true; }}
       />
     </div>
   );
