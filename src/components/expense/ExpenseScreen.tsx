@@ -18,22 +18,18 @@ import AddMemberSheet from "@/components/group-settings/AddMemberSheet";
 interface ExpenseScreenProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  isFirstExpense?: boolean;
   editExpense?: Expense;
   editSplits?: ExpenseSplit[];
   /** sessionStorage key for persisting in-progress draft (create mode only) */
   draftKey?: string | null;
-  onFirstExpenseSaved?: () => void;
 }
 
 export default function ExpenseScreen({
   open,
   onOpenChange,
-  isFirstExpense = false,
   editExpense,
   editSplits,
   draftKey,
-  onFirstExpenseSaved,
 }: ExpenseScreenProps) {
   const { currentGroup, user, profile, groupMembers, fetchExpenses, fetchExpenseSplits, addPlaceholderMember } = useApp();
   const { toast } = useToast();
