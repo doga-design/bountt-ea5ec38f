@@ -41,6 +41,7 @@ const App = () => (
 
               {/* Empty Groups */}
               <Route path="/groups/empty" element={<AuthGuard><EmptyGroups /></AuthGuard>} />
+              <Route path="/profile" element={<AuthGuard><Profile /></AuthGuard>} />
 
               {/* Protected — Onboarding */}
               <Route path="/onboarding/group-name" element={<AuthGuard><GroupName /></AuthGuard>} />
