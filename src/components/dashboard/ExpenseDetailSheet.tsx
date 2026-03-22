@@ -61,8 +61,7 @@ export default function ExpenseDetailSheet({
   // Activity log
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
 
-  // Celebrate pending flag — set true when settlement completes, read in close handler
-  const celebratePendingRef = useRef(false);
+  // (celebratePendingRef removed — handleClose now checks settledAtOpenRef directly)
 
   // Derived values
   const isCreator = expense ? expense.created_by === user?.id : false;
@@ -256,7 +255,7 @@ export default function ExpenseDetailSheet({
       if (error) throw error;
       await Promise.all([fetchExpenses(currentGroup.id), fetchExpenseSplits(currentGroup.id)]);
       toast({ title: "Expense fully settled" });
-      // Don't call onSettled here — auto-close effect handles it via celebratePendingRef
+      // Don't call onSettled here — auto-close effect and handleClose handle it via settledAtOpenRef
     } catch (err) {
       setSlideCompleted(false);
       setSlideX(0);
@@ -282,9 +281,9 @@ export default function ExpenseDetailSheet({
 
   const handleClose = (nextOpen: boolean) => {
     if (!nextOpen) {
-      // Check if we should fire confetti
-      if (celebratePendingRef.current) {
-        celebratePendingRef.current = false;
+      // Fire confetti if expense became settled while open (manual close path)
+      if (expenseFullySettled && !settledAtOpenRef.current) {
+        settledAtOpenRef.current = true;
         onSettled?.();
       }
       setConfirmDelete(false);
