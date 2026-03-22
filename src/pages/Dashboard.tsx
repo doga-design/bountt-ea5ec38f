@@ -15,7 +15,7 @@ import BottomNav from "@/components/BottomNav";
 import { formatRelativeDate } from "@/lib/bountt-utils";
 import { Expense, ExpenseSplit } from "@/types";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import confetti from "canvas-confetti";
+
 
 export default function Dashboard() {
   const { groupId } = useParams<{ groupId: string }>();
