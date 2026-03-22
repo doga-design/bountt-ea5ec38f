@@ -1,143 +1,177 @@
 
 
-## Step 1 — Remove All Confetti Code
-
-### Files to modify
-
-**Delete entirely:**
-- `src/components/dashboard/ExpenseSheet.tsx` — orphan file, not imported anywhere, only exists with confetti code
-
-**`src/components/dashboard/EmptyState.tsx`:**
-- Remove line 4: `import confetti from "canvas-confetti"`
-- Remove lines 20-26: the `confetti({...})` call inside `handleSubmit`. Keep `setName("")` and the rest
-
-**`src/components/dashboard/ExpenseDetailSheet.tsx`:**
-- Remove line 23: `onSettled?: () => void` from interface
-- Remove line 36: `onSettled` from destructured props
-- Remove lines 64-65: `celebratePendingRef` declaration
-- Remove lines 73-92: `settledAtOpenRef` ref + both `useEffect` blocks that handle auto-close with confetti. **Keep** the auto-close behavior but remove the `onSettled?.()` call — the auto-close itself is useful UX, just strip the confetti flag
-- Remove lines 285-289: `celebratePendingRef` check in `handleClose`, keep the rest of `handleClose`
-- Remove `onSettled` from the `useEffect` dependency array (line 93)
-
-**`src/components/expense/ExpenseScreen.tsx`:**
-- Remove `isFirstExpense` prop from interface (line 21) and destructuring (line 32)
-- Remove `onFirstExpenseSaved` prop from interface (line 26) and destructuring (line 36)
-- Remove lines 562-563: the `if (isFirstExpense)` block that calls `onFirstExpenseSaved?.()` and shows special toast. Keep the `else` toast ("Expense added") as the only toast
-
-**`src/pages/Dashboard.tsx`:**
-- Remove line 18: `import confetti from "canvas-confetti"`
-- Remove lines 52-54: both confetti refs
-- Remove lines 63-66: `handleSettlementComplete` callback
-- Remove lines 68-77: `fireConfetti` function
-- Simplify `handleDetailOpenChange` (lines 80-88): remove confetti ref check, keep `setDetailExpenseId(null)`
-- Remove `onSettled={handleSettlementComplete}` prop from ExpenseDetailSheet (line 249)
-- Remove `isFirstExpense` and `onFirstExpenseSaved` props from ExpenseScreen (lines 288-290)
-- Simplify the `onOpenChange` handler (lines 274-279): remove confetti ref check, keep the rest
-
-**`package.json`:**
-- Remove `"canvas-confetti": "^1.9.4"` from dependencies
-
-### Verification after step 1
-- Zero references to `canvas-confetti`, `confetti`, `pendingConfettiRef`, `pendingFirstExpenseConfettiRef`, `celebratePendingRef`, `fireConfetti`, `onSettled`, `onFirstExpenseSaved`, `isFirstExpense` (in confetti context)
-- No TypeScript errors from removed props
-- App builds cleanly
+## Complete Audit: User and Profile Management
 
 ---
 
-## Step 2 — Audit for Re-implementation
+### PART 1 — WHAT EXISTS TODAY
 
-Answers to each question, with file/line references from the **clean** (post-removal) codebase:
+**1. Does /profile route exist in App.tsx?**
+No. `src/App.tsx` has no `/profile` route anywhere in its Routes block (lines 38-65).
 
-### First expense confetti
+**2. Does src/pages/Profile.tsx exist?**
+No. File does not exist.
 
-**Q1 — Sequence after RPC succeeds (ExpenseScreen.tsx ~line 558):**
-1. `fetchExpenseSplits(currentGroup.id)` — refreshes splits in AppContext
-2. Toast shown ("Expense added")
-3. Draft cleared from sessionStorage
-4. `onOpenChange(false)` — closes the drawer
-5. Dashboard's `onOpenChange` handler fires → clears `editExpense`/`editSplits`, removes sheet marker
+**3. Profile icon in DashboardHeader.tsx?**
+No. The header top row (line 34) has overlapping member avatars on the left and a single Settings gear on the right (lines 75-81). No profile icon, no tappable entry to profile settings.
 
-**Q2 — Cleanest detection point:**
-Inside the save handler in ExpenseScreen, right after the RPC succeeds and before `onOpenChange(false)`. This is the only moment where you definitively know "a new expense was just created by this user, right now."
+**4. Profile tab in BottomNav.tsx?**
+No. BottomNav has exactly 3 elements: Home button, FAB (+), All Groups button. No profile tab.
 
-**Q3 — Reliable first-expense check:**
-Yes. At the moment the save handler runs, `expenses` from AppContext reflects the **pre-creation** state. `expenses.length === 0` (or rather, check that no expenses exist for this group before this one) is reliable because `fetchExpenses` hasn't been called yet at that point. Even simpler: Dashboard already computes `mode === "prompt"` which means `hasExpenses === false` — this is passed as a prop currently. Post-cleanup, the equivalent check is `expenses.length === 0` at save time.
+**5. signOut export and call sites?**
+`signOut` is defined at AppContext.tsx line 165, exported in the value object at line 621. It is **never called from any UI component**. No button in the entire app triggers sign-out. The only sign-out that happens is the automatic one in the auth state handler (line 133) for deleted/revoked users.
 
-**Q4 — Cleanest place to fire:**
-A callback prop from Dashboard → ExpenseScreen. Dashboard passes a `onExpenseCreated(isFirst: boolean)` callback. ExpenseScreen calls it after RPC success. Dashboard fires confetti in a `requestAnimationFrame` after the drawer close animation completes (using the existing `onOpenChange` handler pattern with a pending ref).
+**6. update_display_name RPC?**
+Does not exist. No migration, no function definition anywhere.
 
-### Settlement confetti
+**7. delete_my_account RPC?**
+Does not exist. No migration, no function, no UI for account deletion anywhere.
 
-**Q5 — Sequence when expense becomes fully settled (ExpenseDetailSheet.tsx):**
-1. `handleSettleAll` or `handleSettleMemberShare` RPC succeeds
-2. `fetchExpenses` + `fetchExpenseSplits` called → updates AppContext
-3. `expenseFullySettled` derived value becomes `true`
-4. Auto-close `useEffect` detects transition (unsettled→settled while open)
-5. 800ms timer → `onOpenChange(false)` → drawer closes
+**8. Profiles table columns:**
+- `id` (uuid, not null, default gen_random_uuid())
+- `user_id` (uuid, not null)
+- `display_name` (text, nullable)
+- `avatar_url` (text, nullable)
+- `created_at` (timestamptz, not null, default now())
+- `updated_at` (timestamptz, not null, default now())
 
-**Q6 — Cleanest detection point:**
-The auto-close `useEffect` that detects `expenseFullySettled` transitioning from false→true while the drawer is open. This is already the right pattern — it distinguishes "just settled" from "was already settled."
+**9. RLS on profiles:**
+- SELECT: `auth.uid() = user_id` (own profile only)
+- INSERT: `auth.uid() = user_id`
+- UPDATE: `auth.uid() = user_id`
+- No DELETE policy — users cannot delete their profile row
 
-**Q7 — Distinguishing session settlement from pre-existing:**
-`settledAtOpenRef` snapshots whether the expense was already settled when the drawer opened. The `useEffect` only fires if `!settledAtOpenRef.current && expenseFullySettled` — meaning it transitioned during this session. This pattern should be preserved.
+**10. Where profile.display_name is read in UI:**
+- `AppContext.tsx` line 187: group creation fallback name
+- `Join.tsx` lines 86, 154, 195: join/claim fallback name
+- `ExpenseScreen.tsx` line 525: edit expense actor name
+- `ExpenseDetailSheet.tsx` line 194: delete expense actor name
 
-**Q8 — Cleanest place to fire:**
-Inside the auto-close timer callback in ExpenseDetailSheet, right before or after `onOpenChange(false)`. Or via a callback prop to Dashboard, fired in the detail sheet's close handler.
+**11. user.email accessible?**
+Yes. `user` (Supabase User object) is exposed at AppContext line 592. `user.email` is a standard property. Used as fallback at AppContext line 187, Join.tsx lines 86/154/195, etc.
 
-### Implementation approach
+**12. user.app_metadata?.provider accessible?**
+Yes, via `user.app_metadata.provider`. Since email/password auth was removed (per memory), every user is a Google user. No code currently checks this.
 
-**Q9 — Simplest implementation:**
-Two refs in Dashboard, one callback prop each direction. Total: 2 refs, 0 new components, 2 small callback props.
+**13. Password change flow?**
+None. Zero references to "password" in any .tsx file.
 
-**Q10 — Where should confetti fire:**
-**Dashboard.** It's the parent that controls both drawers. It can coordinate "fire after drawer animation completes" cleanly. ExpenseScreen and ExpenseDetailSheet just signal "something celebration-worthy happened" via callbacks.
+**14. Account deletion flow?**
+None. No UI, no RPC, no edge function. `handle_user_deletion()` trigger exists on `auth.users` BEFORE DELETE, but there's no way to invoke user deletion from the client.
 
-**Q11 — False trigger risks:**
-- On app load: No — confetti only fires via explicit callback from save/settle handlers
-- On navigation: No — refs reset on component mount
-- On other users' realtime updates: The auto-close `useEffect` could trigger on realtime settlement by another user. To prevent this, gate the callback behind a `userDidSettle` ref that's only set in the settle handlers.
+**15. User avatar:**
+No global user avatar. Only per-group avatars stored in `group_members.avatar_color` + `group_members.avatar_index`. The `profiles.avatar_url` column exists but is never written to or read in UI. Google's `user.user_metadata.avatar_url` is available but unused.
 
-**Q12 — Direct call vs utility:**
-Wrap in a utility `fireConfetti()` in `src/lib/confetti-utils.ts`. Brand colors: `["#E8480A", "#FFFFFF", "#D4D4D4"]`. Multi-burst pattern (3 calls at angles 60/120/90) for a full-screen feel. Origin at `y: 0.4`.
+---
 
-### Implementation plan
+### PART 2 — APPCONTEXT USER STATE
 
-**New file: `src/lib/confetti-utils.ts`**
-```ts
-import confetti from "canvas-confetti";
-export function fireCelebration() {
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      const defaults = { origin: { y: 0.4 }, zIndex: 9999, colors: ["#E8480A", "#FFFFFF", "#D4D4D4"] };
-      confetti({ ...defaults, particleCount: 80, spread: 100, angle: 60 });
-      confetti({ ...defaults, particleCount: 80, spread: 100, angle: 120 });
-      confetti({ ...defaults, particleCount: 60, spread: 140, angle: 90 });
-    });
-  });
-}
-```
+**Auth/profile state variables:**
+| Name | Type | Initial | Line |
+|------|------|---------|------|
+| `user` | `User \| null` | `null` | 13 |
+| `session` | `Session \| null` | `null` | 14 |
+| `profile` | `Profile \| null` | `null` | 15 |
+| `authLoading` | `boolean` | `true` | 16 |
 
-**`src/pages/Dashboard.tsx`** — add 2 refs + inline logic:
-- `pendingFirstExpenseRef = useRef(false)`
-- `pendingSettlementRef = useRef(false)`
-- Pass `onFirstExpenseCreated={() => { pendingFirstExpenseRef.current = true }}` to ExpenseScreen
-- In ExpenseScreen's `onOpenChange(!open)` handler: if `pendingFirstExpenseRef.current`, clear it and call `fireCelebration()`
-- Pass `onSettlementComplete={() => { pendingSettlementRef.current = true }}` to ExpenseDetailSheet
-- In `handleDetailOpenChange(!open)`: if `pendingSettlementRef.current`, clear it and call `fireCelebration()`
+**updateDisplayName in AppContext?** No.
 
-**`src/components/expense/ExpenseScreen.tsx`:**
-- Add `onFirstExpenseCreated?: () => void` prop
-- After RPC success, if `expenses.length === 0` (pre-creation state), call `onFirstExpenseCreated?.()` and show "First expense logged!" toast
+**deleteAccount in AppContext?** No.
 
-**`src/components/dashboard/ExpenseDetailSheet.tsx`:**
-- Add `onSettlementComplete?: () => void` prop
-- Keep `settledAtOpenRef` pattern for transition detection
-- Add `userDidSettleRef = useRef(false)` — set true in settle handlers, checked in auto-close effect
-- In auto-close effect: if `userDidSettleRef.current`, call `onSettlementComplete?.()` before closing
-- Reset `userDidSettleRef` when drawer opens
+**User-related functions exported:** Only `signOut` (line 621).
 
-**`src/components/dashboard/EmptyState.tsx`:**
-- Add small confetti burst back (import from `confetti-utils` or inline) on member add — this is a separate, simpler celebration
+**After Google sign-in metadata:**
+- `user.user_metadata.full_name` — Google display name (used by `handle_new_user` trigger to populate `profiles.display_name`)
+- `user.user_metadata.avatar_url` — Google profile photo URL
+- `user.email` — Google email
+- `user.app_metadata.provider` — `"google"`
 
-**Files changed:** 5 files. **New state:** 2 refs in Dashboard, 1 ref in ExpenseDetailSheet. **New props:** 2 callback props. Zero risk of false triggers.
+---
+
+### PART 3 — GAPS AND RISKS
+
+**Routing conflict for /profile?** None. No existing route conflicts.
+
+**update_display_name without RPC?** Yes — current RLS allows `UPDATE` where `auth.uid() = user_id`. A direct `supabase.from("profiles").update({ display_name }).eq("user_id", uid)` works. No RPC needed.
+
+However: changing display_name on profiles does NOT update `group_members.name` or historical `expense_splits.member_name`. Those are snapshot names. This is expected behavior but worth noting.
+
+**delete_my_account without server function?** No. `supabase.auth.admin.deleteUser()` requires the service role key. Client-side `supabase.auth.updateUser()` cannot delete. An edge function or RPC with service role access is required.
+
+**handle_user_deletion trigger:** Exists (attached to `auth.users` BEFORE DELETE). On deletion it: transfers group ownership to next admin or soft-deletes group, demotes the user's admin roles, marks all memberships as `left`. This is correct — but nothing currently triggers user deletion.
+
+**Display name change propagation:** Only updates the `profiles` row. `group_members.name` is set at join time and not synced. This is acceptable — group names are independent of profile names.
+
+**Account deletion cleanup:** `clearAllState()` (line 104-116) handles the `null` session from `onAuthStateChange`. It clears all state. This is correct.
+
+**Null profile crash risk:** `profile` is used with optional chaining (`profile?.display_name`) everywhere. No crash risk.
+
+**Google-only users:** Correct. Every user is Google. Password section should not exist at all.
+
+---
+
+### PART 4 — IMPLEMENTATION READINESS
+
+| Feature | Exists | What exists | What needs building | Risk |
+|---------|--------|-------------|---------------------|------|
+| Profile page route | No | Nothing | Route in App.tsx, Profile.tsx page | None |
+| Entry point from header | No | Settings gear exists | Add profile icon/avatar next to gear | Low — layout change |
+| Display name view | Partial | profile.display_name in context | Render it on profile page | None |
+| Display name edit | No | RLS allows update | Input + save handler in Profile.tsx | Low — direct update works |
+| Email display | Partial | user.email in context | Render on profile page | None |
+| Google account indicator | No | user.app_metadata.provider available | Badge/label on profile | None |
+| Sign out button | Partial | signOut() in context, no UI | Button on profile page calling signOut | None |
+| Delete account | No | handle_user_deletion trigger exists | Edge function + confirmation UI | **High** — needs server-side |
+| Privacy policy link | No | URLs exist in Auth.tsx (bountt.app/privacy) | Link on profile page | None |
+| Terms of service link | No | URL exists in Auth.tsx (bountt.app/terms) | Link on profile page | None |
+| App version display | No | Nothing | Read from package.json or env | None |
+| Avatar on profile | No | Google avatar_url in user_metadata, unused | Display Google photo or group avatar | Low |
+
+---
+
+### PART 5 — ENTRY POINT
+
+**Current DashboardHeader layout (top row, line 34):**
+- LEFT: Overlapping member avatar circles + optional "+" add-member button
+- RIGHT: Settings gear icon (single button)
+
+No profile icon exists.
+
+**Icon library:** lucide-react. Best icon: `UserCircle` or `CircleUser` — matches the existing rounded icon style.
+
+**Layout impact:** Minimal. The right side has a single gear button. Adding a profile avatar/icon to the left of the gear or making the current user's avatar in the row tappable would work with no structural changes.
+
+---
+
+### IMPLEMENTATION PLAN (ordered by dependency)
+
+1. **Edge function: delete-account** — Must exist before profile page can offer account deletion. Creates `supabase/functions/delete-account/index.ts` that calls `supabase.auth.admin.deleteUser(uid)`. The `handle_user_deletion` trigger handles cleanup automatically.
+
+2. **Profile page: src/pages/Profile.tsx** — Independent of everything else. Shows display name (editable), email (read-only), Google badge, sign out, delete account with confirmation, privacy/terms links, app version.
+
+3. **Route: /profile in App.tsx** — Trivial, depends on Profile.tsx existing.
+
+4. **Entry point: DashboardHeader.tsx** — Make the current user's avatar in the member row tappable → navigates to `/profile`. Or add a dedicated icon next to the gear.
+
+5. **updateDisplayName in AppContext** — Optional. Could live entirely in Profile.tsx with a local handler since it only affects the profiles table. If added to context, it would update the `profile` state after save.
+
+---
+
+### HONEST ASSESSMENT
+
+**Current state:** The user management system is **incomplete for production**. There is:
+- No way to sign out (the function exists but no UI calls it)
+- No way to view or edit profile information
+- No way to delete an account
+- No entry point to any user settings
+
+**Minimum work for production-grade:**
+- 1 edge function (delete-account) — ~30 lines
+- 1 new page (Profile.tsx) — ~200 lines
+- 1 route addition — 1 line
+- 1 header entry point — ~5 lines changed
+- 0 database migrations needed (RLS already allows profile updates)
+- 0 new RPCs needed (direct update works for display name)
+
+Total: ~4 files changed/created, ~240 lines of new code. The foundation (profiles table, RLS, auth trigger, clearAllState) is solid. The gap is entirely in the UI layer and the delete-account server function.
 
