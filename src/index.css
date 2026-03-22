@@ -4,7 +4,7 @@
 
 @font-face {
   font-family: 'BringBoldNineties';
-  src: url('@/assets/fonts/Bringbold_Nineties_Regular.ttf') format('truetype');
+  src: url('/fonts/BringBoldNineties.woff2') format('woff2');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
