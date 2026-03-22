@@ -78,12 +78,11 @@ export default function ExpenseDetailSheet({
     if (open && expenseFullySettled && !settledAtOpenRef.current) {
       settledAtOpenRef.current = true; // prevent re-trigger
       const timer = setTimeout(() => {
-        onSettled?.(); // fire confetti flag before closing
         onOpenChange(false);
       }, 800);
       return () => clearTimeout(timer);
     }
-  }, [open, expenseFullySettled, onOpenChange, onSettled]);
+  }, [open, expenseFullySettled, onOpenChange]);
 
   // Build subtitle
   const selfMember = groupMembers.find((m) => m.user_id === user?.id && m.status === "active");
