@@ -60,7 +60,7 @@ export default function Auth() {
           <button
             type="button"
             onClick={handleGoogle}
-            className="w-full bg-card rounded-full px-5 py-4 shadow-sm flex items-center justify-center gap-3 font-semibold text-foreground text-base active:scale-[0.98] transition-transform"
+            className="w-full bg-card rounded-full px-5 py-4 shadow-md flex items-center justify-center gap-3 font-semibold text-foreground text-base active:scale-[0.98] transition-transform"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
               <path
