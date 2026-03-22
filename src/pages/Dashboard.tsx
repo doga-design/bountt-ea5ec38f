@@ -222,7 +222,7 @@ export default function Dashboard() {
                 expense={detailExpense}
                 splits={expenseSplits}
                 groupMembers={groupMembers}
-                onSettled={handleSettlementComplete}
+                
                 onEdit={(exp, splits) => {
                   setEditExpense(exp);
                   setEditSplits(splits);
