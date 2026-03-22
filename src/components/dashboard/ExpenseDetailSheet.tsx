@@ -61,8 +61,7 @@ export default function ExpenseDetailSheet({
   // Activity log
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
 
-  // Celebrate pending flag — set true when settlement completes, read in close handler
-  const celebratePendingRef = useRef(false);
+  // (celebratePendingRef removed — handleClose now checks settledAtOpenRef directly)
 
   // Derived values
   const isCreator = expense ? expense.created_by === user?.id : false;
