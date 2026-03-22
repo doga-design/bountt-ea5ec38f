@@ -22,7 +22,10 @@ interface ExpenseDetailSheetProps {
   onEdit: (expense: Expense, splits: ExpenseSplit[]) => void;
 }
 
-export default function ExpenseDetailSheet({
+/* ───────────────────────── Fixed heights for stable layout ───────────────────────── */
+const VIZ_HEIGHT = 260; // spoke viz & settled state share the same height
+
+
   open,
   onOpenChange,
   expense,
