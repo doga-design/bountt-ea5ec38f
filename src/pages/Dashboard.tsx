@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -15,7 +15,7 @@ import BottomNav from "@/components/BottomNav";
 import { formatRelativeDate } from "@/lib/bountt-utils";
 import { Expense, ExpenseSplit } from "@/types";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import confetti from "canvas-confetti";
+
 
 export default function Dashboard() {
   const { groupId } = useParams<{ groupId: string }>();
@@ -49,9 +49,6 @@ export default function Dashboard() {
   const [editSplits, setEditSplits] = useState<ExpenseSplit[] | undefined>(undefined);
   const [filterMemberId, setFilterMemberId] = useState<string | null>(null);
 
-  // Confetti: only fire after drawer fully closes
-  const pendingConfettiRef = useRef(false);
-  const pendingFirstExpenseConfettiRef = useRef(false);
 
   // Derive live expense from expenses array
   const detailExpense = detailExpenseId
@@ -60,32 +57,11 @@ export default function Dashboard() {
 
   const detailOpen = detailExpenseId !== null;
 
-  // Called by ExpenseDetailSheet when it auto-closes due to full settlement
-  const handleSettlementComplete = useCallback(() => {
-    pendingConfettiRef.current = true;
-  }, []);
-
-  const fireConfetti = useCallback(() => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const defaults = { origin: { y: 0.4 }, zIndex: 9999, colors: ["#E8480A", "#FFFFFF", "#D4D4D4"] };
-        confetti({ ...defaults, particleCount: 80, spread: 100, angle: 60 });
-        confetti({ ...defaults, particleCount: 80, spread: 100, angle: 120 });
-        confetti({ ...defaults, particleCount: 60, spread: 140, angle: 90 });
-      });
-    });
-  }, []);
-
-  // Called when the detail drawer open state changes
   const handleDetailOpenChange = useCallback((open: boolean) => {
     if (!open) {
       setDetailExpenseId(null);
-      if (pendingConfettiRef.current) {
-        pendingConfettiRef.current = false;
-        fireConfetti();
-      }
     }
-  }, [fireConfetti]);
+  }, []);
 
   // ... keep existing code
   useEffect(() => {
@@ -246,7 +222,7 @@ export default function Dashboard() {
                 expense={detailExpense}
                 splits={expenseSplits}
                 groupMembers={groupMembers}
-                onSettled={handleSettlementComplete}
+                
                 onEdit={(exp, splits) => {
                   setEditExpense(exp);
                   setEditSplits(splits);
@@ -263,7 +239,6 @@ export default function Dashboard() {
         open={sheetOpen}
         onOpenChange={(o) => {
           setSheetOpen(o);
-          // Persist / clear sheet-open marker for remount recovery
           if (sheetMarkerKey) {
             if (o) {
               sessionStorage.setItem(sheetMarkerKey, "1");
@@ -272,22 +247,14 @@ export default function Dashboard() {
             }
           }
           if (!o) {
-            // Fire first-expense confetti after drawer closes
-            if (pendingFirstExpenseConfettiRef.current) {
-              pendingFirstExpenseConfettiRef.current = false;
-              fireConfetti();
-            }
             setEditExpense(undefined);
             setEditSplits(undefined);
-            // Clear draft on intentional close
             if (draftKey) sessionStorage.removeItem(draftKey);
           }
         }}
         editExpense={editExpense}
         editSplits={editSplits}
-        isFirstExpense={mode === "prompt"}
         draftKey={draftKey}
-        onFirstExpenseSaved={() => { pendingFirstExpenseConfettiRef.current = true; }}
       />
     </div>
   );

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
-import confetti from "canvas-confetti";
 import { useToast } from "@/hooks/use-toast";
 
 export default function EmptyState() {
@@ -17,13 +16,6 @@ export default function EmptyState() {
 
     const member = await addPlaceholderMember(currentGroup.id, name.trim());
     if (member) {
-      // Small confetti burst
-      confetti({
-        particleCount: 40,
-        spread: 60,
-        origin: { y: 0.6 },
-        colors: ["#E8480A", "#FFFFFF"],
-      });
       setName("");
     } else {
       toast({ title: "Couldn't add member", variant: "destructive" });

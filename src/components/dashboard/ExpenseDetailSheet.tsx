@@ -20,12 +20,10 @@ interface ExpenseDetailSheetProps {
   splits: ExpenseSplit[];
   groupMembers: GroupMember[];
   onEdit: (expense: Expense, splits: ExpenseSplit[]) => void;
-  onSettled?: () => void;
 }
 
 /* ───────────────────────── Fixed heights for stable layout ───────────────────────── */
 const VIZ_HEIGHT = 260; // spoke viz & settled state share the same height
-
 export default function ExpenseDetailSheet({
   open,
   onOpenChange,
@@ -33,7 +31,6 @@ export default function ExpenseDetailSheet({
   splits,
   groupMembers,
   onEdit,
-  onSettled,
 }: ExpenseDetailSheetProps) {
   const { user, profile, currentGroup, fetchExpenses, fetchExpenseSplits } = useApp();
   const { toast } = useToast();
@@ -61,8 +58,6 @@ export default function ExpenseDetailSheet({
   // Activity log
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
 
-  // Celebrate pending flag — set true when settlement completes, read in close handler
-  const celebratePendingRef = useRef(false);
 
   // Derived values
   const isCreator = expense ? expense.created_by === user?.id : false;
@@ -85,12 +80,11 @@ export default function ExpenseDetailSheet({
     if (open && expenseFullySettled && !settledAtOpenRef.current) {
       settledAtOpenRef.current = true; // prevent re-trigger
       const timer = setTimeout(() => {
-        onSettled?.(); // fire confetti flag before closing
         onOpenChange(false);
       }, 800);
       return () => clearTimeout(timer);
     }
-  }, [open, expenseFullySettled, onOpenChange, onSettled]);
+  }, [open, expenseFullySettled, onOpenChange]);
 
   // Build subtitle
   const selfMember = groupMembers.find((m) => m.user_id === user?.id && m.status === "active");
@@ -256,7 +250,6 @@ export default function ExpenseDetailSheet({
       if (error) throw error;
       await Promise.all([fetchExpenses(currentGroup.id), fetchExpenseSplits(currentGroup.id)]);
       toast({ title: "Expense fully settled" });
-      // Don't call onSettled here — auto-close effect handles it via celebratePendingRef
     } catch (err) {
       setSlideCompleted(false);
       setSlideX(0);
@@ -282,11 +275,6 @@ export default function ExpenseDetailSheet({
 
   const handleClose = (nextOpen: boolean) => {
     if (!nextOpen) {
-      // Check if we should fire confetti
-      if (celebratePendingRef.current) {
-        celebratePendingRef.current = false;
-        onSettled?.();
-      }
       setConfirmDelete(false);
       setDeleteError(null);
       setConfirmSplit(null);
