@@ -21,6 +21,7 @@ import GroupSettings from "./pages/GroupSettings";
 import ActivityLog from "./pages/ActivityLog";
 import NotFound from "./pages/NotFound";
 import EmptyGroups from "./pages/EmptyGroups";
+import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
 
