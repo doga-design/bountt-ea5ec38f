@@ -248,7 +248,6 @@ export default function ExpenseDetailSheet({
       if (error) throw error;
       await Promise.all([fetchExpenses(currentGroup.id), fetchExpenseSplits(currentGroup.id)]);
       toast({ title: "Expense fully settled" });
-      // Don't call onSettled here — auto-close effect handles it via celebratePendingRef
     } catch (err) {
       setSlideCompleted(false);
       setSlideX(0);
