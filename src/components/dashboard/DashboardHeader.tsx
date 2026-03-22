@@ -72,16 +72,16 @@ export default function DashboardHeader({ onAddMember, showBalance = false }: Da
           </div>
 
           {/* Profile + Settings */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <button
-              className="w-10 h-10 flex items-center justify-center rounded-full"
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-white/15 backdrop-blur-sm"
               aria-label="Profile"
               onClick={() => navigate("/profile")}
             >
               <CircleUser className="w-5 h-5 text-primary-foreground" />
             </button>
             <button
-              className="w-10 h-10 flex items-center justify-center rounded-full"
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-white/15 backdrop-blur-sm"
               aria-label="Group settings"
               onClick={() => navigate(`/groups/${currentGroup.id}/settings`)}
             >
