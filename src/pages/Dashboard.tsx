@@ -57,32 +57,11 @@ export default function Dashboard() {
 
   const detailOpen = detailExpenseId !== null;
 
-  // Called by ExpenseDetailSheet when it auto-closes due to full settlement
-  const handleSettlementComplete = useCallback(() => {
-    pendingConfettiRef.current = true;
-  }, []);
-
-  const fireConfetti = useCallback(() => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const defaults = { origin: { y: 0.4 }, zIndex: 9999, colors: ["#E8480A", "#FFFFFF", "#D4D4D4"] };
-        confetti({ ...defaults, particleCount: 80, spread: 100, angle: 60 });
-        confetti({ ...defaults, particleCount: 80, spread: 100, angle: 120 });
-        confetti({ ...defaults, particleCount: 60, spread: 140, angle: 90 });
-      });
-    });
-  }, []);
-
-  // Called when the detail drawer open state changes
   const handleDetailOpenChange = useCallback((open: boolean) => {
     if (!open) {
       setDetailExpenseId(null);
-      if (pendingConfettiRef.current) {
-        pendingConfettiRef.current = false;
-        fireConfetti();
-      }
     }
-  }, [fireConfetti]);
+  }, []);
 
   // ... keep existing code
   useEffect(() => {
