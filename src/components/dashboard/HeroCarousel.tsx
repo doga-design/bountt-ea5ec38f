@@ -87,13 +87,22 @@ export default function HeroCarousel() {
             />
             <h1 className="text-lg font-bold text-white">{currentGroup.name}</h1>
           </div>
-          <button
-            className="w-10 h-10 flex items-center justify-center rounded-full"
-            aria-label="Group settings"
-            onClick={() => navigate(`/groups/${currentGroup.id}/settings`)}
-          >
-            <Settings className="w-5 h-5 text-white" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-white/15 backdrop-blur-sm"
+              aria-label="Profile"
+              onClick={() => navigate("/profile")}
+            >
+              <CircleUser className="w-5 h-5 text-white" />
+            </button>
+            <button
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-white/15 backdrop-blur-sm"
+              aria-label="Group settings"
+              onClick={() => navigate(`/groups/${currentGroup.id}/settings`)}
+            >
+              <Settings className="w-5 h-5 text-white" />
+            </button>
+          </div>
         </div>
       </div>
 
