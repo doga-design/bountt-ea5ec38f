@@ -43,16 +43,16 @@ export default function Auth() {
     <div className="screen-container bg-background relative h-[100svh] max-h-[100svh] min-h-0 overflow-hidden">
       <div
         aria-hidden
-        className="pointer-events-none absolute left-1/2 z-0 h-[600px] w-[600px] -translate-x-1/2 rounded-full -bottom-[250px] blur-[72px]"
+        className="pointer-events-none absolute left-1/2 z-0 h-[600px] w-[600px] -translate-x-1/2 rounded-full -bottom-[200px] blur-[50px]"
         style={{
           background:
-            "linear-gradient(to top, rgb(255, 238, 166) 0%, rgba(255, 238, 166, 0.8) 28%, rgba(255, 238, 166, 0.18) 58%, hsl(var(--background)) 100%)",
+            "linear-gradient(to top, rgb(255, 228, 118) 0%, rgb(255, 238, 166) 12%, rgba(255, 238, 166, 0.82) 36%, rgba(255, 238, 166, 0.35) 52%, rgba(255, 238, 166, 0.08) 72%, hsl(var(--background)) 100%)",
         }}
       />
       <FloatingIcons />
       <div className="relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center px-6">
         <div className="w-full max-w-sm flex flex-col items-center">
-          <img src={authLogoImg} alt="" className="w-[59px] h-[62px] mb-4" />
+          <img src={authLogoImg} alt="" className="w-[46px] h-[48px] mb-4" />
           <h1 className="bountt-wordmark text-5xl text-primary mb-1">bountt.</h1>
 
           <p className="text-muted-foreground text-base font-medium mb-10">Split costs with friends. No drama.</p>
@@ -60,9 +60,9 @@ export default function Auth() {
           <button
             type="button"
             onClick={handleGoogle}
-            className="w-full bg-card rounded-full px-5 py-4 shadow-md flex items-center justify-center gap-3 font-semibold text-foreground text-base active:scale-[0.98] transition-transform"
+            className="w-full bg-card rounded-full px-5 py-4 shadow-lg flex items-center justify-center gap-3 font-semibold text-foreground text-base active:scale-[0.98] transition-transform"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0">
               <path
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                 fill="#4285F4"
