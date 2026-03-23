@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -17,6 +17,8 @@ export default function HeroCarousel() {
 
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false });
   const [activeIndex, setActiveIndex] = useState(0);
+  const slideRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const [carouselHeight, setCarouselHeight] = useState<number>(190);
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
@@ -72,6 +74,25 @@ export default function HeroCarousel() {
 
   const showDots = slides.length > 1;
 
+  useEffect(() => {
+    const activeSlide = slideRefs.current[activeIndex];
+    if (!activeSlide) return;
+
+    const updateHeight = () => {
+      const nextHeight = activeSlide.offsetHeight;
+      if (nextHeight > 0) setCarouselHeight(nextHeight);
+    };
+
+    updateHeight();
+    const raf = requestAnimationFrame(updateHeight);
+    window.addEventListener("resize", updateHeight);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", updateHeight);
+    };
+  }, [activeIndex, slides.length]);
+
   return (
     <div className="relative overflow-hidden" style={bgStyle}>
       {/* Dark tint overlay for text readability */}
@@ -99,10 +120,20 @@ export default function HeroCarousel() {
       </div>
 
       {/* Carousel viewport */}
-      <div className="overflow-hidden" ref={emblaRef}>
+      <div
+        className="overflow-hidden transition-[height] duration-300 ease-out"
+        ref={emblaRef}
+        style={{ height: `${carouselHeight}px` }}
+      >
         <div className="flex">
           {slides.map((slide, i) => (
-            <div key={i} className="flex-[0_0_100%] min-w-0">
+            <div
+              key={i}
+              className="flex-[0_0_100%] min-w-0"
+              ref={(el) => {
+                slideRefs.current[i] = el;
+              }}
+            >
               {slide}
             </div>
           ))}
