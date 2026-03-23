@@ -3,6 +3,7 @@ import { GroupMember } from "@/types";
 import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
 import { formatCurrency } from "@/lib/bountt-utils";
 import { Check } from "lucide-react";
+import { ArcDot } from "@/components/expense/ArcDot";
 
 export interface SpokeMember {
   splitId: string;
@@ -22,15 +23,16 @@ interface ExpenseSpokeVizProps {
   isPayer: boolean;
   onMemberTap: (splitId: string, memberName: string, shareAmount: number) => void;
   memberAvatarRef?: (splitId: string, el: HTMLDivElement | null) => void;
+  selectedSplitId?: string | null;
 }
 
-const PAYER_SIZE = 64;
+const PAYER_SIZE = 80;
 
 function getMemberSize(count: number): number {
-  if (count <= 1) return 72;
-  if (count === 2) return 64;
-  if (count === 3) return 56;
-  if (count === 4) return 48;
+  if (count <= 1) return 80;
+  if (count === 2) return 72;
+  if (count === 3) return 64;
+  if (count === 4) return 56;
   if (count === 5) return 44;
   return 40;
 }
@@ -48,6 +50,7 @@ export default function ExpenseSpokeViz({
   isPayer,
   onMemberTap,
   memberAvatarRef,
+  selectedSplitId = null,
 }: ExpenseSpokeVizProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const payerRef = useRef<HTMLDivElement>(null);
@@ -100,7 +103,9 @@ export default function ExpenseSpokeViz({
   const count = members.length;
   const memberSize = getMemberSize(count);
   const memberBorder = getBorderWidth(memberSize);
-  const payerColor = payer ? getAvatarColor(payer).bg : '#B984E5';
+  const { bg: payerColor, stroke: payerStroke } = payer
+    ? getAvatarColor(payer)
+    : { bg: "#B984E5", stroke: "#FFFFFF" };
   const payerImg = payer ? getAvatarImage(payer) : undefined;
 
   const canTap = (m: SpokeMember) => {
@@ -111,6 +116,7 @@ export default function ExpenseSpokeViz({
   };
 
   const hasPositions = payerPos && Object.keys(memberPositions).length === count && count > 0;
+  const hasSelection = !!selectedSplitId;
 
   return (
     <div
@@ -134,19 +140,49 @@ export default function ExpenseSpokeViz({
             zIndex: 1,
           }}
         >
+          <defs>
+            <filter
+              id="pulseGlow"
+              x="-120%"
+              y="-120%"
+              width="340%"
+              height="340%"
+              colorInterpolationFilters="sRGB"
+            >
+              <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+            <filter
+              id="trailLineGlow"
+              x="-80%"
+              y="-80%"
+              width="260%"
+              height="260%"
+              colorInterpolationFilters="sRGB"
+            >
+              <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
           {members.map((m, i) => {
             const mPos = memberPositions[i];
             if (!mPos || !payerPos) return null;
             const ctrlX = (payerPos.x + mPos.x) / 2;
             const ctrlY = payerPos.y + (mPos.y - payerPos.y) * 0.15;
             const d = `M ${payerPos.x} ${payerPos.y} Q ${ctrlX} ${ctrlY} ${mPos.x} ${mPos.y}`;
-            // Reversed path for animation: bottom (member) → top (payer)
-            const dReversed = `M ${mPos.x} ${mPos.y} Q ${ctrlX} ${ctrlY} ${payerPos.x} ${payerPos.y}`;
-            const dur = `${1.2 + (i * 0.3) % 1.2}s`;
-            const begin = `${i * 0.4}s`;
+            const { bg: splitterColor } = m.member ? getAvatarColor(m.member) : { bg: "#D4D4D4" };
+            const hasSelection = !!selectedSplitId;
+            const isSelected = selectedSplitId === m.splitId;
+            const dimArc = hasSelection && !isSelected;
 
             return (
-              <g key={i} opacity={m.isSettled ? 0.3 : 1}>
+              <g key={i} opacity={m.isSettled ? 0.3 : dimArc ? 0.35 : 1}>
                 <path
                   d={d}
                   stroke="#D4D4D4"
@@ -155,25 +191,16 @@ export default function ExpenseSpokeViz({
                   fill="none"
                 />
                 {!m.isSettled && (
-                  <circle r="4" fill="#D4D4D4">
-                    <animateMotion
-                      path={dReversed}
-                      dur={dur}
-                      begin={begin}
-                      repeatCount="indefinite"
-                      calcMode="spline"
-                      keySplines="0.4 0 0.6 1"
-                      keyTimes="0;1"
-                    />
-                    <animate
-                      attributeName="opacity"
-                      values="1;1;0"
-                      keyTimes="0;0.7;1"
-                      dur={dur}
-                      begin={begin}
-                      repeatCount="indefinite"
-                    />
-                  </circle>
+                  <ArcDot
+                    fromX={mPos.x}
+                    fromY={mPos.y}
+                    toX={payerPos.x}
+                    toY={payerPos.y}
+                    ctrlX={ctrlX}
+                    ctrlY={ctrlY}
+                    index={i}
+                    color={dimArc ? "#BDBDBD" : splitterColor}
+                  />
                 )}
               </g>
             );
@@ -190,7 +217,7 @@ export default function ExpenseSpokeViz({
             width: PAYER_SIZE,
             height: PAYER_SIZE,
             backgroundColor: payerColor,
-            border: "3px solid white",
+            border: hasSelection ? `3px solid ${payerStroke}` : "none",
             boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
           }}
         >
@@ -220,12 +247,16 @@ export default function ExpenseSpokeViz({
       {/* Member avatars row */}
       <div className="flex justify-center w-full z-10" style={{ gap: 8 }}>
         {members.map((m, i) => {
-          const memberColor = m.member ? getAvatarColor(m.member).bg : '#B984E5';
+          const { bg: memberColor, stroke: memberStroke } = m.member
+            ? getAvatarColor(m.member)
+            : { bg: "#B984E5", stroke: "#FFFFFF" };
           const memberImg = m.member ? getAvatarImage(m.member) : undefined;
           const tappable = canTap(m);
           const isMe = m.userId === currentUserId;
           const label = isMe ? "You" : m.name;
           const labelStyle = isMe ? { fontWeight: 700 as const } : undefined;
+          const isSelected = selectedSplitId === m.splitId;
+          const blurOthers = hasSelection && !isSelected;
 
           return (
             <div
@@ -268,9 +299,10 @@ export default function ExpenseSpokeViz({
                   width: memberSize,
                   height: memberSize,
                   backgroundColor: memberColor,
-                  border: `${memberBorder}px solid white`,
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
-                  filter: m.isSettled ? "grayscale(100%)" : "none",
+                  border: hasSelection && !blurOthers ? `${memberBorder}px solid ${memberStroke}` : "none",
+                  boxShadow: blurOthers ? "none" : "0 2px 8px rgba(0,0,0,0.12)",
+                  filter: blurOthers ? "grayscale(100%) blur(1.5px)" : m.isSettled ? "grayscale(100%)" : "none",
+                  opacity: blurOthers ? 0.55 : 1,
                 }}
               >
                 {memberImg && (
@@ -283,10 +315,10 @@ export default function ExpenseSpokeViz({
                 )}
               </div>
 
-              <span className="text-[10px] font-medium text-muted-foreground mt-1 text-center leading-tight max-w-[72px] break-words" style={labelStyle}>
+              <span className="text-xs font-medium text-muted-foreground mt-1 text-center leading-tight max-w-[72px] break-words" style={labelStyle}>
                 {m.isSettled ? `${label} settled` : `${label}'s share`}
               </span>
-              <span className="text-[11px] font-bold text-foreground">
+              <span className="text-xs font-bold text-foreground">
                 {formatCurrency(m.shareAmount)}
               </span>
             </div>

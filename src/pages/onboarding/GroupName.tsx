@@ -183,8 +183,14 @@ export default function GroupName() {
             name.trim() ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
           }`}
         >
-          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-          Continue →
+          {loading ? (
+            <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+          ) : (
+            <>
+              Continue
+              <ChevronRight className="h-5 w-5 shrink-0" aria-hidden />
+            </>
+          )}
         </button>
       </div>
     </div>

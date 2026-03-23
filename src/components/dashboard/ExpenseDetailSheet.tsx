@@ -48,6 +48,8 @@ export default function ExpenseDetailSheet({
   const [confirmSplit, setConfirmSplit] = useState<{ splitId: string; name: string; amount: number } | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
   const avatarRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const vizWrapRef = useRef<HTMLDivElement>(null);
+  const [confirmPopoverPos, setConfirmPopoverPos] = useState<{ left: number; top: number } | null>(null);
 
   // Slide-to-settle
   const slideTrackRef = useRef<HTMLDivElement>(null);
@@ -273,6 +275,42 @@ export default function ExpenseDetailSheet({
     }
   };
 
+  // Anchor confirm popover below selected avatar and clamp horizontally in viewport.
+  useEffect(() => {
+    if (!confirmSplit) {
+      setConfirmPopoverPos(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      const avatarEl = avatarRefs.current[confirmSplit.splitId];
+      const wrapEl = vizWrapRef.current;
+      if (!avatarEl || !wrapEl) return;
+
+      const POPOVER_WIDTH = 260;
+      const EDGE_GUTTER = 12;
+      const V_GAP = 10;
+
+      const aRect = avatarEl.getBoundingClientRect();
+      const wRect = wrapEl.getBoundingClientRect();
+
+      const idealLeft = aRect.left + aRect.width / 2 - wRect.left;
+      const minLeft = POPOVER_WIDTH / 2 + EDGE_GUTTER;
+      const maxLeft = wRect.width - POPOVER_WIDTH / 2 - EDGE_GUTTER;
+      const left = Math.max(minLeft, Math.min(idealLeft, maxLeft));
+      const top = aRect.bottom - wRect.top + V_GAP;
+
+      setConfirmPopoverPos({ left, top });
+    };
+
+    const raf = requestAnimationFrame(updatePosition);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [confirmSplit]);
+
   const handleClose = (nextOpen: boolean) => {
     if (!nextOpen) {
       setConfirmDelete(false);
@@ -287,27 +325,28 @@ export default function ExpenseDetailSheet({
 
   // --- Slide to settle gesture ---
   const SLIDE_THRESHOLD = 0.85;
+  const SLIDE_THUMB_WIDTH = 78;
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (slideCompleted || settleAllLoading) return;
     setSliding(true);
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    e.currentTarget.setPointerCapture(e.pointerId);
   }, [slideCompleted, settleAllLoading]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!sliding || !slideTrackRef.current) return;
     const track = slideTrackRef.current.getBoundingClientRect();
-    const thumbWidth = 48;
+    const thumbWidth = SLIDE_THUMB_WIDTH;
     const maxX = track.width - thumbWidth;
     const newX = Math.max(0, Math.min(e.clientX - track.left - thumbWidth / 2, maxX));
     setSlideX(newX);
-  }, [sliding]);
+  }, [sliding, SLIDE_THUMB_WIDTH]);
 
   const handlePointerUp = useCallback(() => {
     if (!sliding || !slideTrackRef.current) return;
     setSliding(false);
     const track = slideTrackRef.current.getBoundingClientRect();
-    const thumbWidth = 48;
+    const thumbWidth = SLIDE_THUMB_WIDTH;
     const maxX = track.width - thumbWidth;
     if (slideX / maxX >= SLIDE_THRESHOLD) {
       setSlideCompleted(true);
@@ -316,7 +355,7 @@ export default function ExpenseDetailSheet({
     } else {
       setSlideX(0);
     }
-  }, [sliding, slideX]);
+  }, [sliding, slideX, SLIDE_THUMB_WIDTH]);
 
   const setAvatarRef = useCallback((splitId: string, el: HTMLDivElement | null) => {
     avatarRefs.current[splitId] = el;
@@ -330,14 +369,26 @@ export default function ExpenseDetailSheet({
     <Drawer open={open} onOpenChange={handleClose}>
       <DrawerContent className="h-[90dvh] max-h-[90dvh]">
         {/* Full-height flex container with 3 sections */}
-        <div className="h-full flex flex-col min-h-0 px-4 pb-4 pt-2">
+        <div className="relative flex h-full min-h-0 flex-col px-6 pb-4 pt-5">
+          <div
+            className={
+              expenseFullySettled
+                ? "pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(to_top,rgba(253,224,71,0.50)_0%,rgba(253,224,71,0.28)_42%,hsl(var(--background))_100%)]"
+                : "pointer-events-none absolute left-1/2 top-1/2 z-0 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full bg-yellow-300/35 blur-3xl"
+            }
+            aria-hidden="true"
+          />
+          <div className="relative z-10 flex h-full min-h-0 flex-col">
 
           {/* ═══════════════ SECTION 1: TOP — Header ═══════════════ */}
           <div className="flex items-start justify-between gap-3 shrink-0 pb-3">
             {/* Left: title, subtitle, date */}
             <div className="min-w-0 flex-1">
-              <h2 className="font-sans text-lg font-bold text-foreground truncate">
-                {expense.description} · {formatCurrency(Number(expense.amount))}
+              <p className="font-bringbold text-4xl text-foreground leading-tight truncate">
+                {formatCurrency(Number(expense.amount))}
+              </p>
+              <h2 className="font-sans text-base font-semibold text-foreground mt-0 truncate">
+                {expense.description}
               </h2>
               <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{subtitle}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -386,13 +437,13 @@ export default function ExpenseDetailSheet({
                   <button
                     onClick={handleDelete}
                     disabled={deleteLoading}
-                    className="flex-1 bg-destructive text-destructive-foreground rounded-xl py-3 text-sm font-bold"
+                    className="flex-1 rounded-full border-0 bg-destructive py-3 text-sm font-bold text-destructive-foreground"
                   >
                     {deleteLoading ? "Deleting..." : "Yes, delete it"}
                   </button>
                   <button
                     onClick={() => { setConfirmDelete(false); setDeleteError(null); }}
-                    className="flex-1 bg-muted text-foreground rounded-xl py-3 text-sm font-bold"
+                    className="flex-1 rounded-full border border-foreground bg-transparent py-3 text-sm font-bold text-foreground"
                   >
                     Keep it
                   </button>
@@ -409,7 +460,7 @@ export default function ExpenseDetailSheet({
                       <ExpenseSettledState members={settledMembers} />
                     </div>
                   ) : (
-                    <div className="relative h-full">
+                    <div ref={vizWrapRef} className="relative h-full">
                       <ExpenseSpokeViz
                         payer={payerMember}
                         payerName={expense.paid_by_name}
@@ -419,27 +470,35 @@ export default function ExpenseDetailSheet({
                         isPayer={isPayer}
                         onMemberTap={handleMemberTap}
                         memberAvatarRef={setAvatarRef}
+                        selectedSplitId={confirmSplit?.splitId ?? null}
                       />
 
                       {/* Confirmation popover */}
                       {confirmSplit && (
-                        <div className="absolute left-1/2 -translate-x-1/2 bottom-0 z-50 w-[260px]">
+                        <div
+                          className="absolute z-50 w-[260px] -translate-x-1/2"
+                          style={
+                            confirmPopoverPos
+                              ? { left: confirmPopoverPos.left, top: confirmPopoverPos.top }
+                              : { left: "50%", bottom: 0 }
+                          }
+                        >
                           <div className="bg-card rounded-xl border border-border shadow-lg p-4 space-y-3">
                             <p className="text-sm text-foreground">
-                              <span className="font-semibold">{confirmSplit.name}</span> still owes{" "}
-                              {formatCurrency(confirmSplit.amount)}, do you want to settle it up?
+                              <span className="font-bold">{confirmSplit.name}</span> still owes{" "}
+                              <span className="font-bold">{formatCurrency(confirmSplit.amount)}</span>, do you want to settle it up?
                             </p>
                             <div className="flex gap-2">
                               <button
                                 onClick={() => handleSettleMemberShare(confirmSplit.splitId)}
                                 disabled={confirmLoading}
-                                className="flex-1 bg-foreground text-background rounded-xl py-2.5 text-sm font-bold"
+                                className="flex-1 bg-primary text-primary-foreground rounded-full py-2.5 text-sm font-bold"
                               >
                                 {confirmLoading ? "Settling..." : "Confirm"}
                               </button>
                               <button
                                 onClick={() => setConfirmSplit(null)}
-                                className="flex-1 bg-muted text-foreground rounded-xl py-2.5 text-sm font-bold"
+                                className="flex-1 bg-muted text-foreground rounded-full py-2.5 text-sm font-bold"
                               >
                                 Cancel
                               </button>
@@ -517,28 +576,40 @@ export default function ExpenseDetailSheet({
                     <div className="h-px bg-border mb-3" />
                     <div
                       ref={slideTrackRef}
-                      className="relative h-14 rounded-full bg-muted overflow-hidden select-none touch-none"
+                      className="relative h-14 rounded-full bg-[#D5D5D5] overflow-hidden select-none touch-none"
                       onPointerMove={handlePointerMove}
                       onPointerUp={handlePointerUp}
                     >
-                      <span className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-muted-foreground pointer-events-none">
+                      <div
+                        className="absolute left-0 top-0 h-full rounded-full bg-[#003F73] transition-none pointer-events-none"
+                        style={{ width: slideX + SLIDE_THUMB_WIDTH }}
+                      />
+
+                      <span className="absolute inset-0 z-10 flex items-center justify-center text-[14px] font-semibold text-[#6B6B6B] pointer-events-none px-4">
+                        {slideCompleted ? "Settling..." : "Slide to settle everyone"}
+                      </span>
+                      <span
+                        className="absolute inset-0 z-10 flex items-center justify-center text-[14px] font-semibold text-white pointer-events-none px-4"
+                        style={{
+                          clipPath: `inset(0 ${Math.max(
+                            0,
+                            (slideTrackRef.current?.clientWidth ?? 0) - (slideX + SLIDE_THUMB_WIDTH),
+                          )}px 0 0)`,
+                        }}
+                      >
                         {slideCompleted ? "Settling..." : "Slide to settle everyone"}
                       </span>
 
                       <div
-                        className="absolute left-0 top-0 h-full bg-foreground/10 transition-none"
-                        style={{ width: slideX + 48 }}
-                      />
-
-                      <div
-                        className="absolute top-1 left-1 w-12 h-12 rounded-2xl bg-foreground flex items-center justify-center cursor-grab active:cursor-grabbing"
+                        className="absolute top-0 left-0 z-20 h-full rounded-full bg-[#003F73] flex items-center justify-center cursor-grab active:cursor-grabbing"
                         style={{
+                          width: SLIDE_THUMB_WIDTH,
                           transform: `translateX(${slideX}px)`,
                           transition: sliding ? "none" : "transform 0.3s ease",
                         }}
                         onPointerDown={handlePointerDown}
                       >
-                        <span className="text-background text-lg font-bold tracking-tighter">»</span>
+                        <span className="text-white text-[32px] leading-none font-light select-none">»</span>
                       </div>
                     </div>
                   </>
@@ -546,6 +617,7 @@ export default function ExpenseDetailSheet({
               </div>
             </>
           )}
+          </div>
         </div>
       </DrawerContent>
     </Drawer>

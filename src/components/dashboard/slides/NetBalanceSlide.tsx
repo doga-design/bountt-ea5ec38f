@@ -121,10 +121,10 @@ export default function NetBalanceSlide({ netBalance, totalOwedToYou, totalYouOw
     : "";
 
   return (
-    <div className="flex flex-col justify-center px-6 py-2 min-h-[150px] relative">
+    <div className="flex flex-col justify-center px-6 py-5 min-h-[190px] relative">
       {/* Badge */}
       <div className="mb-2">
-        <span className="inline-block bg-white/10 text-white text-xs font-semibold rounded-full px-3 py-1 mb-2">
+        <span className="inline-block text-white text-xs font-semibold">
           {badge}
         </span>
       </div>
@@ -150,7 +150,7 @@ export default function NetBalanceSlide({ netBalance, totalOwedToYou, totalYouOw
             <div className="flex gap-2 ml-3 shrink-0">
               <button
                 onClick={handleCtaClick}
-                className="bg-white text-[hsl(18,89%,47%)] font-bold text-xs rounded-full px-4 py-2"
+                className="bg-white text-foreground font-bold text-xs rounded-full px-4 py-2"
               >
                 {ctaLabel}
               </button>

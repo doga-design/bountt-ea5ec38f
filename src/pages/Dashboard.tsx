@@ -16,7 +16,6 @@ import { formatRelativeDate } from "@/lib/bountt-utils";
 import { Expense, ExpenseSplit } from "@/types";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
-
 export default function Dashboard() {
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
@@ -63,18 +62,18 @@ export default function Dashboard() {
     }
   }, []);
 
-  // ... keep existing code
   useEffect(() => {
-    if (groupId) {
-      const group = userGroups.find((g) => g.id === groupId);
-      if (group) {
-        setCurrentGroup(group);
-        localStorage.setItem("bountt_last_group_id", groupId);
-      }
+    if (!groupId) return;
+
+    const group = userGroups.find((g) => g.id === groupId);
+    if (group) {
+      setCurrentGroup(group);
+      localStorage.setItem("bountt_last_group_id", groupId);
     }
-  }, [groupId, userGroups]);
+  }, [groupId, userGroups, setCurrentGroup]);
 
   useEffect(() => {
+    if (!groupId) return;
     if (groupId && !groupsLoading && userGroups.length >= 0) {
       const found = userGroups.find((g) => g.id === groupId);
       if (!found && !groupsLoading) {
@@ -87,7 +86,7 @@ export default function Dashboard() {
         return () => clearTimeout(timer);
       }
     }
-  }, [groupId, userGroups, groupsLoading]);
+  }, [groupId, userGroups, groupsLoading, navigate, toast]);
 
   const otherMembers = groupMembers.filter((m) => m.user_id !== user?.id);
   const hasOtherMembers = otherMembers.length > 0;
@@ -146,7 +145,11 @@ export default function Dashboard() {
           {mode === "normal" ? (
             <HeroCarousel />
           ) : (
-            <DashboardHeader onAddMember={undefined} showBalance={false} />
+            <DashboardHeader
+              onAddMember={undefined}
+              showBalance={false}
+              hideMemberAvatars={mode === "prompt"}
+            />
           )}
 
           {mode === "empty" && <EmptyState />}

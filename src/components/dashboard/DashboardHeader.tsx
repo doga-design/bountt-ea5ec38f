@@ -1,17 +1,22 @@
-import { Settings, Plus, ChevronDown, CircleUser } from "lucide-react";
+import { Settings, Plus, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
 import BalancePill from "./BalancePill";
-import { getGroupIconSrc } from "@/lib/group-icon-utils";
 import { getBackgroundSrc } from "@/lib/background-utils";
 
 interface DashboardHeaderProps {
   onAddMember?: () => void;
   showBalance?: boolean;
+  /** When true, hide the overlapping member stack (e.g. shown above prompt headline instead). */
+  hideMemberAvatars?: boolean;
 }
 
-export default function DashboardHeader({ onAddMember, showBalance = false }: DashboardHeaderProps) {
+export default function DashboardHeader({
+  onAddMember,
+  showBalance = false,
+  hideMemberAvatars = false,
+}: DashboardHeaderProps) {
   const { currentGroup, groupMembers, user } = useApp();
   const navigate = useNavigate();
   if (!currentGroup) return null;
@@ -23,7 +28,7 @@ export default function DashboardHeader({ onAddMember, showBalance = false }: Da
     <div className="relative">
       {/* Banner */}
       <div
-        className="px-5 pt-5 pb-10"
+        className={hideMemberAvatars ? "px-5 pb-4 pt-5" : "px-5 pb-10 pt-5"}
         style={{
           backgroundImage: `url(${bgSrc})`,
           backgroundSize: "cover",
@@ -31,63 +36,56 @@ export default function DashboardHeader({ onAddMember, showBalance = false }: Da
         }}
       >
         {/* Top row: avatars + settings */}
-        <div className="flex items-center justify-between mb-6">
-          {/* Overlapping avatars */}
-          <div className="flex items-center">
-            {activeMembers.map((member, i) => {
-              const isCurrentUser = member.user_id === user?.id;
-              const { bg } = getAvatarColor(member);
+        <div
+          className={`mb-6 flex items-center ${hideMemberAvatars ? "justify-end" : "justify-between"}`}
+        >
+          {!hideMemberAvatars && (
+            <div className="flex items-center">
+              {activeMembers.map((member, i) => {
+                const isCurrentUser = member.user_id === user?.id;
+                const { bg } = getAvatarColor(member);
 
-              return (
-                <div
-                  key={member.id}
-                  className="w-10 h-10 rounded-full flex items-center justify-center border-2 border-primary-foreground overflow-hidden"
-                  style={{
-                    marginLeft: i > 0 ? "-12px" : "0",
-                    backgroundColor: isCurrentUser ? "hsl(var(--card))" : bg,
-                    zIndex: activeMembers.length - i,
-                    position: "relative",
-                  }}
-                  title={member.name}
+                return (
+                  <div
+                    key={member.id}
+                    className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-primary-foreground"
+                    style={{
+                      marginLeft: i > 0 ? "-12px" : "0",
+                      backgroundColor: isCurrentUser ? "hsl(var(--card))" : bg,
+                      zIndex: activeMembers.length - i,
+                      position: "relative",
+                    }}
+                    title={member.name}
+                  >
+                    <img
+                      src={getAvatarImage(member)}
+                      alt={member.name}
+                      className="h-[75%] w-[75%] object-contain"
+                      draggable={false}
+                    />
+                  </div>
+                );
+              })}
+              {onAddMember && (
+                <button
+                  onClick={onAddMember}
+                  className="relative flex h-10 w-10 items-center justify-center rounded-full border-2 border-primary-foreground bg-primary-foreground/20"
+                  style={{ marginLeft: activeMembers.length > 0 ? "-12px" : "0", zIndex: 0 }}
+                  aria-label="Add member"
                 >
-                  <img
-                    src={getAvatarImage(member)}
-                    alt={member.name}
-                    className="w-[75%] h-[75%] object-contain"
-                    draggable={false}
-                  />
-                </div>
-              );
-            })}
-            {onAddMember && (
-              <button
-                onClick={onAddMember}
-                className="w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center border-2 border-primary-foreground relative"
-                style={{ marginLeft: activeMembers.length > 0 ? "-12px" : "0", zIndex: 0 }}
-                aria-label="Add member"
-              >
-                <Plus className="w-4 h-4 text-primary-foreground" />
-              </button>
-            )}
-          </div>
+                  <Plus className="h-4 w-4 text-primary-foreground" />
+                </button>
+              )}
+            </div>
+          )}
 
-          {/* Profile + Settings */}
-          <div className="flex items-center gap-1.5">
-            <button
-              className="w-9 h-9 flex items-center justify-center rounded-full bg-white/15 backdrop-blur-sm"
-              aria-label="Profile"
-              onClick={() => navigate("/profile")}
-            >
-              <CircleUser className="w-5 h-5 text-primary-foreground" />
-            </button>
-            <button
-              className="w-9 h-9 flex items-center justify-center rounded-full bg-white/15 backdrop-blur-sm"
-              aria-label="Group settings"
-              onClick={() => navigate(`/groups/${currentGroup.id}/settings`)}
-            >
-              <Settings className="w-5 h-5 text-primary-foreground" />
-            </button>
-          </div>
+          <button
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-white/15 backdrop-blur-sm"
+            aria-label="Group settings"
+            onClick={() => navigate(`/groups/${currentGroup.id}/settings`)}
+          >
+            <Settings className="w-5 h-5 text-primary-foreground" />
+          </button>
         </div>
 
         {/* Bottom row: group name + balance */}
@@ -101,11 +99,6 @@ export default function DashboardHeader({ onAddMember, showBalance = false }: Da
           </button>
           {showBalance && <BalancePill />}
         </div>
-      </div>
-
-      {/* Group icon overlapping bottom edge */}
-      <div className="absolute left-5 bottom-0 translate-y-1/2 w-14 h-14 rounded-full bg-card flex items-center justify-center border-2 border-background z-10">
-        <img src={getGroupIconSrc(currentGroup.emoji)} alt="" className="w-8 h-8" />
       </div>
     </div>
   );

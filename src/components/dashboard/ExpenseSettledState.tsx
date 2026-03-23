@@ -17,12 +17,17 @@ export default function ExpenseSettledState({ members }: ExpenseSettledStateProp
       {/* Large checkmark circle — dark navy / foreground, NOT green */}
       <div
         className="rounded-full flex items-center justify-center bg-foreground"
-        style={{ width: 80, height: 80 }}
+        style={{
+          width: 80,
+          height: 80,
+          border: "3px solid #FFFFFF",
+          boxShadow: "rgba(0, 0, 0, 0.2) 0px 20px 30px",
+        }}
       >
         <Check className="w-10 h-10 text-background" strokeWidth={3} />
       </div>
 
-      <p className="text-lg font-bold text-foreground font-sans">All settled up!</p>
+      <p className="text-5xl text-foreground font-bringbold">All settled up</p>
 
       {/* Overlapping avatar stack */}
       <div className="flex items-center justify-center">
@@ -33,12 +38,13 @@ export default function ExpenseSettledState({ members }: ExpenseSettledStateProp
           return (
             <div
               key={m.name + i}
-              className={`rounded-full flex items-center justify-center border-2 border-card ${i > 0 ? "-ml-3" : ""}`}
+              className={`rounded-full flex items-center justify-center border-2 border-card ${i > 0 ? "-ml-4" : ""}`}
               style={{
-                width: 40,
-                height: 40,
+                width: 60,
+                height: 60,
                 backgroundColor: color,
                 zIndex: members.length - i,
+                boxShadow: "rgba(0, 0, 0, 0.2) 0px 20px 30px",
               }}
             >
               {img && (
