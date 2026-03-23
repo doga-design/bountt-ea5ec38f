@@ -26,7 +26,7 @@ export default function AgingDebtSlide({ agingDebts }: Props) {
       : <><span className="font-semibold">{debt.personName}</span> still owes you {formatCurrency(debt.amount)} from <span className="font-semibold">{debt.expenseName}</span></>;
 
   return (
-    <div className="flex flex-col justify-center px-6 py-2 min-h-[150px]">
+    <div className="flex flex-col justify-center px-6 py-5 min-h-[190px]">
       <div className="flex items-center gap-3 mb-1">
         <span className="text-6xl font-extrabold text-white">{debt.daysWaiting}</span>
         {hasMultiple && (
@@ -44,7 +44,7 @@ export default function AgingDebtSlide({ agingDebts }: Props) {
       <div className="flex gap-2">
         {debt.direction === "you_owe" ? (
           <>
-            <button className="bg-white text-[hsl(18,89%,47%)] font-bold text-sm rounded-full px-5 py-2.5">
+            <button className="bg-white text-foreground font-bold text-sm rounded-full px-5 py-2.5">
               Pay {debt.personName.split(" ")[0]}
             </button>
             <button
@@ -56,7 +56,7 @@ export default function AgingDebtSlide({ agingDebts }: Props) {
           </>
         ) : (
           <>
-            <button className="bg-white text-[hsl(18,89%,47%)] font-bold text-sm rounded-full px-5 py-2.5">
+            <button className="bg-white text-foreground font-bold text-sm rounded-full px-5 py-2.5">
               Settle up
             </button>
             <button

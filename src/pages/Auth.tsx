@@ -43,10 +43,10 @@ export default function Auth() {
     <div className="screen-container bg-background relative h-[100svh] max-h-[100svh] min-h-0 overflow-hidden">
       <div
         aria-hidden
-        className="pointer-events-none absolute left-1/2 z-0 h-[600px] w-[600px] -translate-x-1/2 rounded-full -bottom-[200px] blur-[50px]"
+        className="pointer-events-none absolute left-1/2 z-0 h-[500px] w-[500px] -translate-x-1/2 rounded-full -bottom-[330px] blur-[50px]"
         style={{
           background:
-            "linear-gradient(to top, rgb(255, 228, 118) 0%, rgb(255, 238, 166) 12%, rgba(255, 238, 166, 0.82) 36%, rgba(255, 238, 166, 0.35) 52%, rgba(255, 238, 166, 0.08) 72%, hsl(var(--background)) 100%)",
+            "radial-gradient(circle at center, rgb(255, 228, 118) 0%, rgb(255, 238, 166) 28%, rgba(255, 238, 166, 0.62) 52%, rgba(255, 238, 166, 0.2) 72%, rgba(255, 238, 166, 0) 100%)",
         }}
       />
       <FloatingIcons />
@@ -60,7 +60,7 @@ export default function Auth() {
           <button
             type="button"
             onClick={handleGoogle}
-            className="w-full bg-card rounded-full px-5 py-4 shadow-lg flex items-center justify-center gap-3 font-semibold text-foreground text-base active:scale-[0.98] transition-transform"
+            className="w-[340px] h-[60px] bg-card rounded-full px-5 py-4 shadow-lg flex items-center justify-center gap-3 font-semibold text-foreground text-base active:scale-[0.98] transition-transform"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0">
               <path
@@ -83,7 +83,7 @@ export default function Auth() {
             Continue with Google
           </button>
 
-          <p className="text-xs text-muted-foreground text-center mt-5 leading-relaxed">
+          <p className="text-xs text-muted-foreground text-center mt-5 leading-relaxed max-w-[280px]">
             By continuing you agree to our{" "}
             <a
               href="https://bountt.app/terms"

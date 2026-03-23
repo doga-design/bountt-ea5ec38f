@@ -92,9 +92,8 @@ export default function Invite() {
   };
 
   const handleContinue = () => {
-    if (group) {
-      navigate(`/dashboard/${group.id}`);
-    }
+    if (!group) return;
+    navigate(`/dashboard/${group.id}`);
   };
 
   if (loading) {
@@ -108,35 +107,30 @@ export default function Invite() {
   if (!group) return null;
 
   return (
-    <div className="screen-container relative">
-      {/* Background: lighter orange*/}
-        <div
-        className="absolute top-0 left-1/2 -translate-x-1/2 z-0 h-[730px] w-[1000px]"
-        style={{
-          background: "#FF7534",
-          borderBottomLeftRadius: "50%",
-          borderBottomRightRadius: "50%",
-        }}
-        />
-
-      {/* Orange header: wide background shape + normal-width content */}
+    <div className="screen-container relative min-h-0 h-[100svh] max-h-[100svh] overflow-hidden">
       <div
-        className="absolute top-0 left-1/2 -translate-x-1/2 z-10 w-[500px] h-[200px] bg-primary pt-12 pb-10"
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-0"
+        style={{ background: "linear-gradient(180deg, #0073CA 0%, #003964 100%)" }}
+      />
+      <div
+        className="absolute left-1/2 top-0 z-10 h-[200px] w-[500px] -translate-x-1/2 bg-primary pt-12 pb-10"
         style={{ borderBottomLeftRadius: "50%", borderBottomRightRadius: "50%" }}
-        aria-hidden />
+        aria-hidden
+      />
 
-      <div className="relative z-20 px-6 pt-12 pb-10">
-        {/* Nav row: back | progress dots (step 2 of 2) | continue */}
-        <div className="flex items-center justify-between mt-4">
-          <button
-            onClick={() => navigate("/onboarding/group-name")}
-            className="w-11 h-11 rounded-full bg-primary-foreground/20 flex items-center justify-center"
-            aria-label="Go back"
-          >
-            <ChevronLeft className="w-5 h-5 text-primary-foreground" />
-          </button>
+      <main className="relative z-20 flex min-h-0 flex-1 flex-col overflow-y-auto px-6 pb-4 pt-12">
+        <div className="mx-auto flex w-full max-w-md flex-col items-center">
+          <div className="mt-4 flex w-full items-center justify-between">
+            <button
+              type="button"
+              onClick={() => navigate("/onboarding/group-name")}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-primary-foreground/20"
+              aria-label="Go back"
+            >
+              <ChevronLeft className="h-5 w-5 text-primary-foreground" />
+            </button>
 
-          <div className="flex-1 flex justify-center">
             <div
               className="flex items-center justify-center gap-2"
               role="progressbar"
@@ -144,101 +138,98 @@ export default function Invite() {
               aria-valuenow={2}
               aria-valuemax={2}
             >
-              <div className="w-2 h-2 bg-primary-foreground/40 rounded-full" />
-              <div className="w-8 h-2 bg-primary-foreground rounded-full" />
+              <div className="h-2 w-2 rounded-full bg-primary-foreground/40" />
+              <div className="h-2 w-8 rounded-full bg-primary-foreground" />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleContinue}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-primary-foreground/20"
+              aria-label="Continue"
+            >
+              <ChevronRight className="h-5 w-5 text-primary-foreground" />
+            </button>
+          </div>
+
+          <h1 className="bountt-wordmark mt-2 text-center text-3xl text-primary-foreground">
+            bountt<span className="opacity-70">.</span>
+          </h1>
+
+          <div className="relative z-10 mt-4 flex justify-center">
+            <span className="rounded-2xl bg-secondary px-6 py-4 text-sm font-bold text-secondary-foreground">
+              Invite your friends
+            </span>
+          </div>
+
+          <div
+            className="mx-auto mt-4 w-full max-w-[300px] -rotate-[1.8deg] rounded-3xl border-2 border-white px-6 py-12 shadow-[0_24px_48px_-12px_rgba(0,0,0,0.1),0_4px_12px_rgba(0,0,0,0.06)]"
+            style={{ background: "linear-gradient(to bottom, hsl(0, 0.00%, 91.80%), hsl(0,0%,100%))" }}
+          >
+            <p className="mb-2 text-center text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Your group code
+            </p>
+
+            <p className="mb-5 text-center font-bringbold text-5xl leading-none tracking-tight text-foreground">
+              {group.invite_code}
+            </p>
+
+            <div className="mb-6 flex items-center justify-center gap-4">
+              <button
+                type="button"
+                onClick={handleShare}
+                className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-white bg-muted shadow-[0_8px_30px_rgba(0,0,0,0.08),0_2px_6px_rgba(0,0,0,0.04)]"
+                style={{
+                  background: "linear-gradient(to bottom, hsl(0, 0.00%, 87.10%), hsl(0, 0.00%, 87.80%))",
+                }}
+                aria-label="Share invite"
+              >
+                <Share2 className="h-6 w-6 text-foreground" />
+              </button>
+              <button
+                type="button"
+                onClick={handleCopyCode}
+                className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-white bg-muted shadow-[0_8px_30px_rgba(0,0,0,0.08),0_2px_6px_rgba(0,0,0,0.04)]"
+                style={{
+                  background: "linear-gradient(to bottom, hsl(0, 0.00%, 87.10%), hsl(0, 0.00%, 87.80%))",
+                }}
+                aria-label="Copy invite code"
+              >
+                <ExternalLink className="h-6 w-6 text-foreground" />
+              </button>
+            </div>
+
+            <p className="mb-3 text-center text-[0.7rem] font-bold uppercase tracking-wider text-muted-foreground">
+              Or let your friends scan
+            </p>
+
+            <div className="flex justify-center">
+              {joinUrl && (
+                <QRCodeSVG
+                  value={joinUrl}
+                  size={160}
+                  fgColor="hsl(var(--primary))"
+                  bgColor="transparent"
+                  level="M"
+                />
+              )}
             </div>
           </div>
+        </div>
+      </main>
 
+      <footer className="relative z-20 shrink-0 px-6 pb-10 pt-4">
+        <div className="mx-auto flex w-full max-w-md justify-center">
           <button
+            type="button"
             onClick={handleContinue}
-            className="w-11 h-11 rounded-full bg-primary-foreground/20 flex items-center justify-center"
-            aria-label="Continue"
+            className="flex w-full max-w-[280px] items-center justify-center gap-2 rounded-full bg-white py-4 text-base font-bold text-primary shadow-[0_24px_48px_-12px_rgba(0,0,0,0.1),0_4px_12px_rgba(0,0,0,0.06)]"
           >
-            <ChevronRight className="w-5 h-5 text-primary-foreground" />
+            Start your group
+            <ChevronRight className="h-5 w-5 shrink-0" aria-hidden />
           </button>
         </div>
-
-        {/* bountt. wordmark */}
-        <h1 className="bountt-wordmark text-3xl text-primary-foreground text-center mb-6">
-          bountt<span className="opacity-70">.</span>
-        </h1>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 flex flex-col items-center px-6 pb-8 pt-6 relative z-10">
-        {/* Pill — overlapping orange header */}
-        <div className="relative z-10 flex justify-center mb-6 -mt-16">
-          <span className="bg-secondary text-secondary-foreground rounded-2xl px-6 py-4 text-sm font-bold">
-            Invite your friends
-          </span>
-        </div>
-
-        {/* Single card — white gradient bg, 2px white border */}
-        <div
-          className="rounded-3xl -rotate-[1.8deg] p-6 border-2 border-white py-12 px-6 max-w-[270px] w-full mx-auto shadow-[0_24px_48px_-12px_rgba(0,0,0,0.1),0_4px_12px_rgba(0,0,0,0.06)]"
-          style={{ background: "linear-gradient(to bottom, hsl(0, 0.00%, 91.80%), hsl(0,0%,100%))" }}
-          > 
-          {/* Label */}
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2 text-center">
-            Your Bountt group code
-          </p>
-
-          {/* Code */}
-          <p className="font-sans text-3xl font-black text-foreground mb-5 text-center">
-            {group.invite_code}
-          </p>
-
-          {/* 2 action buttons */}
-          <div className="flex gap-3 mb-6 items-center justify-center">
-            <button
-              onClick={handleShare}
-              className="w-11 h-11 rounded-full bg-muted flex items-center justify-center border-2 border-white shadow-[0_8px_30px_rgba(0,0,0,0.08),0_2px_6px_rgba(0,0,0,0.04)]"
-              style={{
-                background: "linear-gradient(to bottom, hsl(0, 0.00%, 87.10%), hsl(0, 0.00%, 87.80%))",
-              }}
-              aria-label="Share invite"
-            >
-              <Share2 className="w-4 h-4 text-foreground" />
-            </button>
-            <button
-              onClick={handleCopyCode}
-              className="w-11 h-11 rounded-full bg-muted flex items-center justify-center border-2 border-white shadow-[0_8px_30px_rgba(0,0,0,0.08),0_2px_6px_rgba(0,0,0,0.04)]"
-              style={{
-                background: "linear-gradient(to bottom, hsl(0, 0.00%, 87.10%), hsl(0, 0.00%, 87.80%))",
-              }}
-              aria-label="Copy invite code"
-            >
-              <ExternalLink className="w-4 h-4 text-foreground" />
-            </button>
-          </div>
-
-          {/* Small copy */}
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4 text-center">
-            Or let your friends scan
-          </p>
-
-          {/* QR code — orange */}
-          <div className="flex justify-center">
-            {joinUrl && (
-              <QRCodeSVG
-                value={joinUrl}
-                size={160}
-                fgColor="hsl(18, 89%, 47%)"
-                bgColor="transparent"
-                level="M"
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Continue button — below card */}
-        <button
-          onClick={handleContinue}
-          className="mt-6 w-full max-w-[280px] mx-auto bg-primary text-primary-foreground rounded-full py-4 font-bold text-base shadow-[0_24px_48px_-12px_rgba(0,0,0,0.1),0_4px_12px_rgba(0,0,0,0.06)]"
-        >
-          Continue to group →
-        </button>
-      </div>
+      </footer>
     </div>
   );
 }

@@ -106,7 +106,7 @@ export default function MemberCard({ member, currentUserId, isAdmin, onRemove, o
                 {member.name}{isSelf ? " (You)" : ""}
               </p>
               {member.role === "admin" && (
-                <span className="flex items-center gap-0.5 text-[10px] font-medium text-primary bg-primary/10 rounded px-1.5 py-0.5">
+                <span className="flex items-center gap-0.5 text-[12px] font-medium text-primary bg-primary/10 rounded px-1.5 py-0.5">
                   <Shield className="w-2.5 h-2.5" /> Admin
                 </span>
               )}

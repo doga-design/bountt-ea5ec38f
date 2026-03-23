@@ -45,7 +45,7 @@ export default function NumpadGrid({ onKey }: NumpadGridProps) {
               </span>
               {SUB_LETTERS[key] && (
                 <span
-                  className="text-[8px] font-bold leading-none mt-0"
+                  className="mt-0 text-[12px] font-bold leading-none"
                   style={{ color: "#C8C8C4" }}
                 >
                   {SUB_LETTERS[key]}

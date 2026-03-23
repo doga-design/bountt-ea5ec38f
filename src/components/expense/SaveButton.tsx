@@ -1,4 +1,5 @@
 import { Plus, ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface SaveButtonProps {
   active: boolean;
@@ -27,11 +28,13 @@ export default function SaveButton({
       <button
         onClick={handleClick}
         disabled={loading}
-        className="w-full rounded-[18px] py-4 font-sans text-[17px] font-extrabold transition-all active:scale-[0.985] flex items-center justify-center gap-2"
+        className={cn(
+          "flex w-full items-center justify-center gap-2 rounded-[18px] py-4 font-sans text-[17px] font-extrabold transition-all active:scale-[0.985]",
+          active
+            ? "bg-primary text-primary-foreground shadow-[0_4px_14px_hsl(var(--primary)_/_0.3)]"
+            : "bg-[#EAEAE6] text-[#C0C0BC]",
+        )}
         style={{
-          backgroundColor: active ? "#D94F00" : "#EAEAE6",
-          color: active ? "#FFFFFF" : "#C0C0BC",
-          boxShadow: active ? "0 4px 14px rgba(217,79,0,0.3)" : "none",
           cursor: !active && !shakeOnDisabled ? "default" : "pointer",
         }}
       >

@@ -24,7 +24,7 @@ export default function CustomSplitRows({
 
   return (
     <div className="px-4 py-2">
-      {members.map((m, idx) => {
+      {members.map((m) => {
         const isSelf = m.user_id === currentUserId;
         const isFocused = focusedMemberId === m.id;
         const isShaking = shakeMemberId === m.id;
@@ -59,47 +59,34 @@ export default function CustomSplitRows({
                   />
                 </div>
                 <span
-                  className={`mt-1 text-xs truncate w-full text-center ${isSelf ? "font-bold text-foreground" : "text-foreground"}`}
+                  className={`mt-1 truncate w-full text-center text-xs text-muted-foreground ${isSelf ? "font-bold" : ""}`}
                 >
                   {isSelf ? "You" : m.name}
                 </span>
               </div>
 
-              {/* Amount box */}
+              {/* Amount box — nudged up to align with avatar circle (row centers against circle + label) */}
               <div
-                className="flex-1 flex items-center justify-end rounded-2xl px-4 py-3 transition-all"
+                className="-mt-4 flex flex-1 items-center justify-end rounded-2xl px-4 py-3 transition-colors"
                 style={{
                   backgroundColor: isFocused
-                    ? isSelf ? "#FFFAF8" : "#F0F4FF"
-                    : "hsl(var(--card))",
-                  border: `2px solid ${isFocused ? (isSelf ? "#D94F00" : "#2563EB") : "hsl(var(--border))"}`,
-                  boxShadow: isFocused ? "0 2px 8px rgba(0,0,0,0.08)" : "none",
+                    ? `color-mix(in srgb, ${bg} 32%, #DDD)`
+                    : `color-mix(in srgb, ${bg} 22%, #EEE)`,
+                  boxShadow:
+                    "inset 6px 8px 4px -4px rgba(0,0,0,0.1), inset 0px 23px 4px -12px rgba(0,0,0,0.1)",
                 }}
               >
                 <div className="flex items-baseline">
-                  <span className="text-sm font-bold text-muted-foreground mr-0.5">$</span>
-                  <span
-                    className="text-[26px] font-extrabold font-sans"
-                    style={{
-                      color: isFocused
-                        ? isSelf ? "#D94F00" : "#2563EB"
-                        : "hsl(var(--foreground))",
-                    }}
-                  >
+                  <span className="mr-0.5 text-sm font-bold text-muted-foreground">$</span>
+                  <span className="text-[24px] font-extrabold font-sans text-foreground">
                     {displayAmount}
                   </span>
                   {isFocused && (
-                    <span
-                      className="w-[2px] h-[22px] rounded-full ml-0.5 animate-blink"
-                      style={{ backgroundColor: isSelf ? "#D94F00" : "#2563EB" }}
-                    />
+                    <span className="ml-0.5 h-[22px] w-[2px] animate-blink rounded-full bg-foreground" />
                   )}
                 </div>
               </div>
             </button>
-            {idx < members.length - 1 && (
-              <div className="border-t border-border/50 mx-2" />
-            )}
           </div>
         );
       })}

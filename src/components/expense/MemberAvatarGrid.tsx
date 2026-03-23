@@ -2,6 +2,7 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { GroupMember } from "@/types";
 import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
 import { Plus } from "lucide-react";
+import { ArcDot } from "./ArcDot";
 
 interface MemberAvatarGridProps {
   members: GroupMember[];
@@ -105,15 +106,43 @@ export default function MemberAvatarGrid({
             zIndex: 1,
           }}
         >
+          <defs>
+            <filter
+              id="pulseGlow"
+              x="-120%"
+              y="-120%"
+              width="340%"
+              height="340%"
+              colorInterpolationFilters="sRGB"
+            >
+              <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+            <filter
+              id="trailLineGlow"
+              x="-80%"
+              y="-80%"
+              width="260%"
+              height="260%"
+              colorInterpolationFilters="sRGB"
+            >
+              <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
           {activeMembers.map((m, i) => {
             const mPos = memberPositions[m.id];
             if (!mPos || !payerPos) return null;
             const ctrlX = (payerPos.x + mPos.x) / 2;
             const ctrlY = payerPos.y + (mPos.y - payerPos.y) * 0.15;
             const d = `M ${payerPos.x} ${payerPos.y} Q ${ctrlX} ${ctrlY} ${mPos.x} ${mPos.y}`;
-            const dReversed = `M ${mPos.x} ${mPos.y} Q ${ctrlX} ${ctrlY} ${payerPos.x} ${payerPos.y}`;
-            const dur = `${1.2 + (i * 0.3) % 1.2}s`;
-            const begin = `${i * 0.4}s`;
+            const { bg: splitterColor } = getAvatarColor(m);
 
             return (
               <g key={m.id}>
@@ -124,25 +153,16 @@ export default function MemberAvatarGrid({
                   strokeDasharray="4 4"
                   fill="none"
                 />
-                <circle r="4" fill="#D4D4D4">
-                  <animateMotion
-                    path={dReversed}
-                    dur={dur}
-                    begin={begin}
-                    repeatCount="indefinite"
-                    calcMode="spline"
-                    keySplines="0.4 0 0.6 1"
-                    keyTimes="0;1"
-                  />
-                  <animate
-                    attributeName="opacity"
-                    values="1;1;0"
-                    keyTimes="0;0.7;1"
-                    dur={dur}
-                    begin={begin}
-                    repeatCount="indefinite"
-                  />
-                </circle>
+                <ArcDot
+                  fromX={mPos.x}
+                  fromY={mPos.y}
+                  toX={payerPos.x}
+                  toY={payerPos.y}
+                  ctrlX={ctrlX}
+                  ctrlY={ctrlY}
+                  index={i}
+                  color={splitterColor}
+                />
               </g>
             );
           })}
@@ -177,8 +197,8 @@ export default function MemberAvatarGrid({
               )}
             </div>
           </button>
-          <span className="mt-1 text-xs font-medium text-muted-foreground">
-            <span className={payerMember.user_id === currentUserId ? "font-bold text-foreground" : ""}>
+          <span className="mt-1 text-xs font-bold text-muted-foreground">
+            <span>
               {payerMember.user_id === currentUserId ? "You" : payerMember.name}
             </span>
             {" paid"}
@@ -231,18 +251,27 @@ export default function MemberAvatarGrid({
                 />
               </div>
               <span
-                className="mt-1 text-center truncate w-full"
-                style={{
-                  fontSize,
-                  color: isActive ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))",
-                  fontWeight: isSelf ? 700 : undefined,
-                }}
+                className="mt-1 flex w-full flex-col items-center text-center"
+                style={{ color: "hsl(var(--muted-foreground))" }}
               >
-                {isSelf ? "You" : m.name}
+                <span
+                  className="w-full truncate"
+                  style={{
+                    fontSize,
+                    fontWeight: isSelf || isActive ? 600 : undefined,
+                  }}
+                >
+                  {isSelf ? "You" : m.name}
+                </span>
                 {isActive && splitAmounts?.has(m.id) && (
-                  <span style={{ color: "hsl(var(--muted-foreground))", fontWeight: 500 }}>
-                    {" · $"}
-                    {(() => {
+                  <span
+                    className="w-full truncate"
+                    style={{
+                      fontSize: Math.max(fontSize - 1, 11),
+                      fontWeight: 600,
+                    }}
+                  >
+                    ${(() => {
                       const val = splitAmounts.get(m.id)!;
                       return val % 1 === 0 ? val.toFixed(0) : val.toFixed(2);
                     })()}

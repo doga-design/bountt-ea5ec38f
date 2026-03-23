@@ -15,5 +15,5 @@ const BACKGROUND_MAP: Record<string, string> = {
 export const BACKGROUND_IDS = Object.keys(BACKGROUND_MAP);
 
 export function getBackgroundSrc(key: string): string {
-  return BACKGROUND_MAP[key] ?? BACKGROUND_MAP["bg-02"];
+  return BACKGROUND_MAP[key] ?? BACKGROUND_MAP["bg-01"];
 }

@@ -15,7 +15,7 @@ export default function ContributionSlide({ contributionPct, totalUserPaid, tota
         : "Others have been covering more.";
 
   return (
-    <div className="flex flex-col justify-center px-6 py-2 min-h-[150px]">
+    <div className="flex flex-col justify-center px-6 py-5 min-h-[190px]">
       <h2 className="text-3xl font-extrabold italic text-white mb-3 leading-tight">
         {insight}
       </h2>

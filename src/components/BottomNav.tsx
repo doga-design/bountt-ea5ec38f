@@ -30,7 +30,7 @@ export default function BottomNav({ onFabPress }: BottomNavProps) {
           aria-label="Home"
         >
           <Home className={`w-5 h-5 ${isHome ? "text-primary" : "text-muted-foreground"}`} />
-          <span className={`text-[10px] font-semibold ${isHome ? "text-primary" : "text-muted-foreground"}`}>Home</span>
+          <span className={`text-[12px] font-semibold ${isHome ? "text-primary" : "text-muted-foreground"}`}>Home</span>
         </button>
 
         {/* FAB */}
@@ -54,7 +54,7 @@ export default function BottomNav({ onFabPress }: BottomNavProps) {
           aria-label="All Groups"
         >
           <Layers className={`w-5 h-5 ${isGroups ? "text-primary" : "text-muted-foreground"}`} />
-          <span className={`text-[10px] font-semibold ${isGroups ? "text-primary" : "text-muted-foreground"}`}>
+          <span className={`text-[12px] font-semibold ${isGroups ? "text-primary" : "text-muted-foreground"}`}>
             All Groups
           </span>
         </button>

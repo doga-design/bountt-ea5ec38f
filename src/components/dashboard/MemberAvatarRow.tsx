@@ -3,6 +3,7 @@ import { PieChart } from "lucide-react";
 import { GroupMember } from "@/types";
 import { getAvatarImage, getAvatarColor } from "@/lib/avatar-utils";
 import { useToast } from "@/hooks/use-toast";
+import { PlaceholderGhostIcon } from "./PlaceholderGhostIcon";
 
 interface MemberAvatarRowProps {
   members: GroupMember[];
@@ -82,7 +83,7 @@ export default function MemberAvatarRow({
 
   return (
     <div ref={containerRef} className="px-4">
-      <p className="text-[10px] font-semibold tracking-[0.15em] text-muted-foreground uppercase mb-3">
+      <p className="text-[12px] font-semibold tracking-[0.15em] text-muted-foreground uppercase mb-3">
         All Members
       </p>
 
@@ -100,23 +101,23 @@ export default function MemberAvatarRow({
                 key={member.id}
                 onClick={() => handleTap(member)}
                 className="flex flex-col items-center gap-1.5 shrink-0 min-w-0 transition-opacity duration-200"
-                style={{ width: 60, opacity: selectedMemberId && !isSelected ? 0.4 : 1 }}
+                style={{ width: 52, opacity: selectedMemberId && !isSelected ? 0.4 : 1 }}
               >
                 {/* Avatar circle */}
                 <div className="relative">
                   <div
                     className="rounded-full flex items-center justify-center overflow-hidden"
                     style={{
-                      width: 56,
-                      height: 56,
+                      width: 48,
+                      height: 48,
                       backgroundColor: bgColor,
-                      border: isSelected ? `2.5px solid ${strokeColor}` : "2.5px solid transparent",
+                      border: isSelected ? `2.5px solid ${strokeColor}` : "2.5px solid #FFFFFF",
                     }}
                   >
                     <img
                       src={avatarImg}
                       alt={member.name}
-                      className="w-10 h-10 object-contain"
+                      className="w-9 h-9 object-contain"
                       draggable={false}
                     />
                   </div>
@@ -124,10 +125,10 @@ export default function MemberAvatarRow({
                   {/* Status badge */}
                   {member.is_placeholder ? (
                     <span
-                      className="absolute -top-0.5 -right-0.5 text-[12px] leading-none"
+                      className="absolute -top-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-background text-foreground shadow-sm"
                       aria-label="Placeholder member"
                     >
-                      👻
+                      <PlaceholderGhostIcon className="h-[15px] w-[13px]" />
                     </span>
                   ) : (
                     <span
@@ -154,13 +155,13 @@ export default function MemberAvatarRow({
           {/* Pie chart placeholder icon */}
           <div
             className="flex flex-col items-center gap-1.5 shrink-0 pointer-events-none"
-            style={{ width: 60, opacity: 0.4 }}
+            style={{ width: 52, opacity: 0.4 }}
           >
             <div
               className="rounded-full flex items-center justify-center border-2 border-muted"
-              style={{ width: 56, height: 56 }}
+              style={{ width: 48, height: 48 }}
             >
-              <PieChart className="w-6 h-6 text-muted-foreground" />
+              <PieChart className="w-5 h-5 text-muted-foreground" />
             </div>
             <span className="text-[12px] font-medium text-muted-foreground text-center leading-tight">
               Stats
@@ -180,7 +181,9 @@ export default function MemberAvatarRow({
         {inviteMember && (
           <div className="mt-3 rounded-2xl bg-muted/60 border border-border p-4 flex flex-col gap-3">
             <div className="flex items-center gap-3">
-              <span className="text-2xl">👻</span>
+              <span className="flex h-14 w-11 shrink-0 items-center justify-center text-foreground">
+                <PlaceholderGhostIcon className="h-12 w-10" />
+              </span>
               <p className="text-sm text-foreground leading-snug">
                 <span className="font-semibold text-foreground">
                   {inviteMember.name}

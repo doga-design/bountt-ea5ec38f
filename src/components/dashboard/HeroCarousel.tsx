@@ -4,8 +4,8 @@ import { Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { useHeroData } from "./slides/useHeroData";
-import { getGroupIconSrc } from "@/lib/group-icon-utils";
 import { getBackgroundSrc } from "@/lib/background-utils";
+import { getGroupIconSrc } from "@/lib/group-icon-utils";
 import NetBalanceSlide from "./slides/NetBalanceSlide";
 import AgingDebtSlide from "./slides/AgingDebtSlide";
 import ContributionSlide from "./slides/ContributionSlide";
@@ -77,15 +77,16 @@ export default function HeroCarousel() {
       {/* Dark tint overlay for text readability */}
       <div className="absolute inset-0 bg-black/35" style={{ zIndex: 0 }} />
       <div className="relative z-10">
-        <div className="relative flex items-center justify-between px-5 py-4">
-          <div className="flex items-center gap-2">
+        <div className="relative flex items-center justify-between gap-3 px-5 py-5">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             <img
               src={getGroupIconSrc(currentGroup.emoji)}
               alt=""
-              className="w-6 h-6"
+              className="h-6 w-6 shrink-0"
               style={{ filter: "brightness(0) invert(1)" }}
+              draggable={false}
             />
-            <h1 className="text-lg font-bold text-white">{currentGroup.name}</h1>
+            <h1 className="truncate text-lg font-bold text-white">{currentGroup.name}</h1>
           </div>
           <button
             className="w-10 h-10 flex items-center justify-center rounded-full"
@@ -110,16 +111,15 @@ export default function HeroCarousel() {
 
       {/* Dot indicators */}
       {showDots && (
-        <div className="flex justify-center gap-1.5 pb-4">
+        <div className="relative z-10 flex justify-center gap-1.5 pb-4">
           {slides.map((_, i) => (
             <button
               key={i}
               onClick={() => emblaApi?.scrollTo(i)}
               className={`rounded-full transition-all ${
-                i === activeIndex
-                  ? "w-6 h-2 bg-white"
-                  : "w-2 h-2 bg-white/50"
+                i === activeIndex ? "h-1.5 w-6" : "h-1.5 w-2"
               }`}
+              style={{ backgroundColor: "#FFFFFF", opacity: 1 }}
               aria-label={`Go to slide ${i + 1}`}
             />
           ))}

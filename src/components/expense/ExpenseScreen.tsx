@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { ArrowLeft, RotateCcw, Plus, Camera } from "lucide-react";
+import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from "react";
+import { ArrowLeft, RotateCcw, Plus, Camera, X, RefreshCw } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,6 +31,7 @@ export default function ExpenseScreen({
   editSplits,
   draftKey,
 }: ExpenseScreenProps) {
+  const SHEET_ANIM_MS = 300;
   const { currentGroup, user, profile, groupMembers, fetchExpenses, fetchExpenseSplits, addPlaceholderMember } = useApp();
   const { toast } = useToast();
   const [showAddMember, setShowAddMember] = useState(false);
@@ -49,6 +50,8 @@ export default function ExpenseScreen({
   const [prevAmount, setPrevAmount] = useState("0");
   const [shakeButton, setShakeButton] = useState(false);
   const [payerDrawerOpen, setPayerDrawerOpen] = useState(false);
+  const [sheetRendered, setSheetRendered] = useState(open);
+  const [sheetVisible, setSheetVisible] = useState(false);
 
   // Snapshot members when drawer opens
   const membersSnapshot = useRef<GroupMember[]>([]);
@@ -154,6 +157,19 @@ export default function ExpenseScreen({
       setCustomAmounts(new Map());
       setShakeButton(false);
     }
+  }, [open]);
+
+  // Animate this custom bottom sheet with the same easing as ui/drawer.
+  useEffect(() => {
+    if (open) {
+      setSheetVisible(false);
+      setSheetRendered(true);
+      const timer = setTimeout(() => setSheetVisible(true), 20);
+      return () => clearTimeout(timer);
+    }
+    setSheetVisible(false);
+    const timer = setTimeout(() => setSheetRendered(false), SHEET_ANIM_MS);
+    return () => clearTimeout(timer);
   }, [open]);
 
   // Persist draft to sessionStorage while the drawer is open (create mode only)
@@ -572,7 +588,7 @@ export default function ExpenseScreen({
     }
   };
 
-  if (!open) return null;
+  if (!sheetRendered) return null;
 
   const hasSelectedMembers = selectedMembers.length > 0;
   const slide2SaveActive = hasSelectedMembers && (splitMode === "equal" || isBalanced);
@@ -581,14 +597,17 @@ export default function ExpenseScreen({
     <div className="fixed inset-0 z-50 flex items-end justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className={`absolute inset-0 bg-black/80 transition-opacity duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          sheetVisible ? "opacity-100" : "opacity-0"
+        }`}
         onClick={() => onOpenChange(false)}
       />
 
-      {/* Drawer container */}
+      {/* Drawer container — match @/components/ui/drawer (Vaul) chrome */}
       <div
-        className="relative w-full max-w-[430px] rounded-t-[24px] overflow-hidden flex flex-col"
-        style={{ height: "85dvh", backgroundColor: "#EFEFEF" }}
+        className={`relative flex h-[85dvh] w-full max-w-[430px] flex-col overflow-hidden rounded-t-[10px] border bg-white transform-gpu transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          sheetVisible ? "translate-y-0" : "translate-y-full"
+        }`}
       >
         {/* Slide viewport */}
         <div className="flex-1 overflow-hidden min-h-0 relative">
@@ -601,39 +620,57 @@ export default function ExpenseScreen({
           >
             {/* ============ SLIDE 1: Amount Entry ============ */}
             <div className="w-1/2 h-full flex flex-col min-h-0 overflow-hidden">
-              {/* Drag handle */}
-              <div className="flex justify-center pt-3 pb-2 flex-shrink-0">
-                <div className="w-10 h-1 rounded-full bg-muted" />
-              </div>
+              {/* Drag handle — same pill as ui/drawer DrawerContent */}
+              <div className="mx-auto mb-2 mt-5 h-2 w-[100px] shrink-0 rounded-full bg-muted" />
 
-              {/* Headline */}
-              <div className="text-center px-6 flex-shrink-0 mt-2.5 mb-2.5">
-                <h2 className="font-sans text-xl font-bold text-foreground">
-                  What did{" "}
+              {/* Headline (+ camera aligned to this row) */}
+              <div className="flex-shrink-0 px-6 mt-2.5 mb-2.5">
+                <div className="flex items-center gap-2">
+                  <h2 className="min-w-0 flex-1 pl-1 text-left font-sans text-xl font-bold text-muted-foreground">
+                    What did{" "}
+                    <button
+                      onClick={() => {
+                        if (isEditMode) {
+                          toast({ title: "To change the payer, delete this expense and log a new one" });
+                          return;
+                        }
+                        setPayerDrawerOpen(true);
+                      }}
+                      className="font-extrabold underline decoration-dotted underline-offset-4 text-primary"
+                    >
+                      {payerMember?.user_id === user?.id ? "you" : payerMember?.name ?? "you"}
+                    </button>
+                    {" "}pay?
+                  </h2>
                   <button
-                    onClick={() => {
-                      if (isEditMode) {
-                        toast({ title: "To change the payer, delete this expense and log a new one" });
-                        return;
-                      }
-                      setPayerDrawerOpen(true);
-                    }}
-                    className="font-extrabold underline decoration-dotted underline-offset-4 text-primary"
+                    type="button"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EEE]"
+                    aria-label="Camera"
                   >
-                    {payerMember?.user_id === user?.id ? "you" : payerMember?.name ?? "you"}
+                    <Camera className="h-5 w-5 text-muted-foreground" />
                   </button>
-                  {" "}pay?
-                </h2>
+                </div>
                 {/* Description input */}
-                <div className="mt-2.5">
+                <div
+                  className="mt-2.5 flex h-[60px] w-full flex-row items-center gap-2 self-stretch rounded-[10px] bg-[#EEE] px-[10px] py-0 transition-colors focus-within:bg-[#DDD]"
+                >
                   <input
                     type="text"
                     value={description}
                     onChange={(e) => setDescription(e.target.value.slice(0, 50))}
                     placeholder="What is it? (e.g Ski Pass)"
-                    className="w-full px-4 py-3 rounded-xl text-sm font-medium text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    style={{ backgroundColor: "white", border: "1px solid #D4D4D4" }}
+                    className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left text-sm font-medium text-foreground placeholder:text-muted-foreground focus:outline-none"
                   />
+                  {description.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setDescription("")}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black/10 text-foreground/70 transition-colors hover:bg-black/15 hover:text-foreground"
+                      aria-label="Clear description"
+                    >
+                      <X className="h-3.5 w-3.5 stroke-[2.5]" />
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
@@ -644,9 +681,11 @@ export default function ExpenseScreen({
 
               {/* "I am covering for someone" */}
               <div className="text-center pb-2 flex-shrink-0">
-                <span className="text-xs font-medium text-muted-foreground inline-flex items-center gap-1.5 underline decoration-dotted underline-offset-4">
+                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground underline decoration-dotted underline-offset-4">
                   I am covering for someone
-                  <RotateCcw className="w-3 h-3" />
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <RotateCcw className="h-3 w-3" />
+                  </span>
                 </span>
               </div>
 
@@ -670,38 +709,80 @@ export default function ExpenseScreen({
             {/* ============ SLIDE 2: Split Configuration ============ */}
             <div className="w-1/2 h-full flex flex-col min-h-0 overflow-hidden">
               {/* Top bar with back arrow + drag handle */}
-              <div className="flex items-center px-4 pt-3 pb-1 flex-shrink-0">
+              <div className="flex flex-shrink-0 items-center px-6 pb-2 pt-5">
                 <button
+                  type="button"
                   onClick={goToSlide1}
-                  className="w-9 h-9 flex items-center justify-center rounded-full border border-border"
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EEE]"
                 >
-                  <ArrowLeft className="w-5 h-5 text-foreground" />
+                  <ArrowLeft className="h-5 w-5 text-muted-foreground" />
                 </button>
-                <div className="flex-1 flex justify-center">
-                  <div className="w-10 h-1 rounded-full bg-muted" />
+                <div className="flex flex-1 justify-center px-2">
+                  <div className="h-2 w-[100px] shrink-0 rounded-full bg-muted" />
                 </div>
                 <button
-                  className="w-9 h-9 flex items-center justify-center rounded-full bg-muted"
+                  type="button"
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EEE]"
                   aria-label="Camera"
                 >
-                  <Camera className="w-5 h-5 text-muted-foreground" />
+                  <Camera className="h-5 w-5 text-muted-foreground" />
                 </button>
               </div>
 
-              {/* Cost name label + Amount display */}
-              <div className="flex flex-col items-center justify-center gap-1 py-2 flex-shrink-0">
-                {description.trim() && (
-                  <span className="text-sm font-medium text-muted-foreground">
-                    {description.trim()}
-                  </span>
-                )}
+              {/* Amount display */}
+              <div className="flex flex-shrink-0 flex-col items-center justify-center pb-0 pt-2">
                 <AmountDisplay amount={amount} size="medium" />
               </div>
+
+              {splitMode === "custom" &&
+                (() => {
+                  const overBudget = remaining < -0.01;
+                  const unassigned = remaining > 0.01;
+                  const showButton = canDistribute && Math.abs(remaining) > 0.01 && totalNum > 0;
+
+                  const chipLayout =
+                    "inline-flex items-center justify-center rounded-full px-4 py-1.5 text-[13px] font-semibold leading-none";
+
+                  const wrap = (node: ReactNode) => (
+                    <div className="mb-2 flex shrink-0 justify-center px-4 pt-1">{node}</div>
+                  );
+
+                  if (showButton) {
+                    const buttonLabel = overBudget
+                      ? `Remove $${Math.abs(remaining).toFixed(2)}`
+                      : `Distribute $${remaining.toFixed(2)} with others`;
+                    return wrap(
+                      <button
+                        type="button"
+                        onClick={handleDistribute}
+                        className={`${chipLayout} gap-1.5 bg-primary/10 text-primary transition-transform active:scale-[0.96]`}
+                      >
+                        {buttonLabel}
+                        <RefreshCw className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} aria-hidden />
+                      </button>,
+                    );
+                  }
+
+                  if (isBalanced && totalNum > 0) return null;
+
+                  let statusText = "assign to everyone";
+                  let tone = "bg-muted text-muted-foreground";
+                  if (totalNum === 0) {
+                    statusText = "assign to everyone";
+                  } else if (overBudget) {
+                    statusText = `$${Math.abs(remaining).toFixed(2)} over total`;
+                    tone = "bg-destructive/10 text-destructive";
+                  } else if (unassigned) {
+                    statusText = `$${remaining.toFixed(2)} left to assign`;
+                    tone = "bg-primary/10 text-primary";
+                  }
+                  return wrap(<span className={`${chipLayout} ${tone}`}>{statusText}</span>);
+                })()}
 
               {/* Scrollable middle section */}
               <div className="flex-1 overflow-y-auto min-h-0">
                 {/* Split sentence */}
-                <div className="py-1">
+                <div className="pb-0 pt-2">
                   <SplitSentence
                     splitMode={splitMode}
                     onToggleMode={toggleMode}
@@ -740,77 +821,28 @@ export default function ExpenseScreen({
 
                 {/* Custom split rows */}
                 {splitMode === "custom" && (
-                  <div className="mt-1">
-                    {/* Status pill only — no duplicate amount display */}
-                    <div className="flex justify-center mb-2">
-                      {(() => {
-                        const overBudget = remaining < -0.01;
-                        const unassigned = remaining > 0.01;
-                        const showButton = canDistribute && Math.abs(remaining) > 0.01 && totalNum > 0;
-
-                        if (showButton) {
-                          const buttonLabel = overBudget
-                            ? `Remove $${Math.abs(remaining).toFixed(2)} →`
-                            : `Distribute $${remaining.toFixed(2)} →`;
-                          return (
-                            <button
-                              type="button"
-                              onClick={handleDistribute}
-                              className="px-4 py-1.5 rounded-full font-bold transition-transform active:scale-[0.96]"
-                              style={{
-                                background: "#FFF0E8",
-                                border: "1.5px solid rgba(217, 79, 0, 0.6)",
-                                color: "#D94F00",
-                                fontSize: "13px",
-                                fontWeight: 700,
-                              }}
-                            >
-                              {buttonLabel}
-                            </button>
-                          );
-                        }
-
-                        let statusText = "assign to everyone";
-                        let statusColor = "hsl(var(--muted-foreground))";
-                        if (totalNum === 0) {
-                          statusText = "assign to everyone";
-                        } else if (isBalanced) {
-                          statusText = "perfectly split";
-                          statusColor = "#22C55E";
-                        } else if (overBudget) {
-                          statusText = `$${Math.abs(remaining).toFixed(2)} over total`;
-                          statusColor = "#EF4444";
-                        } else if (unassigned) {
-                          statusText = `$${remaining.toFixed(2)} left to assign`;
-                        }
-                        return (
-                          <span className="text-xs font-semibold" style={{ color: statusColor }}>
-                            {statusText}
-                          </span>
-                        );
-                      })()}
-                    </div>
-                    <CustomSplitRows
-                      members={splitMembers}
-                      currentUserId={user?.id}
-                      customAmounts={customAmounts}
-                      focusedMemberId={focusedMemberId}
-                      shakeMemberId={shakeMemberId}
-                      onFocus={handleFocusRow}
-                      visible
-                    />
-                  </div>
+                  <CustomSplitRows
+                    members={splitMembers}
+                    currentUserId={user?.id}
+                    customAmounts={customAmounts}
+                    focusedMemberId={focusedMemberId}
+                    shakeMemberId={shakeMemberId}
+                    onFocus={handleFocusRow}
+                    visible
+                  />
                 )}
               </div>
 
-              {/* "I am covering for someone" */}
-              <div className="text-center pb-1 flex-shrink-0">
-                <span className="text-xs font-medium text-muted-foreground inline-flex items-center gap-1.5 underline decoration-dotted underline-offset-4">
-                  I am covering for someone
-                  <RotateCcw className="w-3 h-3" />
-                </span>
-              </div>
-
+              {splitMode === "equal" && (
+                <div className="flex-shrink-0 pb-1 text-center">
+                  <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground underline decoration-dotted underline-offset-4">
+                    I am covering for someone
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <RotateCcw className="h-3 w-3" />
+                    </span>
+                  </span>
+                </div>
+              )}
 
               {/* Save button */}
               <div className="flex-shrink-0">

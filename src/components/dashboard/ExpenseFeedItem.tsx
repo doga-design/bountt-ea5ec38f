@@ -72,7 +72,7 @@ function StackedAvatars({
         </div>
       ))}
       {overflow > 0 && (
-        <span className="text-xs text-muted-foreground ml-1 font-medium">
+        <span className="text-sm text-muted-foreground ml-1 font-medium">
           +{overflow}
         </span>
       )}
@@ -224,24 +224,24 @@ export default function ExpenseFeedItem({
   // --- Amount text ---
   const amountText = `$${formatAmount(displayAmount)}`;
   const totalText = showTotal ? `/$${formatAmount(expense.amount)}` : "";
-  const amountLength = amountText.length;
-  const amountSizeClass =
-    amountLength >= 7 ? "text-base" : amountLength >= 5 ? "text-lg" : "text-xl";
+  const mutedClass = isMuted ? "opacity-60 grayscale" : "";
 
   return (
     <div
       onClick={onClick}
-      className="flex items-center gap-3 py-5 px-4 cursor-pointer active:opacity-80 transition-opacity"
+      className="flex items-start gap-3 py-5 cursor-pointer active:opacity-80 transition-opacity"
     >
       {/* LEFT: payer avatar + info */}
-      <div className="flex items-start gap-3 flex-1 min-w-0">
+      <div className={`flex items-start gap-3 flex-1 min-w-0 ${mutedClass}`}>
         <Avatar member={payerMember} size={56} />
         <div className="min-w-0 flex-1">
           <p className="text-sm text-muted-foreground">
-            <span className={`font-medium text-foreground ${isPayer ? "font-bold" : ""}`}>{payerName}</span>
+            <span className={`font-medium text-foreground ${isPayer ? "font-bold" : ""}`}>
+              {payerName}
+            </span>
             <span className="ml-1">paid ${formatAmount(expense.amount)}</span>
           </p>
-          <p className="font-extrabold text-base text-foreground truncate max-w-[220px]">
+          <p className="font-bold text-base text-foreground truncate max-w-[210px]">
             {expense.description}
           </p>
         </div>
@@ -249,28 +249,22 @@ export default function ExpenseFeedItem({
 
       {/* RIGHT: label + avatars + amount */}
       <div
-        className={`flex flex-col items-end flex-shrink-0 max-w-[140px] ${
-          isMuted ? "opacity-40" : ""
-        }`}
+        className={`flex flex-col items-end flex-shrink-0 max-w-[140px] ${mutedClass}`}
       >
-        <span className="text-[11px] text-muted-foreground font-normal mb-1 text-right leading-tight">
+        <span className="text-sm text-muted-foreground font-normal mb-1 text-right leading-tight">
           {label}
         </span>
+        <div className="mb-1 flex items-baseline justify-end gap-0">
+          <span className="font-bold text-base text-foreground">{amountText}</span>
+          {totalText && (
+            <span className="text-sm text-muted-foreground font-normal">{totalText}</span>
+          )}
+        </div>
         {rightAvatarMembers.length > 0 && (
-          <div className="mb-1">
+          <div>
             <StackedAvatars members={rightAvatarMembers} size={28} />
           </div>
         )}
-        <div className="flex items-baseline gap-0">
-          <span className={`font-bold text-foreground ${amountSizeClass}`}>
-            {amountText}
-          </span>
-          {totalText && (
-            <span className="text-sm text-muted-foreground font-normal">
-              {totalText}
-            </span>
-          )}
-        </div>
       </div>
     </div>
   );

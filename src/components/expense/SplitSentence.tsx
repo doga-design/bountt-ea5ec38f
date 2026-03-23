@@ -1,4 +1,5 @@
 import { Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { GroupMember } from "@/types";
 import { getAvatarColor, getAvatarImage } from "@/lib/avatar-utils";
 import {
@@ -46,7 +47,7 @@ export default function SplitSentence({
     const isYou = member.user_id === currentUserId;
     const label = isYou ? "you" : member.name;
     return (
-      <span key={member.id} className={`text-foreground ${isYou ? "font-bold" : "font-bold"}`}>
+      <span key={member.id} className="font-bold text-foreground">
         {label}
       </span>
     );
@@ -82,7 +83,12 @@ export default function SplitSentence({
 
   return (
     <>
-      <p className="text-center text-sm font-semibold text-muted-foreground px-6">
+      <p
+        className={cn(
+          "mx-auto max-w-[300px] px-6 text-center text-lg font-semibold leading-tight text-muted-foreground",
+          splitMode === "custom" ? "mb-2" : "mb-6",
+        )}
+      >
         <button
           onClick={() => {
             if (hidePayerDrawer) return;
@@ -95,8 +101,7 @@ export default function SplitSentence({
         {" paid, splitting "}
         <button
           onClick={onToggleMode}
-          className="font-extrabold underline decoration-dotted underline-offset-4"
-          style={{ color: isEqual ? "#D94F00" : "#2563EB" }}
+          className="font-extrabold text-primary underline decoration-dotted underline-offset-4"
         >
           {isEqual ? "equally" : "custom"}
         </button>{" "}
