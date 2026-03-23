@@ -121,7 +121,11 @@ export default function NetBalanceSlide({ netBalance, totalOwedToYou, totalYouOw
     : "";
 
   return (
-    <div className="flex flex-col justify-center px-6 py-5 min-h-[190px] relative">
+    <div
+      className={`relative flex flex-col justify-center px-6 ${
+        showActionRow ? "py-5" : "py-3"
+      }`}
+    >
       {/* Badge */}
       <div className="mb-2">
         <span className="inline-block text-white text-xs font-semibold">
