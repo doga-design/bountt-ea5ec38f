@@ -29,7 +29,7 @@ import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
 
-const ProtectedDesktop = ({ children }: { children: ReactNode }) => (
+const Protected = ({ children }: { children: ReactNode }) => (
   <AuthGuard>
     <DesktopShell>{children}</DesktopShell>
   </AuthGuard>
@@ -49,28 +49,19 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
-              
 
-              {/* Empty Groups */}
-              <Route path="/groups/empty" element={<AuthGuard><EmptyGroups /></AuthGuard>} />
-              <Route path="/profile" element={<ProtectedDesktop><Profile /></ProtectedDesktop>} />
-
-              {/* Protected — Onboarding */}
-              <Route path="/onboarding/group-name" element={<AuthGuard><GroupName /></AuthGuard>} />
-              <Route path="/onboarding/invite" element={<AuthGuard><Invite /></AuthGuard>} />
-
-              {/* Protected — Join */}
-              <Route path="/join" element={<AuthGuard><Join /></AuthGuard>} />
-              <Route path="/join/:inviteCode" element={<AuthGuard><Join /></AuthGuard>} />
-
-              {/* Protected — Dashboard */}
-              <Route path="/dashboard/:groupId" element={<ProtectedDesktop><Dashboard /></ProtectedDesktop>} />
-
-              {/* Protected — Phase 2 stubs */}
-              <Route path="/groups" element={<ProtectedDesktop><Groups /></ProtectedDesktop>} />
-              <Route path="/groups/:groupId/members" element={<AuthGuard><ComingSoon title="Members — Phase 2" /></AuthGuard>} />
-              <Route path="/groups/:groupId/settings" element={<ProtectedDesktop><GroupSettings /></ProtectedDesktop>} />
-              <Route path="/groups/:groupId/activity" element={<ProtectedDesktop><ActivityLog /></ProtectedDesktop>} />
+              {/* All protected routes — desktop gate applied universally */}
+              <Route path="/groups/empty" element={<Protected><EmptyGroups /></Protected>} />
+              <Route path="/profile" element={<Protected><Profile /></Protected>} />
+              <Route path="/onboarding/group-name" element={<Protected><GroupName /></Protected>} />
+              <Route path="/onboarding/invite" element={<Protected><Invite /></Protected>} />
+              <Route path="/join" element={<Protected><Join /></Protected>} />
+              <Route path="/join/:inviteCode" element={<Protected><Join /></Protected>} />
+              <Route path="/dashboard/:groupId" element={<Protected><Dashboard /></Protected>} />
+              <Route path="/groups" element={<Protected><Groups /></Protected>} />
+              <Route path="/groups/:groupId/members" element={<Protected><ComingSoon title="Members — Phase 2" /></Protected>} />
+              <Route path="/groups/:groupId/settings" element={<Protected><GroupSettings /></Protected>} />
+              <Route path="/groups/:groupId/activity" element={<Protected><ActivityLog /></Protected>} />
 
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />

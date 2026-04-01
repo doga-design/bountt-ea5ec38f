@@ -9,7 +9,7 @@ interface DesktopShellProps {
 }
 
 export default function DesktopShell({ children }: DesktopShellProps) {
-  const [isDesktop, setIsDesktop] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
   const [modalVisible, setModalVisible] = useState(true);
 
   useEffect(() => {
