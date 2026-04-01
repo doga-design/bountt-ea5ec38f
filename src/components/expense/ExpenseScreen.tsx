@@ -582,7 +582,7 @@ export default function ExpenseScreen({
 
         await fetchExpenseSplits(currentGroup.id);
 
-        if (expenses.length === 0) {
+        if (wasFirstExpenseRef.current) {
           onFirstExpenseCreated?.();
         }
 
