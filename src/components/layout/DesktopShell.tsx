@@ -68,7 +68,7 @@ export default function DesktopShell({ children }: DesktopShellProps) {
               type="button"
               aria-label="Close"
               onClick={() => {
-                window.location.href = "https://www.bountt.com";
+                window.location.href = "https://bountt.com/";
               }}
               style={{
                 position: "absolute",
