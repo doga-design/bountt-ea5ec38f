@@ -59,6 +59,9 @@ export default function ExpenseScreen({
   // Snapshot members when drawer opens
   const membersSnapshot = useRef<GroupMember[]>([]);
 
+  // Snapshot whether this is the first expense (captured at open time)
+  const wasFirstExpenseRef = useRef(false);
+
   // Fires fireMemberAdded exactly once per session
   const hasAddedFirstMemberRef = useRef(false);
 
