@@ -48,8 +48,8 @@ export default function Groups() {
   }
 
   return (
-    <div className="screen-container bg-background">
-      <div className="flex-1 px-5 pt-8 pb-24">
+    <div className="screen-container bg-background lg:h-full lg:min-h-0 lg:max-h-none">
+      <div className="component-max flex-1 px-5 pb-24 pt-8 lg:max-w-4xl lg:pb-8">
         <h1 className="text-2xl font-bold text-foreground mb-6">Your Groups</h1>
 
         {/* Group cards */}
@@ -118,10 +118,12 @@ export default function Groups() {
           </button>
         </div>
       </div>
-      <BottomNav onFabPress={() => {
-        const lastGroupId = localStorage.getItem("bountt_last_group_id") || userGroups[0]?.id;
-        if (lastGroupId) navigate(`/dashboard/${lastGroupId}`);
-      }} />
+      <div className="lg:hidden">
+        <BottomNav onFabPress={() => {
+          const lastGroupId = localStorage.getItem("bountt_last_group_id") || userGroups[0]?.id;
+          if (lastGroupId) navigate(`/dashboard/${lastGroupId}`);
+        }} />
+      </div>
     </div>
   );
 }

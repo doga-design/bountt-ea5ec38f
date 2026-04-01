@@ -1,5 +1,6 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { fireFirstCost, fireFirstSettle } from "@/lib/confetti-utils";
 import { ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useApp } from "@/contexts/AppContext";
@@ -33,6 +34,12 @@ export default function Dashboard() {
     groupsLoading,
   } = useApp();
 
+  // Confetti refs — in-memory per session, no DB tracking needed
+  const pendingFirstCostRef = useRef(false);
+  const hasFirstCostFiredRef = useRef(false);
+  const pendingSettlementRef = useRef(false);
+  const hasFirstSettleFiredRef = useRef(false);
+
   // Auto-restore expense sheet if a draft was in progress before remount
   const draftKey = user?.id && groupId ? `expense_draft_${groupId}_${user.id}` : null;
   const sheetMarkerKey = user?.id && groupId ? `expense_sheet_open_${groupId}_${user.id}` : null;
@@ -58,6 +65,15 @@ export default function Dashboard() {
 
   const handleDetailOpenChange = useCallback((open: boolean) => {
     if (!open) {
+      if (pendingSettlementRef.current && !hasFirstSettleFiredRef.current) {
+        pendingSettlementRef.current = false;
+        hasFirstSettleFiredRef.current = true;
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            fireFirstSettle();
+          });
+        });
+      }
       setDetailExpenseId(null);
     }
   }, []);
@@ -135,7 +151,7 @@ export default function Dashboard() {
   const mode = !hasOtherMembers ? "empty" : !hasExpenses ? "prompt" : "normal";
 
   return (
-    <div className="screen-container">
+    <div className="screen-container lg:h-full lg:min-h-0 lg:max-h-none">
       {!groupReady || isLoading ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
@@ -172,7 +188,7 @@ export default function Dashboard() {
                 />
               </div>
 
-              <div className="flex-1 px-4 py-4 space-y-4 pb-24">
+              <div className="flex-1 space-y-4 px-4 py-4 pb-24 lg:mx-auto lg:w-full lg:max-w-3xl lg:pb-8">
                 {unsettledGroups.map((group, idx) => (
                   <div key={group.label}>
                     {idx > 0 && <div className="border-t border-border mb-3" />}
@@ -217,7 +233,9 @@ export default function Dashboard() {
                 )}
               </div>
 
-              <BottomNav onFabPress={() => setSheetOpen(true)} />
+              <div className="lg:hidden">
+                <BottomNav onFabPress={() => setSheetOpen(true)} />
+              </div>
 
               <ExpenseDetailSheet
                 open={detailOpen}
@@ -225,7 +243,11 @@ export default function Dashboard() {
                 expense={detailExpense}
                 splits={expenseSplits}
                 groupMembers={groupMembers}
-                
+                onSettlementComplete={() => {
+                  if (!hasFirstSettleFiredRef.current) {
+                    pendingSettlementRef.current = true;
+                  }
+                }}
                 onEdit={(exp, splits) => {
                   setEditExpense(exp);
                   setEditSplits(splits);
@@ -250,9 +272,23 @@ export default function Dashboard() {
             }
           }
           if (!o) {
+            if (pendingFirstCostRef.current && !hasFirstCostFiredRef.current) {
+              pendingFirstCostRef.current = false;
+              hasFirstCostFiredRef.current = true;
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  fireFirstCost();
+                });
+              });
+            }
             setEditExpense(undefined);
             setEditSplits(undefined);
             if (draftKey) sessionStorage.removeItem(draftKey);
+          }
+        }}
+        onFirstExpenseCreated={() => {
+          if (!hasFirstCostFiredRef.current) {
+            pendingFirstCostRef.current = true;
           }
         }}
         editExpense={editExpense}

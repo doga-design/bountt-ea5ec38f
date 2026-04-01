@@ -1,7 +1,5 @@
-import { Home, Layers } from "lucide-react";
+import { Home, Layers, Plus } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useApp } from "@/contexts/AppContext";
-import { getBackgroundSrc } from "@/lib/background-utils";
 
 interface BottomNavProps {
   onFabPress: () => void;
@@ -10,14 +8,14 @@ interface BottomNavProps {
 export default function BottomNav({ onFabPress }: BottomNavProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentGroup } = useApp();
   const isHome = location.pathname.startsWith("/dashboard");
   const isGroups = location.pathname === "/groups";
 
-  const fabBgSrc = getBackgroundSrc(currentGroup?.banner_gradient ?? "");
-
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[49] bg-card border-t border-border px-12 pb-5 pt-4">
+    <div
+      className="fixed bottom-0 left-1/2 z-[49] w-full -translate-x-1/2 bg-card px-12 pb-5 pt-4 shadow-[rgba(50,50,93,0.25)_0px_50px_100px_-20px,rgba(0,0,0,0.3)_0px_30px_60px_-30px] sm:bottom-24 sm:rounded-full"
+      style={{ maxWidth: "min(var(--app-frame-width), var(--component-max-width))" }}
+    >
       <div className="flex items-center justify-between">
         {/* Home */}
         <button
@@ -36,15 +34,10 @@ export default function BottomNav({ onFabPress }: BottomNavProps) {
         {/* FAB */}
         <button
           onClick={onFabPress}
-          className="relative bottom-4 w-16 h-16 -mt-8 border-4 border-white rounded-full text-white flex items-center justify-center shadow-[0_8px_10px_rgba(0,0,0,0.15)] active:scale-90 transition-transform overflow-hidden"
-          style={{
-            backgroundImage: `url(${fabBgSrc})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
+          className="bottom-nav-fab relative -mt-8 rounded-full border-4 border-white bg-primary text-primary-foreground shadow-[0_8px_10px_rgba(0,0,0,0.15)] transition-transform active:scale-90"
           aria-label="Add expense"
         >
-          <span className="font-bringbold text-6xl leading-none">+</span>
+          <Plus className="bottom-nav-fab-icon mx-auto stroke-[3]" />
         </button>
 
         {/* All Groups */}

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { lovable } from "@/integrations/lovable/index";
 import { useToast } from "@/hooks/use-toast";
 import { useApp } from "@/contexts/AppContext";
@@ -40,27 +40,25 @@ export default function Auth() {
   if (user && !authLoading) return null;
 
   return (
-    <div className="screen-container bg-background relative h-[100svh] max-h-[100svh] min-h-0 overflow-hidden">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute left-1/2 z-0 h-[500px] w-[500px] -translate-x-1/2 rounded-full -bottom-[330px] blur-[50px]"
-        style={{
-          background:
-            "radial-gradient(circle at center, rgb(255, 228, 118) 0%, rgb(255, 238, 166) 28%, rgba(255, 238, 166, 0.62) 52%, rgba(255, 238, 166, 0.2) 72%, rgba(255, 238, 166, 0) 100%)",
-        }}
-      />
+    <div className="auth-page-root bg-background">
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden>
+        <div className="auth-ambient-glow-wrap">
+          <div className="auth-ambient-glow-blob" />
+        </div>
+      </div>
       <FloatingIcons />
-      <div className="relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center px-6">
+      <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-hidden px-6">
         <div className="w-full max-w-sm flex flex-col items-center">
           <img src={authLogoImg} alt="" className="w-[46px] h-[48px] mb-4" />
           <h1 className="bountt-wordmark text-5xl text-primary mb-1">bountt.</h1>
 
-          <p className="text-muted-foreground text-base font-medium mb-10">Split costs with friends. No drama.</p>
+          <p className="text-muted-foreground text-base font-medium mb-6">Split costs with friends. No drama.</p>
 
           <button
             type="button"
             onClick={handleGoogle}
-            className="w-[340px] h-[60px] bg-card rounded-full px-5 py-4 shadow-lg flex items-center justify-center gap-3 font-semibold text-foreground text-base active:scale-[0.98] transition-transform"
+            className="w-[340px] h-[60px] bg-card rounded-full px-5 py-4 flex items-center justify-center gap-3 font-semibold text-foreground text-base active:scale-[0.98] transition-transform"
+            style={{ boxShadow: "rgba(0, 0, 0, 0.25) 0px 25px 50px -12px" }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0">
               <path
@@ -82,26 +80,15 @@ export default function Auth() {
             </svg>
             Continue with Google
           </button>
-
-          <p className="text-xs text-muted-foreground text-center mt-5 leading-relaxed max-w-[280px]">
+          <p className="text-xs text-muted-foreground text-center mt-8 leading-relaxed max-w-[280px]">
             By continuing you agree to our{" "}
-            <a
-              href="https://bountt.app/terms"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2"
-            >
+            <Link to="/terms" className="underline underline-offset-2">
               Terms of Service
-            </a>{" "}
+            </Link>{" "}
             and{" "}
-            <a
-              href="https://bountt.app/privacy"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2"
-            >
+            <Link to="/privacy" className="underline underline-offset-2">
               Privacy Policy
-            </a>
+            </Link>
           </p>
         </div>
       </div>

@@ -510,7 +510,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       splitsChannelRef.current?.unsubscribe();
       return;
     }
-
     expensesChannelRef.current = supabase
       .channel(`expenses:${currentGroup.id}`)
       .on(
