@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { distributeCents } from "@/lib/bountt-utils";
 import { GroupMember, Expense, ExpenseSplit } from "@/types";
+import { fireMemberAdded } from "@/lib/confetti-utils";
 
 import AmountDisplay from "./AmountDisplay";
 import SplitSentence from "./SplitSentence";
@@ -22,6 +23,7 @@ interface ExpenseScreenProps {
   editSplits?: ExpenseSplit[];
   /** sessionStorage key for persisting in-progress draft (create mode only) */
   draftKey?: string | null;
+  onFirstExpenseCreated?: () => void;
 }
 
 export default function ExpenseScreen({
@@ -30,9 +32,10 @@ export default function ExpenseScreen({
   editExpense,
   editSplits,
   draftKey,
+  onFirstExpenseCreated,
 }: ExpenseScreenProps) {
   const SHEET_ANIM_MS = 300;
-  const { currentGroup, user, profile, groupMembers, fetchExpenses, fetchExpenseSplits, addPlaceholderMember } = useApp();
+  const { currentGroup, user, profile, groupMembers, expenses, fetchExpenses, fetchExpenseSplits, addPlaceholderMember } = useApp();
   const { toast } = useToast();
   const [showAddMember, setShowAddMember] = useState(false);
 
@@ -55,6 +58,9 @@ export default function ExpenseScreen({
 
   // Snapshot members when drawer opens
   const membersSnapshot = useRef<GroupMember[]>([]);
+
+  // Fires fireMemberAdded exactly once per session
+  const hasAddedFirstMemberRef = useRef(false);
 
   const isEditMode = !!editExpense;
 
@@ -571,6 +577,10 @@ export default function ExpenseScreen({
 
         await fetchExpenseSplits(currentGroup.id);
 
+        if (expenses.length === 0) {
+          onFirstExpenseCreated?.();
+        }
+
         toast({ title: "Expense added" });
       }
 
@@ -605,9 +615,10 @@ export default function ExpenseScreen({
 
       {/* Drawer container — match @/components/ui/drawer (Vaul) chrome */}
       <div
-        className={`relative flex h-[85dvh] w-full max-w-[430px] flex-col overflow-hidden rounded-t-[10px] border bg-white transform-gpu transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        className={`relative flex h-[85dvh] w-full flex-col overflow-hidden rounded-t-[10px] border bg-white transform-gpu transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           sheetVisible ? "translate-y-0" : "translate-y-full"
         }`}
+        style={{ maxWidth: "var(--app-frame-width)" }}
       >
         {/* Slide viewport */}
         <div className="flex-1 overflow-hidden min-h-0 relative">
@@ -876,6 +887,10 @@ export default function ExpenseScreen({
           if (member) {
             membersSnapshot.current = [...membersSnapshot.current, member];
             setActiveIds((prev) => new Set([...prev, member.id]));
+            if (!hasAddedFirstMemberRef.current) {
+              hasAddedFirstMemberRef.current = true;
+              fireMemberAdded();
+            }
           }
         }}
       />

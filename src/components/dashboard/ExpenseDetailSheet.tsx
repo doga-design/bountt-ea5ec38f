@@ -20,6 +20,7 @@ interface ExpenseDetailSheetProps {
   splits: ExpenseSplit[];
   groupMembers: GroupMember[];
   onEdit: (expense: Expense, splits: ExpenseSplit[]) => void;
+  onSettlementComplete?: () => void;
 }
 
 /* ───────────────────────── Fixed heights for stable layout ───────────────────────── */
@@ -31,6 +32,7 @@ export default function ExpenseDetailSheet({
   splits,
   groupMembers,
   onEdit,
+  onSettlementComplete,
 }: ExpenseDetailSheetProps) {
   const { user, profile, currentGroup, fetchExpenses, fetchExpenseSplits } = useApp();
   const { toast } = useToast();
@@ -70,9 +72,12 @@ export default function ExpenseDetailSheet({
   // Auto-close on full settlement — transition detection
   // Snapshot whether expense was already settled when the drawer opened
   const settledAtOpenRef = useRef(false);
+  // Tracks whether the current user triggered the settlement (guards confetti)
+  const userDidSettleRef = useRef(false);
   useEffect(() => {
     if (open) {
       settledAtOpenRef.current = expenseFullySettled;
+      userDidSettleRef.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -81,12 +86,15 @@ export default function ExpenseDetailSheet({
     // Only auto-close if it transitioned from unsettled→settled while open
     if (open && expenseFullySettled && !settledAtOpenRef.current) {
       settledAtOpenRef.current = true; // prevent re-trigger
+      if (userDidSettleRef.current) {
+        onSettlementComplete?.();
+      }
       const timer = setTimeout(() => {
         onOpenChange(false);
       }, 800);
       return () => clearTimeout(timer);
     }
-  }, [open, expenseFullySettled, onOpenChange]);
+  }, [open, expenseFullySettled, onOpenChange, onSettlementComplete]);
 
   // Build subtitle
   const selfMember = groupMembers.find((m) => m.user_id === user?.id && m.status === "active");
@@ -216,6 +224,7 @@ export default function ExpenseDetailSheet({
     try {
       const { error } = await supabase.rpc("settle_my_share", { p_expense_id: expense.id });
       if (error) throw error;
+      userDidSettleRef.current = true;
       await Promise.all([fetchExpenses(currentGroup.id), fetchExpenseSplits(currentGroup.id)]);
       toast({ title: "Share settled" });
     } catch (err) {
@@ -234,6 +243,7 @@ export default function ExpenseDetailSheet({
         p_split_id: splitId,
       });
       if (error) throw error;
+      userDidSettleRef.current = true;
       await Promise.all([fetchExpenses(currentGroup.id), fetchExpenseSplits(currentGroup.id)]);
       setConfirmSplit(null);
       toast({ title: "Share settled" });
@@ -250,6 +260,7 @@ export default function ExpenseDetailSheet({
     try {
       const { error } = await supabase.rpc("settle_all", { p_expense_id: expense.id });
       if (error) throw error;
+      userDidSettleRef.current = true;
       await Promise.all([fetchExpenses(currentGroup.id), fetchExpenseSplits(currentGroup.id)]);
       toast({ title: "Expense fully settled" });
     } catch (err) {

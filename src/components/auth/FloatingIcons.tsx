@@ -156,7 +156,7 @@ const ICONS: IconConfig[] = [
 
 export default function FloatingIcons() {
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-[min(46vh,340px)]">
+    <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-[min(46vh,340px)] lg:left-1/2 lg:right-auto lg:w-[420px] lg:-translate-x-1/2">
       {ICONS.map(({ Icon, anim, className, opacity }, i) => (
         <div key={i} className={`absolute ${className}`} style={{ opacity }}>
           <div className={`h-full w-full ${anim}`}>
