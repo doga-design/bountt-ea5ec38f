@@ -59,6 +59,9 @@ export default function ExpenseScreen({
   // Snapshot members when drawer opens
   const membersSnapshot = useRef<GroupMember[]>([]);
 
+  // Snapshot whether this is the first expense (captured at open time)
+  const wasFirstExpenseRef = useRef(false);
+
   // Fires fireMemberAdded exactly once per session
   const hasAddedFirstMemberRef = useRef(false);
 
@@ -80,6 +83,8 @@ export default function ExpenseScreen({
     if (open) {
       // Snapshot members
       membersSnapshot.current = [...groupMembers];
+      // Snapshot whether this will be the first expense
+      wasFirstExpenseRef.current = expenses.length === 0;
 
       const members = groupMembers
         .filter((m) => m.status === "active")
@@ -577,7 +582,7 @@ export default function ExpenseScreen({
 
         await fetchExpenseSplits(currentGroup.id);
 
-        if (expenses.length === 0) {
+        if (wasFirstExpenseRef.current) {
           onFirstExpenseCreated?.();
         }
 
