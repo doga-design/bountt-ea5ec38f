@@ -83,6 +83,8 @@ export default function ExpenseScreen({
     if (open) {
       // Snapshot members
       membersSnapshot.current = [...groupMembers];
+      // Snapshot whether this will be the first expense
+      wasFirstExpenseRef.current = expenses.length === 0;
 
       const members = groupMembers
         .filter((m) => m.status === "active")
